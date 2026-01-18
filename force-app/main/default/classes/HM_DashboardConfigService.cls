@@ -67,58 +67,8 @@ public with sharing class HM_DashboardConfigService {
         throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_DASHBOARD);
       }
 
-      HM_Dashboard__c dashboard;
-
       // Try to find by ID first, then by Name
-      if (String.isNotBlank(dashboardIdOrName)) {
-        if (
-          dashboardIdOrName.length() == SALESFORCE_ID_LENGTH_15 ||
-          dashboardIdOrName.length() == SALESFORCE_ID_LENGTH_18
-        ) {
-          // Looks like an ID
-          dashboard = [
-            SELECT
-              Id,
-              Name,
-              HM_Description__c,
-              HM_Active__c,
-              HM_Display_Order__c,
-              HM_Show_New_Opportunity_Action__c,
-              HM_Show_New_Case_Action__c,
-              HM_Show_Schedule_Meeting_Action__c,
-              HM_Show_New_Account_Action__c,
-              HM_Custom_Actions_Configuration__c,
-              HM_Show_Actions_Menu__c,
-              HM_Default_Dark_Mode__c,
-              HM_Enable_Dark_Mode__c
-            FROM HM_Dashboard__c
-            WHERE Id = :dashboardIdOrName AND HM_Active__c = TRUE
-            LIMIT 1
-          ];
-        } else {
-          // Treat as Name
-          dashboard = [
-            SELECT
-              Id,
-              Name,
-              HM_Description__c,
-              HM_Active__c,
-              HM_Display_Order__c,
-              HM_Show_New_Opportunity_Action__c,
-              HM_Show_New_Case_Action__c,
-              HM_Show_Schedule_Meeting_Action__c,
-              HM_Show_New_Account_Action__c,
-              HM_Custom_Actions_Configuration__c,
-              HM_Show_Actions_Menu__c,
-              HM_Default_Dark_Mode__c,
-              HM_Enable_Dark_Mode__c
-            FROM HM_Dashboard__c
-            WHERE Name = :dashboardIdOrName AND HM_Active__c = TRUE
-            LIMIT 1
-          ];
-        }
-      }
-
+      HM_Dashboard__c dashboard = findDashboardByIdOrName(dashboardIdOrName);
       if (dashboard == null) {
         return null;
       }
@@ -284,6 +234,10 @@ public with sharing class HM_DashboardConfigService {
 
       // Build dynamic SOQL query based on field existence and accessibility
       List<String> queryFields = buildComponentQueryFields();
+      if (queryFields.isEmpty()) {
+        throw new AuraHandledException('No accessible fields found for HM_Dashboard_Component__c');
+      }
+
       String soqlQuery = 'SELECT ' + String.join(queryFields, ', ') + 
         ' FROM HM_Dashboard_Component__c' +
         ' WHERE Id = :componentId AND HM_Active__c = TRUE' +
@@ -370,6 +324,43 @@ public with sharing class HM_DashboardConfigService {
   // ==================== HELPER METHODS ====================
 
   /**
+   * @description Find dashboard by ID or Name
+   * @param dashboardIdOrName Dashboard ID (15 or 18 chars) or Name
+   * @return HM_Dashboard__c Dashboard record, or null if not found
+   */
+  private static HM_Dashboard__c findDashboardByIdOrName(String dashboardIdOrName) {
+    if (String.isBlank(dashboardIdOrName)) {
+      return null;
+    }
+
+    Boolean isId = dashboardIdOrName.length() == SALESFORCE_ID_LENGTH_15 ||
+                   dashboardIdOrName.length() == SALESFORCE_ID_LENGTH_18;
+
+    List<String> fields = new List<String>{
+      'Id', 'Name', 'HM_Description__c', 'HM_Active__c', 'HM_Display_Order__c',
+      'HM_Show_New_Opportunity_Action__c', 'HM_Show_New_Case_Action__c',
+      'HM_Show_Schedule_Meeting_Action__c', 'HM_Show_New_Account_Action__c',
+      'HM_Custom_Actions_Configuration__c', 'HM_Show_Actions_Menu__c',
+      'HM_Default_Dark_Mode__c', 'HM_Enable_Dark_Mode__c'
+    };
+
+    String query = 'SELECT ' + String.join(fields, ', ') +
+                   ' FROM HM_Dashboard__c' +
+                   ' WHERE HM_Active__c = TRUE';
+
+    if (isId) {
+      query += ' AND Id = :dashboardIdOrName';
+    } else {
+      query += ' AND Name = :dashboardIdOrName';
+    }
+
+    query += ' LIMIT 1';
+
+    List<HM_Dashboard__c> dashboards = Database.query(query);
+    return dashboards.isEmpty() ? null : dashboards[0];
+  }
+
+  /**
    * @description Build map from Dashboard record for API response
    * @param dashboard Dashboard SObject record
    * @return Map<String, Object> Dashboard configuration map with camelCase keys
@@ -423,25 +414,15 @@ public with sharing class HM_DashboardConfigService {
     mapData.put('active', component.HM_Active__c);
     
     // Only set iconName if field exists and has value
-    try {
-      String iconName = (String) component.get('HM_Icon_Name__c');
-      mapData.put('iconName', String.isNotBlank(iconName) ? iconName : null);
-    } catch (Exception ex) {
-      // Field doesn't exist - set to null
-      mapData.put('iconName', null);
-    }
+    String iconName = getFieldValueSafely(component, 'HM_Icon_Name__c');
+    mapData.put('iconName', String.isNotBlank(iconName) ? iconName : null);
     
     // Only set rowIconConfiguration if field exists and has value
-    try {
-      String rowIconConfig = (String) component.get('HM_Row_Icon_Configuration__c');
-      if (String.isNotBlank(rowIconConfig)) {
-        Map<String, String> iconMap = parseRowIconConfiguration(rowIconConfig);
-        mapData.put('rowIconConfiguration', iconMap);
-      } else {
-        mapData.put('rowIconConfiguration', null);
-      }
-    } catch (Exception ex) {
-      // Field doesn't exist - set to null
+    String rowIconConfig = getFieldValueSafely(component, 'HM_Row_Icon_Configuration__c');
+    if (String.isNotBlank(rowIconConfig)) {
+      Map<String, String> iconMap = parseRowIconConfiguration(rowIconConfig);
+      mapData.put('rowIconConfiguration', iconMap);
+    } else {
       mapData.put('rowIconConfiguration', null);
     }
     
@@ -496,54 +477,96 @@ public with sharing class HM_DashboardConfigService {
     
     String trimmed = configString.trim();
     
-    // Check if it's JSON format (starts with {)
+    // Try JSON format first
     if (trimmed.startsWith('{')) {
-      try {
-        Map<String, Object> jsonMap = (Map<String, Object>) JSON.deserializeUntyped(trimmed);
-        for (String key : jsonMap.keySet()) {
-          Object value = jsonMap.get(key);
-          if (value != null && value instanceof String) {
-            String iconName = (String) value;
-            if (String.isNotBlank(iconName)) {
-              iconMap.put(key, iconName);
-            }
-          }
-        }
-        return iconMap;
-      } catch (Exception ex) {
-        // JSON parsing failed - fall through to comma-separated parsing
+      Map<String, String> jsonResult = parseJsonIconConfiguration(trimmed);
+      if (!jsonResult.isEmpty()) {
+        return jsonResult;
       }
+      // JSON parsing failed - fall through to other formats
     }
     
-    // Check if it's a single icon value (no colon, or colon is part of icon name like "utility:moneybag")
-    // OR if it's a single ObjectType:IconName pair (no comma)
+    // Check if it's a single value or single pair (no comma)
     if (!trimmed.contains(PARSE_DELIMITER_COMMA)) {
-      // Check if it contains a colon
-      Integer colonIndex = trimmed.indexOf(PARSE_DELIMITER_COLON);
-      if (colonIndex > 0 && colonIndex < trimmed.length() - 1) {
-        String beforeColon = trimmed.substring(0, colonIndex).trim();
-        String afterColon = trimmed.substring(colonIndex + 1).trim();
-        
-        // Known icon namespaces are short: utility, standard, custom, action
-        // If the part before colon is longer or doesn't match known namespaces, it's likely an object type
-        Set<String> iconNamespaces = new Set<String>{ 'utility', 'standard', 'custom', 'action' };
-        Boolean isIconNamespace = iconNamespaces.contains(beforeColon.toLowerCase());
-        
-        if (!isIconNamespace && String.isNotBlank(beforeColon) && String.isNotBlank(afterColon)) {
-          // This is ObjectType:IconName format (e.g., "AccountActivityWrapper:utility:moneybag")
-          iconMap.put(beforeColon, afterColon);
-          return iconMap;
+      return parseSingleIconConfiguration(trimmed);
+    }
+    
+    // Parse comma-separated pairs
+    return parseCommaSeparatedIconConfiguration(trimmed);
+  }
+
+  /**
+   * @description Parse JSON format icon configuration
+   * @param jsonString JSON string to parse
+   * @return Map<String, String> Parsed icon map, empty if parsing fails
+   */
+  private static Map<String, String> parseJsonIconConfiguration(String jsonString) {
+    Map<String, String> iconMap = new Map<String, String>();
+    
+    try {
+      Map<String, Object> jsonMap = (Map<String, Object>) JSON.deserializeUntyped(jsonString);
+      for (String key : jsonMap.keySet()) {
+        Object value = jsonMap.get(key);
+        if (value instanceof String && String.isNotBlank((String) value)) {
+          iconMap.put(key, (String) value);
         }
       }
-      
-      // Single icon value - treat as default for all object types
-      if (String.isNotBlank(trimmed)) {
-        iconMap.put('*', trimmed);
-      }
+    } catch (Exception ex) {
+      // Return empty map on parse failure
+    }
+    
+    return iconMap;
+  }
+
+  /**
+   * @description Parse single icon value or ObjectType:IconName pair
+   * @param trimmed Trimmed configuration string
+   * @return Map<String, String> Icon map with single entry
+   */
+  private static Map<String, String> parseSingleIconConfiguration(String trimmed) {
+    Map<String, String> iconMap = new Map<String, String>();
+    
+    if (String.isBlank(trimmed)) {
       return iconMap;
     }
     
-    // Parse comma-separated pairs (format: "ObjectType:IconName,ObjectType:IconName")
+    Integer colonIndex = trimmed.indexOf(PARSE_DELIMITER_COLON);
+    if (colonIndex <= 0 || colonIndex >= trimmed.length() - 1) {
+      // No colon or invalid position - treat as single icon value
+      iconMap.put('*', trimmed);
+      return iconMap;
+    }
+    
+    String beforeColon = trimmed.substring(0, colonIndex).trim();
+    String afterColon = trimmed.substring(colonIndex + 1).trim();
+    
+    if (String.isBlank(beforeColon) || String.isBlank(afterColon)) {
+      iconMap.put('*', trimmed);
+      return iconMap;
+    }
+    
+    // Check if before colon is an icon namespace
+    Set<String> iconNamespaces = new Set<String>{ 'utility', 'standard', 'custom', 'action' };
+    Boolean isIconNamespace = iconNamespaces.contains(beforeColon.toLowerCase());
+    
+    if (!isIconNamespace) {
+      // ObjectType:IconName format
+      iconMap.put(beforeColon, afterColon);
+    } else {
+      // Single icon value with namespace
+      iconMap.put('*', trimmed);
+    }
+    
+    return iconMap;
+  }
+
+  /**
+   * @description Parse comma-separated ObjectType:IconName pairs
+   * @param trimmed Trimmed configuration string
+   * @return Map<String, String> Icon map with object type keys
+   */
+  private static Map<String, String> parseCommaSeparatedIconConfiguration(String trimmed) {
+    Map<String, String> iconMap = new Map<String, String>();
     List<String> pairs = trimmed.split(PARSE_DELIMITER_COMMA);
     
     for (String pair : pairs) {
@@ -553,18 +576,33 @@ public with sharing class HM_DashboardConfigService {
       }
       
       Integer colonIndex = pairTrimmed.indexOf(PARSE_DELIMITER_COLON);
-      if (colonIndex > 0 && colonIndex < pairTrimmed.length() - 1) {
-        String objectType = pairTrimmed.substring(0, colonIndex).trim();
-        String iconName = pairTrimmed.substring(colonIndex + 1).trim();
-        
-        if (String.isNotBlank(objectType) && String.isNotBlank(iconName)) {
-          iconMap.put(objectType, iconName);
-        }
+      if (colonIndex <= 0 || colonIndex >= pairTrimmed.length() - 1) {
+        continue;
       }
-      // Skip invalid pairs (no colon or malformed) - continue processing
+      
+      String objectType = pairTrimmed.substring(0, colonIndex).trim();
+      String iconName = pairTrimmed.substring(colonIndex + 1).trim();
+      
+      if (String.isNotBlank(objectType) && String.isNotBlank(iconName)) {
+        iconMap.put(objectType, iconName);
+      }
     }
     
     return iconMap;
+  }
+
+  /**
+   * @description Safely get field value from SObject, returning null if field doesn't exist
+   * @param record SObject to get field from
+   * @param fieldName API name of field
+   * @return String Field value, or null if field doesn't exist or is not accessible
+   */
+  private static String getFieldValueSafely(SObject record, String fieldName) {
+    try {
+      return (String) record.get(fieldName);
+    } catch (Exception ex) {
+      return null;
+    }
   }
 
   /**

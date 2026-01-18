@@ -179,18 +179,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
   }
 
   /**
-   * @description Load data from Apex
+   * @description Load data from Apex service
+   * Validates component configuration and processes response based on shape
    */
   async loadData() {
-    // Input validation
-    if (!this.componentConfig || !this.componentId) {
-      this.isLoading = false;
-      return;
-    }
-
-    if (!this.componentId || typeof this.componentId !== 'string') {
-      this.errorMessage = 'Invalid component ID';
-      this.isLoading = false;
+    if (!this.validateLoadDataInputs()) {
       return;
     }
 
@@ -203,46 +196,222 @@ export default class HM_ConfigurableList extends NavigationMixin(
         context: {}
       });
 
-      if (response && response.success) {
-        if (response.shape === 'LIST') {
-          this.rows = this.formatRows(response.rows || []);
-        } else if (response.shape === 'MULTI_OBJECT') {
-          // Flatten multiObjectData into rows
-          this.rows = this.formatRowsFromMultiObject(response.multiObjectData);
-        } else if (response.shape === 'AGGREGATE') {
-          // Error: List component received aggregate
-          this.errorMessage = 'List component requires LIST or MULTI_OBJECT shape';
-          const defaultData = this.getDefaultListData();
-          this.rows = defaultData.rows;
-          this.filteredRows = defaultData.filteredRows;
-          this.filters = defaultData.filters;
-          return;
-        } else {
-          // Unknown shape
-          this.errorMessage = 'Unknown response shape: ' + response.shape;
-          const defaultData = this.getDefaultListData();
-          this.rows = defaultData.rows;
-          this.filteredRows = defaultData.filteredRows;
-          this.filters = defaultData.filters;
-          return;
-        }
-      } else {
-        // Response indicates failure or no data
-        this.rows = this.formatRows([]);
+      if (!this.processDataResponse(response)) {
+        return;
       }
 
       this.buildFilters();
       this.applyFilter();
       this.updatePagination();
     } catch (error) {
-      this.errorMessage = this.extractErrorMessage(error);
-      const defaultData = this.getDefaultListData();
-      this.rows = defaultData.rows;
-      this.filteredRows = defaultData.filteredRows;
-      this.filters = defaultData.filters;
+      this.handleLoadDataError(error);
     } finally {
       this.isLoading = false;
     }
+  }
+
+  /**
+   * @description Extract error message from error object
+   * Handles different error formats (AuraHandledException, standard errors, strings)
+   * @param {Object|String} error - Error object or string
+   * @return {String} Extracted error message
+   */
+  extractErrorMessage(error) {
+    if (!error) {
+      return "Unknown error";
+    }
+    if (error.body?.message) {
+      return error.body.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return "Unknown error occurred";
+  }
+
+  /**
+   * @description Parse number from value
+   * @param {*} value - Value to parse as number
+   * @return {Number} Parsed number, or 0 if invalid
+   */
+  parseNumber(value) {
+    if (typeof value === "number") {
+      return value;
+    }
+    if (typeof value === "string") {
+      const cleaned = value.replace("%", "").trim();
+      const parsed = parseFloat(cleaned);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  }
+
+  /**
+   * @description Format currency value
+   * @param {*} value - Numeric value to format
+   * @return {String} Formatted currency string (e.g., $1.5M, $5K, $100)
+   */
+  formatCurrency(value) {
+    const num = this.parseNumber(value);
+    if (isNaN(num)) {
+      return String(value);
+    }
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `$${(num / 1000).toFixed(0)}K`;
+    }
+    return `$${num.toFixed(0)}`;
+  }
+
+  /**
+   * @description Format number value
+   * @param {*} value - Numeric value to format
+   * @return {String} Formatted number string with locale formatting
+   */
+  formatNumber(value) {
+    const num = this.parseNumber(value);
+    if (isNaN(num)) {
+      return String(value);
+    }
+    return num.toLocaleString();
+  }
+
+  /**
+   * @description Format percent value
+   * @param {*} value - Numeric value to format (0.5 = 50%)
+   * @return {String} Formatted percent string
+   */
+  formatPercent(value) {
+    const num = this.parseNumber(value);
+    if (isNaN(num)) {
+      return String(value);
+    }
+    return `${num.toFixed(1)}%`;
+  }
+
+  /**
+   * @description Format date value
+   * @param {*} value - Date value to format
+   * @return {String} Formatted date string
+   */
+  formatDate(value) {
+    if (!value) {
+      return "";
+    }
+
+    if (value instanceof Date) {
+      if (isNaN(value.getTime())) {
+        return "";
+      }
+      return value.toLocaleDateString();
+    }
+
+    if (typeof value === "string") {
+      let date = new Date(value);
+
+      if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        const dateOnly = value.substring(0, 10);
+        date = new Date(dateOnly + "T00:00:00");
+      }
+
+      if (isNaN(date.getTime()) && /^\d+$/.test(value)) {
+        date = new Date(parseInt(value, 10));
+      }
+
+      if (isNaN(date.getTime())) {
+        return value;
+      }
+
+      return date.toLocaleDateString();
+    }
+
+    if (typeof value === "number") {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        return String(value);
+      }
+      return date.toLocaleDateString();
+    }
+
+    return String(value);
+  }
+
+  /**
+   * @description Validate inputs for loadData method
+   * @return {Boolean} True if inputs are valid, false otherwise
+   */
+  validateLoadDataInputs() {
+    if (!this.componentConfig || !this.componentId) {
+      this.isLoading = false;
+      return false;
+    }
+
+    if (typeof this.componentId !== 'string' || this.componentId.trim().length === 0) {
+      this.errorMessage = 'Invalid component ID';
+      this.isLoading = false;
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * @description Process data response from Apex service
+   * @param {Object} response - Response object from executeComponentQuery
+   * @return {Boolean} True if processing succeeded, false if error occurred
+   */
+  processDataResponse(response) {
+    if (!response || !response.success) {
+      this.rows = this.formatRows([]);
+      return true;
+    }
+
+    if (response.shape === 'LIST') {
+      this.rows = this.formatRows(response.rows || []);
+      return true;
+    }
+
+    if (response.shape === 'MULTI_OBJECT') {
+      this.rows = this.formatRowsFromMultiObject(response.multiObjectData);
+      return true;
+    }
+
+    if (response.shape === 'AGGREGATE') {
+      this.setErrorAndResetData('List component requires LIST or MULTI_OBJECT shape');
+      return false;
+    }
+
+    this.setErrorAndResetData('Unknown response shape: ' + response.shape);
+    return false;
+  }
+
+  /**
+   * @description Set error message and reset data to defaults
+   * @param {String} errorMsg - Error message to set
+   */
+  setErrorAndResetData(errorMsg) {
+    this.errorMessage = errorMsg;
+    const defaultData = this.getDefaultListData();
+    this.rows = defaultData.rows;
+    this.filteredRows = defaultData.filteredRows;
+    this.filters = defaultData.filters;
+  }
+
+  /**
+   * @description Handle errors during data loading
+   * @param {Error} error - Error object from catch block
+   */
+  handleLoadDataError(error) {
+    this.errorMessage = this.extractErrorMessage(error);
+    const defaultData = this.getDefaultListData();
+    this.rows = defaultData.rows;
+    this.filteredRows = defaultData.filteredRows;
+    this.filters = defaultData.filters;
   }
 
   /**
@@ -737,99 +906,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     }
   }
 
-  /**
-   * @description Format currency value
-   * @param {*} value - Numeric value to format
-   * @return {String} Formatted currency string (e.g., $1.5M, $5K, $100)
-   */
-  formatCurrency(value) {
-    const num = Number(value);
-    if (isNaN(num)) return String(value);
-    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
-    return `$${num.toFixed(0)}`;
-  }
-
-  /**
-   * @description Format number value
-   * @param {*} value - Numeric value to format
-   * @return {String} Formatted number string with locale formatting
-   */
-  formatNumber(value) {
-    const num = Number(value);
-    if (isNaN(num)) return String(value);
-    return num.toLocaleString();
-  }
-
-  /**
-   * @description Format percent value
-   * @param {*} value - Numeric value to format (0.5 = 50%)
-   * @return {String} Formatted percent string
-   */
-  formatPercent(value) {
-    const num = Number(value);
-    if (isNaN(num)) return String(value);
-    return `${(num * 100).toFixed(1)}%`;
-  }
-
-  /**
-   * @description Format date value
-   * @param {*} value - Date value to format
-   * @return {String} Formatted date string
-   */
-  formatDate(value) {
-    if (!value) return "";
-    
-    // Handle Date objects
-    if (value instanceof Date) {
-      if (isNaN(value.getTime())) return "";
-      return value.toLocaleDateString();
-    }
-    
-    // Handle string dates from Salesforce
-    if (typeof value === "string") {
-      // Try parsing directly
-      let date = new Date(value);
-      
-      // If that fails, try parsing as YYYY-MM-DD format (Salesforce Date format)
-      if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-        const dateOnly = value.substring(0, 10);
-        date = new Date(dateOnly + "T00:00:00");
-      }
-      
-      // If still invalid, try parsing as timestamp
-      if (isNaN(date.getTime()) && /^\d+$/.test(value)) {
-        date = new Date(parseInt(value, 10));
-      }
-      
-      if (isNaN(date.getTime())) {
-        // If all parsing fails, return the original string
-        return value;
-      }
-      
-      return date.toLocaleDateString();
-    }
-    
-    // Handle numbers (timestamps)
-    if (typeof value === "number") {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) return String(value);
-      return date.toLocaleDateString();
-    }
-    
-    return String(value);
-  }
-
-  /**
-   * @description Extract error message from error object
-   */
-  extractErrorMessage(error) {
-    if (!error) return "Unknown error";
-    if (error.body?.message) return error.body.message;
-    if (error.message) return error.message;
-    if (typeof error === "string") return error;
-    return "Unknown error occurred";
-  }
 
   /**
    * @description Handle row click - navigate to record
@@ -1236,6 +1312,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Handle column header click for sorting
+   * Toggles sort direction if same column, or sets new column with ascending sort
+   * @param {Event} event - Click event with columnKey in dataset
    */
   handleColumnSort(event) {
     if (!this.enableColumnSorting) {
@@ -1267,6 +1345,9 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get cell value from row for sorting
+   * @param {Object} row - Row object containing cells array
+   * @param {String} columnKey - Key of column to get value from
+   * @return {*} Raw cell value, or null if not found
    */
   getCellValue(row, columnKey) {
     const cell = row.cells.find((c) => c && c.key === columnKey);
@@ -1279,6 +1360,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Sort rows based on column and format type
+   * @param {Array} rows - Array of row objects to sort
+   * @param {String} columnKey - Key of column to sort by
+   * @param {String} direction - Sort direction ('asc' or 'desc')
+   * @param {String} formatType - Format type for proper comparison
+   * @return {Array} Sorted array of rows (new array, original not modified)
    */
   sortRows(rows, columnKey, direction, formatType) {
     return [...rows].sort((a, b) => {
@@ -1331,7 +1417,9 @@ export default class HM_ConfigurableList extends NavigationMixin(
   }
 
   /**
-   * @description Compute column header class
+   * @description Compute CSS class for column header based on sort state
+   * @param {Object} column - Column definition object
+   * @return {String} CSS class string for header
    */
   computeColumnHeaderClass(column) {
     let classes = HM_ConfigurableList.CSS_CLASSES.COL_DATA;

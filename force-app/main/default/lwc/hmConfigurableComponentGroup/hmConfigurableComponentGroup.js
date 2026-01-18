@@ -37,6 +37,10 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
   isLoading = true;
   error = null;
 
+  /**
+   * @description Lifecycle hook called when component is inserted into DOM
+   * Validates componentGroupId is provided
+   */
   connectedCallback() {
     if (!this.componentGroupId) {
       this.error = {
@@ -47,7 +51,10 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
     }
   }
 
-  // Wire group configuration
+  /**
+   * @description Wire group configuration from Apex
+   * Automatically loads configuration when componentGroupId changes
+   */
   @wire(getComponentGroupConfiguration, { groupId: "$componentGroupId" })
   wiredGroupConfig({ error, data }) {
     if (data) {
@@ -59,22 +66,10 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
     this.isLoading = false;
   }
 
-  /**
-   * @description Extract error message from error object
-   * Handles different error formats (AuraHandledException, standard errors, strings)
-   * @param {Object|String} error - Error object or string
-   * @return {String} Extracted error message
-   */
-  extractErrorMessage(error) {
-    if (!error) return "Unknown error";
-    if (error.body?.message) return error.body.message;
-    if (error.message) return error.message;
-    if (typeof error === "string") return error;
-    return "Unknown error occurred";
-  }
 
   /**
    * @description Get container class with dark mode support
+   * @return {String} CSS class string for container
    */
   get containerClass() {
     return this.isDarkMode
@@ -84,6 +79,8 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
 
   /**
    * @description Get layout class based on layout type
+   * Maps layout type (Horizontal, Vertical, Grid) to corresponding CSS class
+   * @return {String} CSS class string for layout
    */
   get layoutClass() {
     if (!this.groupConfig) {
@@ -106,7 +103,8 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
 
   /**
    * @description Get components from configuration with type flags
-   * Filters out components without a valid type
+   * Filters out components without a valid type and adds isTile/isList flags
+   * @return {Array} Array of component objects with type flags
    */
   get components() {
     if (!this.groupConfig || !this.groupConfig.components) {
@@ -129,8 +127,9 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
   }
 
   /**
-   * @description Check if group has components
-   * Only returns true if there are components with valid types AND we're not loading
+   * @description Check if group has components to display
+   * Returns true during loading or if error exists to prevent empty state message
+   * @return {Boolean} True if has components, loading, or error
    */
   get hasComponents() {
     // Don't show message while loading
@@ -150,7 +149,30 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
   }
 
   /**
+   * @description Extract error message from error object
+   * Handles different error formats (AuraHandledException, standard errors, strings)
+   * @param {Object|String} error - Error object or string
+   * @return {String} Extracted error message
+   */
+  extractErrorMessage(error) {
+    if (!error) {
+      return "Unknown error";
+    }
+    if (error.body?.message) {
+      return error.body.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return "Unknown error occurred";
+  }
+
+  /**
    * @description Get formatted error message for display
+   * @return {String} Extracted error message
    */
   get errorMessage() {
     return this.extractErrorMessage(this.error);

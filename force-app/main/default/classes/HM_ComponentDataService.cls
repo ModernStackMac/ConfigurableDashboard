@@ -339,7 +339,8 @@ public with sharing class HM_ComponentDataService {
 
       // Process based on return type
       if (returnType == RETURN_TYPE_AGGREGATE) {
-        if (accessibleRecords instanceof List<AggregateResult> && !accessibleRecords.isEmpty()) {
+        // Check if first record is AggregateResult (Apex doesn't support instanceof with generics)
+        if (!accessibleRecords.isEmpty() && accessibleRecords[0] instanceof AggregateResult) {
           AggregateResult ar = (AggregateResult) accessibleRecords[0];
           Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
           
@@ -359,8 +360,13 @@ public with sharing class HM_ComponentDataService {
         }
       } else if (returnType == RETURN_TYPE_LIST) {
         // Convert to LIST (handles both SObject and AggregateResult)
-        if (accessibleRecords instanceof List<AggregateResult>) {
-          return buildListResponseFromAggregate((List<AggregateResult>) accessibleRecords);
+        // Check if first record is AggregateResult (Apex doesn't support instanceof with generics)
+        if (!accessibleRecords.isEmpty() && accessibleRecords[0] instanceof AggregateResult) {
+          List<AggregateResult> aggregateList = new List<AggregateResult>();
+          for (SObject record : accessibleRecords) {
+            aggregateList.add((AggregateResult) record);
+          }
+          return buildListResponseFromAggregate(aggregateList);
         } else {
           List<Map<String, Object>> rows = new List<Map<String, Object>>();
           for (SObject record : accessibleRecords) {
@@ -735,86 +741,108 @@ public with sharing class HM_ComponentDataService {
     }
 
     if (result instanceof List<Object>) {
-      List<Object> objectList = (List<Object>) result;
-      
-      // Check if list is empty
-      if (objectList.isEmpty()) {
-        return new List<Map<String, Object>>();
-      }
-
-      // Check first item to determine type
-      Object firstItem = objectList[0];
-      
-      // If all items are Maps, return as-is
-      Boolean allMaps = true;
-      for (Object item : objectList) {
-        if (!(item instanceof Map<String, Object>)) {
-          allMaps = false;
-          break;
-        }
-      }
-      if (allMaps) {
-        List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-        for (Object item : objectList) {
-          resultList.add((Map<String, Object>) item);
-        }
-        return resultList;
-      }
-
-      // If all items are SObjects, convert them
-      Boolean allSObjects = true;
-      for (Object item : objectList) {
-        if (!(item instanceof SObject)) {
-          allSObjects = false;
-          break;
-        }
-      }
-      if (allSObjects) {
-        // Infer object type from first SObject
-        String objectType = firstItem instanceof SObject 
-          ? String.valueOf(((SObject) firstItem).getSObjectType())
-          : 'Unknown';
-        return convertSObjectListToMapList((List<SObject>) objectList, objectType);
-      }
-
-      // If items are neither Maps nor SObjects, they're likely wrapper classes
-      // Use JSON serialization to convert wrappers to Maps
-      // Infer object type from wrapper class name if possible
-      // IMPORTANT: Keep the full class name (including "Wrapper" if present) so it matches
-      // the Detail Map configuration where users specify the full class name
-      String objectType = 'Custom';
-      if (firstItem != null) {
-        try {
-          // Get string representation and extract class name
-          String itemString = String.valueOf(firstItem);
-          // Pattern: "ClassName:[field=value, ...]" or just "ClassName"
-          String className = itemString.split(':')[0].trim();
-          
-          // Use the full class name as-is (don't remove "Wrapper" suffix)
-          // This ensures it matches what users configure in Detail Maps
-          // Example: "AccountActivityWrapper" stays as "AccountActivityWrapper"
-          objectType = className;
-        } catch (Exception ex) {
-          // If parsing fails, use default
-          objectType = 'Custom';
-        }
-      }
-      return convertWrapperListToMapList(objectList, objectType);
+      return convertObjectListToResultList((List<Object>) result);
     }
 
     if (result instanceof Map<String, Object>) {
       return flattenMapOfLists((Map<String, Object>) result);
     }
 
-    // Try to convert to Map if it's an SObject
     if (result instanceof SObject) {
       return new List<Map<String, Object>>{
         convertSObjectToMap((SObject) result)
       };
     }
 
-    // Unexpected result type from Apex method
     return new List<Map<String, Object>>();
+  }
+
+  /**
+   * @description Convert List<Object> to List<Map<String, Object>> handling Maps, SObjects, and wrappers
+   * @param objectList List of objects to convert
+   * @return List<Map<String, Object>> Converted list
+   */
+  private static List<Map<String, Object>> convertObjectListToResultList(List<Object> objectList) {
+    if (objectList == null || objectList.isEmpty()) {
+      return new List<Map<String, Object>>();
+    }
+
+    Object firstItem = objectList[0];
+    
+    // Check if all items are Maps
+    if (areAllMaps(objectList)) {
+      return convertMapList((List<Object>) objectList);
+    }
+
+    // Check if all items are SObjects
+    if (areAllSObjects(objectList)) {
+      String objectType = String.valueOf(((SObject) firstItem).getSObjectType());
+      return convertSObjectListToMapList((List<SObject>) objectList, objectType);
+    }
+
+    // Treat as wrapper classes
+    String objectType = extractObjectTypeFromWrapper(firstItem);
+    return convertWrapperListToMapList(objectList, objectType);
+  }
+
+  /**
+   * @description Check if all items in list are Map<String, Object>
+   * @param objectList List to check
+   * @return Boolean True if all items are Maps
+   */
+  private static Boolean areAllMaps(List<Object> objectList) {
+    for (Object item : objectList) {
+      if (!(item instanceof Map<String, Object>)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * @description Check if all items in list are SObjects
+   * @param objectList List to check
+   * @return Boolean True if all items are SObjects
+   */
+  private static Boolean areAllSObjects(List<Object> objectList) {
+    for (Object item : objectList) {
+      if (!(item instanceof SObject)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * @description Convert List<Object> of Maps to List<Map<String, Object>>
+   * @param mapList List of Map objects
+   * @return List<Map<String, Object>> Converted list
+   */
+  private static List<Map<String, Object>> convertMapList(List<Object> mapList) {
+    List<Map<String, Object>> resultList = new List<Map<String, Object>>();
+    for (Object item : mapList) {
+      resultList.add((Map<String, Object>) item);
+    }
+    return resultList;
+  }
+
+  /**
+   * @description Extract object type name from wrapper class string representation
+   * @param wrapperItem Wrapper object to extract type from
+   * @return String Object type name, defaults to 'Custom' if extraction fails
+   */
+  private static String extractObjectTypeFromWrapper(Object wrapperItem) {
+    if (wrapperItem == null) {
+      return 'Custom';
+    }
+    
+    try {
+      String itemString = String.valueOf(wrapperItem);
+      String className = itemString.split(':')[0].trim();
+      return String.isNotBlank(className) ? className : 'Custom';
+    } catch (Exception ex) {
+      return 'Custom';
+    }
   }
 
   /**
@@ -924,116 +952,125 @@ public with sharing class HM_ComponentDataService {
    * @return List<Map<String, Object>> Converted list with object type metadata
    */
   private static List<Map<String, Object>> convertWrapperListToMapList(List<Object> wrapperList, String objectType) {
-    List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-    
     if (wrapperList == null || wrapperList.isEmpty()) {
-      return resultList;
+      return new List<Map<String, Object>>();
     }
 
-    // Use default object type if not provided
     String finalObjectType = String.isNotBlank(objectType) ? objectType : 'Custom';
 
     try {
-      // Serialize the entire list to JSON, then deserialize using a workaround
-      // JSON.deserialize() doesn't support List<Map<String, Object>>.class directly
-      // So we deserialize as List<Object> and then convert each item
       String jsonString = JSON.serialize(wrapperList);
-      
-      // Deserialize as List<Object> first (this works in Apex)
       List<Object> deserializedObjects = (List<Object>) JSON.deserializeUntyped(jsonString);
 
-      // Convert each Object to Map<String, Object>
+      List<Map<String, Object>> resultList = new List<Map<String, Object>>();
       Integer index = 0;
+      
       for (Object obj : deserializedObjects) {
-        Map<String, Object> recordMap;
-        
-        if (obj instanceof Map<String, Object>) {
-          recordMap = (Map<String, Object>) obj;
-        } else {
-          // If it's not already a Map, serialize and deserialize the individual object
-          String objJson = JSON.serialize(obj);
-          recordMap = (Map<String, Object>) JSON.deserializeUntyped(objJson);
-        }
-        
+        Map<String, Object> recordMap = convertObjectToMap(obj);
         if (recordMap == null || recordMap.isEmpty()) {
           continue;
         }
         
-        // Validate that the record has at least one non-null, non-empty value
-        // Skip records that are essentially empty (all values are null/empty)
-        Boolean hasValidData = false;
-        for (String key : recordMap.keySet()) {
-          Object value = recordMap.get(key);
-          if (value != null) {
-            // Check if it's a non-empty string, non-zero number, or non-empty collection
-            if (value instanceof String) {
-              if (String.isNotBlank((String) value)) {
-                hasValidData = true;
-                break;
-              }
-            } else if (value instanceof Decimal || value instanceof Integer) {
-              // Numbers are valid even if 0
-              hasValidData = true;
-              break;
-            } else {
-              // Other types (Id, Boolean, etc.) are valid if not null
-              hasValidData = true;
-              break;
-            }
-          }
-        }
-        
-        if (!hasValidData) {
+        if (!hasValidData(recordMap)) {
           continue;
         }
 
-        // Dynamically find ID field - look for any field ending in 'Id' or 'ID' (case-insensitive)
-        // This avoids hardcoding specific field names
-        if (!recordMap.containsKey('Id')) {
-          Boolean idFound = false;
-          
-          // Search for ID fields dynamically
-          for (String key : recordMap.keySet()) {
-            String keyLower = key.toLowerCase();
-            // Check if field ends with 'id' (but not just 'id' itself, and longer than 2 chars)
-            // This catches: accountId, contactId, opportunityId, caseId, recordId, etc.
-            if ((keyLower.endsWith('id') && keyLower.length() > 2) || keyLower.equals('id')) {
-              Object idValue = recordMap.get(key);
-              if (idValue != null) {
-                recordMap.put('Id', idValue);
-                idFound = true;
-                break;
-              }
-            }
-          }
-          
-          // If no ID field found, create synthetic ID from index
-          // LWC needs Id or recordId for row identification
-          if (!idFound) {
-            recordMap.put('Id', 'wrapper-' + index);
-          }
-        }
-
-        // Add object type metadata
-        recordMap.put('attributes', new Map<String, Object>{
-          'type' => finalObjectType
-        });
-        recordMap.put('recordType', finalObjectType);
-        recordMap.put('objectType', finalObjectType);
+        ensureIdField(recordMap, index);
+        addObjectTypeMetadata(recordMap, finalObjectType);
         
         resultList.add(recordMap);
         index++;
       }
+      
+      return resultList;
     } catch (JSONException ex) {
-      // JSON serialization/deserialization failed
-      // Return empty list to prevent breaking the component
       return new List<Map<String, Object>>();
     } catch (Exception ex) {
-      // Other unexpected errors
       return new List<Map<String, Object>>();
     }
+  }
 
-    return resultList;
+  /**
+   * @description Convert an Object to Map<String, Object> using JSON serialization
+   * @param obj Object to convert (may already be a Map)
+   * @return Map<String, Object> Converted map, or null if conversion fails
+   */
+  private static Map<String, Object> convertObjectToMap(Object obj) {
+    if (obj instanceof Map<String, Object>) {
+      return (Map<String, Object>) obj;
+    }
+    
+    try {
+      String objJson = JSON.serialize(obj);
+      return (Map<String, Object>) JSON.deserializeUntyped(objJson);
+    } catch (Exception ex) {
+      return null;
+    }
+  }
+
+  /**
+   * @description Check if record map has at least one valid (non-null, non-empty) value
+   * @param recordMap Map to validate
+   * @return Boolean True if record has valid data, false otherwise
+   */
+  private static Boolean hasValidData(Map<String, Object> recordMap) {
+    if (recordMap == null || recordMap.isEmpty()) {
+      return false;
+    }
+    
+    for (Object value : recordMap.values()) {
+      if (value == null) {
+        continue;
+      }
+      
+      if (value instanceof String) {
+        if (String.isNotBlank((String) value)) {
+          return true;
+        }
+      } else {
+        // Numbers, Ids, Booleans, etc. are valid if not null
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * @description Ensure record map has an Id field, finding it dynamically or creating synthetic one
+   * @param recordMap Map to add Id field to
+   * @param index Index for synthetic ID generation if needed
+   */
+  private static void ensureIdField(Map<String, Object> recordMap, Integer index) {
+    if (recordMap.containsKey('Id')) {
+      return;
+    }
+    
+    // Search for ID fields dynamically (accountId, contactId, etc.)
+    for (String key : recordMap.keySet()) {
+      String keyLower = key.toLowerCase();
+      if (((keyLower.endsWith('id') && keyLower.length() > 2) || keyLower.equals('id'))) {
+        Object idValue = recordMap.get(key);
+        if (idValue != null) {
+          recordMap.put('Id', idValue);
+          return;
+        }
+      }
+    }
+    
+    // Create synthetic ID if none found
+    recordMap.put('Id', 'wrapper-' + index);
+  }
+
+  /**
+   * @description Add object type metadata to record map
+   * @param recordMap Map to add metadata to
+   * @param objectType Object type name
+   */
+  private static void addObjectTypeMetadata(Map<String, Object> recordMap, String objectType) {
+    recordMap.put('attributes', new Map<String, Object>{ 'type' => objectType });
+    recordMap.put('recordType', objectType);
+    recordMap.put('objectType', objectType);
   }
 
   // ==================== RESPONSE BUILDING METHODS ====================
@@ -1190,8 +1227,8 @@ public with sharing class HM_ComponentDataService {
         ? fields.get('totalWon') 
         : fields.values()[0];
       
-      // If numeric and null, return 0
-      if (value == null && (value instanceof Decimal || value instanceof Integer)) {
+      // If null, return 0 (for numeric types)
+      if (value == null) {
         value = 0;
       }
       
@@ -1242,9 +1279,14 @@ public with sharing class HM_ComponentDataService {
         return buildAggregateResponseFromAggregate((AggregateResult) result);
       }
       
-      if (result instanceof List<AggregateResult>) {
-        List<AggregateResult> arList = (List<AggregateResult>) result;
-        if (!arList.isEmpty()) {
+      // Check if result is a list with AggregateResult elements (Apex doesn't support instanceof with generics)
+      if (result instanceof List<Object>) {
+        List<Object> objList = (List<Object>) result;
+        if (!objList.isEmpty() && objList[0] instanceof AggregateResult) {
+          List<AggregateResult> arList = new List<AggregateResult>();
+          for (Object obj : objList) {
+            arList.add((AggregateResult) obj);
+          }
           return buildAggregateResponseFromAggregate(arList[0]);
         }
       }

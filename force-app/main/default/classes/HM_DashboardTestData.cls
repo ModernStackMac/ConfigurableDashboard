@@ -97,28 +97,45 @@ public with sharing class HM_DashboardTestData implements Callable {
     return buckets;
   }
 
-
-
+  /**
+   * @description Get total won amount for current user's opportunities
+   * @return Decimal Total won amount, 0 if null or no records
+   */
   public static Decimal getTotalWonAmount() {
+    if (!Schema.sObjectType.Opportunity.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_OPPORTUNITY);
+    }
+
     List<AggregateResult> results = [
       SELECT SUM(Amount) totalWon
       FROM Opportunity
       WHERE OwnerId = :UserInfo.getUserId()
-  ];
+    ];
 
-  Decimal totalWonAmount = (Decimal) results[0].get('totalWon');
-  return totalWonAmount == null ? 0 : totalWonAmount;
-}
+    if (results.isEmpty()) {
+      return 0;
+    }
 
+    Decimal totalWonAmount = (Decimal) results[0].get('totalWon');
+    return totalWonAmount == null ? 0 : totalWonAmount;
+  }
 
-public static List<Case> getCaseList() {
-  return[
-    SELECT Id, CaseNumber, Account.Name, Priority, Origin
-    FROM Case
-    WHERE Priority != null AND Origin != null AND OwnerId = :UserInfo.getUserId()
-    LIMIT :DEFAULT_RECORD_LIMIT
-  ];
-}
+  /**
+   * @description Get list of cases for current user
+   * @return List<Case> List of cases with Priority and Origin not null
+   */
+  public static List<Case> getCaseList() {
+    if (!Schema.sObjectType.Case.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_CASE);
+    }
+
+    return [
+      SELECT Id, CaseNumber, Account.Name, Priority, Origin
+      FROM Case
+      WHERE Priority != null AND Origin != null AND OwnerId = :UserInfo.getUserId()
+      LIMIT :DEFAULT_RECORD_LIMIT
+    ];
+  }
 
   /**
    * @description Get aggregated account activity data as wrapper objects
@@ -154,40 +171,82 @@ public static List<Case> getCaseList() {
         continue;
       }
 
-      AccountActivityWrapper wrapper = new AccountActivityWrapper();
-      wrapper.accountId = acc.Id;
-      wrapper.accountName = acc.Name;
-      
-      // Calculate opportunity metrics
-      Decimal totalOpportunityAmount = 0;
-      Integer openOpportunityCount = 0;
-      for (Opportunity opp : acc.Opportunities) {
-        if (opp.Amount != null && opp.Amount > 0) {
-          totalOpportunityAmount += opp.Amount;
-        }
-        if (opp.StageName != 'Closed Won' && opp.StageName != 'Closed Lost') {
-          openOpportunityCount++;
-        }
-      }
-      wrapper.totalOpportunityValue = totalOpportunityAmount;
-      wrapper.openOpportunityCount = openOpportunityCount;
-
-      // Calculate case metrics
-      Integer highPriorityCaseCount = 0;
-      for (Case c : acc.Cases) {
-        if (c.Priority == 'High' || c.Priority == 'Critical') {
-          highPriorityCaseCount++;
-        }
-      }
-      wrapper.highPriorityCaseCount = highPriorityCaseCount;
-
-      // Calculate activity score (simple metric combining opp value and case priority)
-      wrapper.activityScore = (totalOpportunityAmount / 1000) + (highPriorityCaseCount * 10);
-
+      AccountActivityWrapper wrapper = buildAccountActivityWrapper(acc);
       wrappers.add(wrapper);
     }
 
     return wrappers;
+  }
+
+  /**
+   * @description Build AccountActivityWrapper from Account with related records
+   * @param acc Account record with Opportunities and Cases subqueries
+   * @return AccountActivityWrapper Wrapper with calculated metrics
+   */
+  private static AccountActivityWrapper buildAccountActivityWrapper(Account acc) {
+    AccountActivityWrapper wrapper = new AccountActivityWrapper();
+    wrapper.accountId = acc.Id;
+    wrapper.accountName = acc.Name;
+    
+    // Calculate opportunity metrics
+    Decimal totalOpportunityAmount = calculateTotalOpportunityAmount(acc.Opportunities);
+    Integer openOpportunityCount = countOpenOpportunities(acc.Opportunities);
+    wrapper.totalOpportunityValue = totalOpportunityAmount;
+    wrapper.openOpportunityCount = openOpportunityCount;
+
+    // Calculate case metrics
+    Integer highPriorityCaseCount = countHighPriorityCases(acc.Cases);
+    wrapper.highPriorityCaseCount = highPriorityCaseCount;
+
+    // Calculate activity score (simple metric combining opp value and case priority)
+    wrapper.activityScore = (totalOpportunityAmount / 1000) + (highPriorityCaseCount * 10);
+
+    return wrapper;
+  }
+
+  /**
+   * @description Calculate total opportunity amount from opportunities list
+   * @param opportunities List of Opportunity records
+   * @return Decimal Total amount, 0 if none
+   */
+  private static Decimal calculateTotalOpportunityAmount(List<Opportunity> opportunities) {
+    Decimal total = 0;
+    for (Opportunity opp : opportunities) {
+      if (opp.Amount != null && opp.Amount > 0) {
+        total += opp.Amount;
+      }
+    }
+    return total;
+  }
+
+  /**
+   * @description Count open opportunities (not Closed Won or Closed Lost)
+   * @param opportunities List of Opportunity records
+   * @return Integer Count of open opportunities
+   */
+  private static Integer countOpenOpportunities(List<Opportunity> opportunities) {
+    Integer count = 0;
+    for (Opportunity opp : opportunities) {
+      if (opp.StageName != 'Closed Won' && opp.StageName != 'Closed Lost') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * @description Count high priority cases (High or Critical)
+   * @param cases List of Case records
+   * @return Integer Count of high priority cases
+   */
+  private static Integer countHighPriorityCases(List<Case> cases) {
+    Integer count = 0;
+    for (Case c : cases) {
+      if (c.Priority == 'High' || c.Priority == 'Critical') {
+        count++;
+      }
+    }
+    return count;
   }
 
   /**

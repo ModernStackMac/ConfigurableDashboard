@@ -72,6 +72,7 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   isMenuOpen = false;
   menuObserver = null;
   darkModeStyleId = HM_ConfigurableDashboard.DEFAULT_VALUES.DARK_MODE_STYLE_ID;
+  menuStyleTimeoutId = null;
 
   // Wire user name
   @wire(getUserName)
@@ -120,19 +121,6 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
     return this.dashboardId || this.dashboardName || "";
   }
 
-  /**
-   * @description Extract error message from error object
-   * Handles different error formats (AuraHandledException, standard errors, strings)
-   * @param {Object|String} error - Error object or string
-   * @return {String} Extracted error message
-   */
-  extractErrorMessage(error) {
-    if (!error) return "Unknown error";
-    if (error.body?.message) return error.body.message;
-    if (error.message) return error.message;
-    if (typeof error === "string") return error;
-    return "Unknown error occurred";
-  }
 
   /**
    * @description Get container CSS class
@@ -237,30 +225,51 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
+   * @description Extract error message from error object
+   * Handles different error formats (AuraHandledException, standard errors, strings)
+   * @param {Object|String} error - Error object or string
+   * @return {String} Extracted error message
+   */
+  extractErrorMessage(error) {
+    if (!error) {
+      return "Unknown error";
+    }
+    if (error.body?.message) {
+      return error.body.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return "Unknown error occurred";
+  }
+
+  /**
    * @description Get formatted error message for display
+   * @return {String} Extracted error message
    */
   get errorMessage() {
     return this.extractErrorMessage(this.error);
   }
 
   /**
-   * @description Handle menu open
+   * @description Handle menu open event
+   * Sets up menu styling and observation for dark mode support
    */
   handleMenuOpen() {
     this.isMenuOpen = true;
-    // Mark our menu button so we can identify its dropdown
     const menuButton = this.template.querySelector(
       'lightning-button-menu[data-menu-id="hm-dashboard-actions-menu"]'
     );
     if (menuButton) {
-      // Add a class to help identify the dropdown
+      // Mark dropdown after a short delay to allow DOM to render
       setTimeout(() => {
         this.markOurMenuDropdown(menuButton);
       }, 100);
     }
-    // Apply dark mode styling to dropdown menu (rendered outside shadow DOM)
     this.styleMenuDropdown();
-    // Set up observer to catch menu rendering
     this.observeMenuDropdown();
   }
 
@@ -314,25 +323,50 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Style the dropdown menu for dark mode
+   * @description Style the dropdown menu for dark mode with debounced retry logic
    * Only targets our custom menu, not native Salesforce dropdowns
+   * Uses a single debounced function instead of multiple setTimeout calls
    */
   styleMenuDropdown() {
     if (!this.isDarkMode) {
       return;
     }
 
-    // Try multiple times with increasing delays to catch the menu
-    [50, 100, 200, 300].forEach((delay) => {
-      setTimeout(() => {
-        const menuButton = this.template.querySelector(
-          'lightning-button-menu[data-menu-id="hm-dashboard-actions-menu"]'
-        );
-        if (menuButton) {
-          this.applyMenuDropdownStyles(menuButton);
-        }
-      }, delay);
-    });
+    // Clear any existing timeout
+    if (this.menuStyleTimeoutId) {
+      clearTimeout(this.menuStyleTimeoutId);
+    }
+
+    // Use a single debounced attempt with retry logic
+    this.menuStyleTimeoutId = setTimeout(() => {
+      this.attemptStyleMenuDropdown(0);
+    }, 50);
+  }
+
+  /**
+   * @description Attempt to style menu dropdown with retry logic
+   * @param {Number} attemptCount - Current attempt number (max 3 attempts)
+   */
+  attemptStyleMenuDropdown(attemptCount) {
+    const MAX_ATTEMPTS = 3;
+    const DELAYS = [50, 100, 200];
+
+    if (attemptCount >= MAX_ATTEMPTS) {
+      return;
+    }
+
+    const menuButton = this.template.querySelector(
+      'lightning-button-menu[data-menu-id="hm-dashboard-actions-menu"]'
+    );
+
+    if (menuButton) {
+      this.applyMenuDropdownStyles(menuButton);
+    } else if (attemptCount < MAX_ATTEMPTS - 1) {
+      // Retry with next delay
+      this.menuStyleTimeoutId = setTimeout(() => {
+        this.attemptStyleMenuDropdown(attemptCount + 1);
+      }, DELAYS[attemptCount] || 200);
+    }
   }
 
   /**
@@ -369,7 +403,9 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Handle menu item selection
+   * @description Handle menu item selection event
+   * Routes to theme toggle or action handler based on selected value
+   * @param {Event} event - Menu selection event with detail.value
    */
   handleMenuSelect(event) {
     const selectedValue = event.detail.value;
@@ -385,7 +421,8 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Handle theme toggle
+   * @description Handle theme toggle between light and dark mode
+   * Only toggles if dark mode is enabled in configuration
    */
   handleThemeToggle() {
     // Only allow toggle if dark mode is enabled
@@ -403,7 +440,9 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Handle action click
+   * @description Handle action click event
+   * Navigates to object or record page based on action configuration
+   * @param {Object} action - Action configuration object with type and target
    */
   handleActionClick(action) {
     if (!action || !action.type) {
@@ -437,7 +476,7 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
 
   /**
    * @description Propagate dark mode state to child components
-   * Uses renderedCallback to ensure components are rendered before propagation
+   * Updates isDarkMode property on all child component groups, tiles, and lists
    */
   propagateDarkMode() {
     // Use setTimeout to ensure DOM is updated
@@ -473,7 +512,8 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Lifecycle hook - propagate dark mode after render
+   * @description Lifecycle hook called after component renders
+   * Applies dark mode styling and propagates state to child components
    */
   renderedCallback() {
     // Apply dark mode class to host element for CSS styling
@@ -493,8 +533,8 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
 
   /**
    * @description Inject global styles for dark mode menu dropdown
-   * Note: Due to Shadow DOM limitations, we can only style the dropdown container,
-   * not the individual menu items. Menu items will use Salesforce's default styling.
+   * Creates a style element in document head for dropdown styling
+   * Note: Due to Shadow DOM limitations, only dropdown container can be styled
    */
   injectDarkModeStyles() {
     // Remove existing styles if any
@@ -520,7 +560,8 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Remove global dark mode styles
+   * @description Remove global dark mode styles from document head
+   * Cleans up injected style element when dark mode is disabled or component disconnects
    */
   removeDarkModeStyles() {
     if (this.darkModeStyleId) {
@@ -532,12 +573,17 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   }
 
   /**
-   * @description Cleanup on disconnect
+   * @description Cleanup on component disconnect
+   * Clears observers, timeouts, and removes injected styles
    */
   disconnectedCallback() {
     if (this.menuObserver) {
       this.menuObserver.disconnect();
       this.menuObserver = null;
+    }
+    if (this.menuStyleTimeoutId) {
+      clearTimeout(this.menuStyleTimeoutId);
+      this.menuStyleTimeoutId = null;
     }
     this.removeDarkModeStyles();
   }

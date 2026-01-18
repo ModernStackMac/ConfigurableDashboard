@@ -227,6 +227,8 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Process raw data into tile display format
+   * Extracts value, change, subtitle, badge, and icon from detail maps
+   * @param {Object} data - Data object containing field values
    */
   processTileData(data) {
     const detailMaps = this.componentConfig.detailMaps || [];
@@ -392,6 +394,9 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Get icon class based on icon name
+   * Returns alert class for warning/alert icons, brand class otherwise
+   * @param {String} iconName - Icon name to check
+   * @return {String} CSS class for icon
    */
   getIconClass(iconName) {
     if (
@@ -405,6 +410,9 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Get formatted subtitle from data (checks for specific subtitle fields)
+   * Checks for pre-formatted subtitle fields from Apex methods
+   * @param {Object} data - Data object to check for subtitle fields
+   * @return {String|null} Formatted subtitle or null if not found
    */
   getFormattedSubtitle(data) {
     // Check for formatted subtitle fields from Apex
@@ -418,6 +426,10 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Get field value from data object (supports dot notation)
+   * Supports nested fields like "Account.Name"
+   * @param {Object} data - Data object to get value from
+   * @param {String} fieldPath - Field path (supports dot notation)
+   * @return {*} Field value or null if not found
    */
   getFieldValue(data, fieldPath) {
     if (!data || !fieldPath) {
@@ -440,6 +452,10 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Format value based on format type
+   * Delegates to shared formatting utilities
+   * @param {*} value - Value to format
+   * @param {String} formatType - Format type (Currency, Number, Percent, Date)
+   * @return {String} Formatted value string
    */
   formatValue(value, formatType) {
     if (value === null || value === undefined) {
@@ -461,7 +477,10 @@ export default class HM_ConfigurableTile extends NavigationMixin(
   }
 
   /**
-   * @description Format change indicator
+   * @description Format change indicator with sign prefix
+   * @param {*} value - Numeric value to format as change
+   * @param {String} formatType - Format type (Percent or Number)
+   * @return {String} Formatted change string with + or - prefix
    */
   formatChange(value, formatType) {
     if (value === null || value === undefined) {
@@ -479,13 +498,14 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Parse number from value
+   * @param {*} value - Value to parse as number
+   * @return {Number} Parsed number, or 0 if invalid
    */
   parseNumber(value) {
     if (typeof value === "number") {
       return value;
     }
     if (typeof value === "string") {
-      // Remove % sign and parse
       const cleaned = value.replace("%", "").trim();
       const parsed = parseFloat(cleaned);
       return isNaN(parsed) ? 0 : parsed;
@@ -500,9 +520,15 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    */
   formatCurrency(value) {
     const num = this.parseNumber(value);
-    if (isNaN(num)) return String(value);
-    if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
+    if (isNaN(num)) {
+      return String(value);
+    }
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(1)}M`;
+    }
+    if (num >= 1000) {
+      return `$${(num / 1000).toFixed(0)}K`;
+    }
     return `$${num.toFixed(0)}`;
   }
 
@@ -513,15 +539,22 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    */
   formatNumber(value) {
     const num = this.parseNumber(value);
-    if (isNaN(num)) return String(value);
+    if (isNaN(num)) {
+      return String(value);
+    }
     return num.toLocaleString();
   }
 
   /**
-   * @description Format percent
+   * @description Format percent value
+   * @param {*} value - Numeric value to format (0.5 = 50%)
+   * @return {String} Formatted percent string
    */
   formatPercent(value) {
     const num = this.parseNumber(value);
+    if (isNaN(num)) {
+      return String(value);
+    }
     return `${num.toFixed(1)}%`;
   }
 
@@ -531,36 +564,35 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @return {String} Formatted datetime string
    */
   formatDateTime(value) {
-    if (!value) return "";
-    
-    // Handle Date objects
+    if (!value) {
+      return "";
+    }
+
     if (value instanceof Date) {
-      if (isNaN(value.getTime())) return "";
+      if (isNaN(value.getTime())) {
+        return "";
+      }
       return value.toLocaleString();
     }
-    
-    // Handle string datetimes from Salesforce
+
     if (typeof value === "string") {
-      // Try parsing directly
       let date = new Date(value);
-      
-      // If that fails, try parsing as ISO format
+
       if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
         date = new Date(value);
       }
-      
-      // If still invalid, try parsing as timestamp
+
       if (isNaN(date.getTime()) && /^\d+$/.test(value)) {
         date = new Date(parseInt(value, 10));
       }
-      
+
       if (isNaN(date.getTime())) {
         return value;
       }
-      
+
       return date.toLocaleString();
     }
-    
+
     return String(value);
   }
 
@@ -570,45 +602,44 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @return {String} Formatted date string
    */
   formatDate(value) {
-    if (!value) return "";
-    
-    // Handle Date objects
+    if (!value) {
+      return "";
+    }
+
     if (value instanceof Date) {
-      if (isNaN(value.getTime())) return "";
+      if (isNaN(value.getTime())) {
+        return "";
+      }
       return value.toLocaleDateString();
     }
-    
-    // Handle string dates from Salesforce
+
     if (typeof value === "string") {
-      // Try parsing directly
       let date = new Date(value);
-      
-      // If that fails, try parsing as YYYY-MM-DD format (Salesforce Date format)
+
       if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
         const dateOnly = value.substring(0, 10);
         date = new Date(dateOnly + "T00:00:00");
       }
-      
-      // If still invalid, try parsing as timestamp
+
       if (isNaN(date.getTime()) && /^\d+$/.test(value)) {
         date = new Date(parseInt(value, 10));
       }
-      
+
       if (isNaN(date.getTime())) {
-        // If all parsing fails, return the original string
         return value;
       }
-      
+
       return date.toLocaleDateString();
     }
-    
-    // Handle numbers (timestamps)
+
     if (typeof value === "number") {
       const date = new Date(value);
-      if (isNaN(date.getTime())) return String(value);
+      if (isNaN(date.getTime())) {
+        return String(value);
+      }
       return date.toLocaleDateString();
     }
-    
+
     return String(value);
   }
 
@@ -619,15 +650,24 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @return {String} Extracted error message
    */
   extractErrorMessage(error) {
-    if (!error) return "Unknown error";
-    if (error.body?.message) return error.body.message;
-    if (error.message) return error.message;
-    if (typeof error === "string") return error;
+    if (!error) {
+      return "Unknown error";
+    }
+    if (error.body?.message) {
+      return error.body.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
     return "Unknown error occurred";
   }
 
   /**
    * @description Get formatted error message for display
+   * @return {String} Extracted error message
    */
   get errorMessage() {
     return this.extractErrorMessage(this.error);
@@ -655,8 +695,9 @@ export default class HM_ConfigurableTile extends NavigationMixin(
   }
 
   /**
-   * @description Handle tile click (navigation if configured)
+   * @description Handle tile click event
    * Placeholder for future navigation functionality
+   * Currently no-op, can be extended for record navigation
    */
   handleTileClick() {
     // Navigation logic can be added here if needed in the future
