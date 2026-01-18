@@ -30,6 +30,12 @@ public with sharing class HM_DashboardTestData implements Callable {
       when 'getMultiObjectTestData' {
         return getMultiObjectTestData();
       }
+      when 'getAccountActivitySummary' {
+        return getAccountActivitySummary();
+      }
+      when 'getCaseList' {
+        return getCaseList();
+      }
       when else {
         throw new AuraHandledException(
           String.format(ERROR_METHOD_NOT_FOUND, new List<String>{ action })
@@ -101,4 +107,97 @@ public with sharing class HM_DashboardTestData implements Callable {
   Decimal totalWonAmount = (Decimal) results[0].get('totalWon');
   return totalWonAmount == null ? 0 : totalWonAmount;
 }
+
+
+public static List<Case> getCaseList() {
+  return[
+    SELECT Id, CaseNumber, Account.Name, Priority, Origin
+    FROM Case
+    WHERE Priority != null AND Origin != null AND OwnerId = :UserInfo.getUserId()
+    LIMIT :DEFAULT_RECORD_LIMIT
+  ];
+}
+
+  /**
+   * @description Get aggregated account activity data as wrapper objects
+   * Combines Account, Opportunity, and Case data into a unified summary
+   * Only returns accounts that have both opportunities (with Amount > 0) and cases
+   * @return List<AccountActivityWrapper> List of aggregated account activity summaries
+   */
+  public static List<AccountActivityWrapper> getAccountActivitySummary() {
+    // Check object accessibility
+    if (!Schema.sObjectType.Account.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_ACCOUNT);
+    }
+    if (!Schema.sObjectType.Opportunity.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_OPPORTUNITY);
+    }
+    if (!Schema.sObjectType.Case.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_CASE);
+    }
+
+    List<AccountActivityWrapper> wrappers = new List<AccountActivityWrapper>();
+
+    // Query accounts with related opportunities and cases
+    List<Account> accounts = [
+      SELECT Id, Name, Client_Code__c, Family_Status__c,
+        (SELECT Id, Amount, StageName, CloseDate FROM Opportunities WHERE Amount != null AND Amount > 0),
+        (SELECT Id, Priority, Status, CaseNumber FROM Cases WHERE Priority != null)
+      FROM Account
+    ];
+
+    for (Account acc : accounts) {
+      // Only process accounts that have both opportunities and cases
+      if (acc.Opportunities.isEmpty() || acc.Cases.isEmpty()) {
+        continue;
+      }
+
+      AccountActivityWrapper wrapper = new AccountActivityWrapper();
+      wrapper.accountId = acc.Id;
+      wrapper.accountName = acc.Name;
+      
+      // Calculate opportunity metrics
+      Decimal totalOpportunityAmount = 0;
+      Integer openOpportunityCount = 0;
+      for (Opportunity opp : acc.Opportunities) {
+        if (opp.Amount != null && opp.Amount > 0) {
+          totalOpportunityAmount += opp.Amount;
+        }
+        if (opp.StageName != 'Closed Won' && opp.StageName != 'Closed Lost') {
+          openOpportunityCount++;
+        }
+      }
+      wrapper.totalOpportunityValue = totalOpportunityAmount;
+      wrapper.openOpportunityCount = openOpportunityCount;
+
+      // Calculate case metrics
+      Integer highPriorityCaseCount = 0;
+      for (Case c : acc.Cases) {
+        if (c.Priority == 'High' || c.Priority == 'Critical') {
+          highPriorityCaseCount++;
+        }
+      }
+      wrapper.highPriorityCaseCount = highPriorityCaseCount;
+
+      // Calculate activity score (simple metric combining opp value and case priority)
+      wrapper.activityScore = (totalOpportunityAmount / 1000) + (highPriorityCaseCount * 10);
+
+      wrappers.add(wrapper);
+    }
+
+    return wrappers;
+  }
+
+  /**
+   * @description Wrapper class for aggregated account activity data
+   * Combines Account, Opportunity, and Case information into a single summary object
+   */
+  public class AccountActivityWrapper {
+    @AuraEnabled public Id accountId;
+    @AuraEnabled public String accountName;
+    @AuraEnabled public Decimal totalOpportunityValue;
+    @AuraEnabled public Integer openOpportunityCount;
+    @AuraEnabled public Integer highPriorityCaseCount;
+    @AuraEnabled public Decimal activityScore;
+  }
 }

@@ -433,12 +433,57 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get row icon based on object type
+   * Supports case-insensitive lookup and default icon fallback
+   * @param {String} objectType Object type to get icon for
+   * @return {String|null} Icon name or null if no match
    */
   getRowIcon(objectType) {
-    if (!this.componentConfig?.rowIconConfiguration) {
+    if (!this.componentConfig?.rowIconConfiguration || !objectType) {
       return null;
     }
-    return this.componentConfig.rowIconConfiguration[objectType] || null;
+
+    const iconConfig = this.componentConfig.rowIconConfiguration;
+    
+    if (!iconConfig || typeof iconConfig !== 'object') {
+      return null;
+    }
+    
+    // Try exact match first
+    if (iconConfig[objectType] && iconConfig[objectType].trim().length > 0) {
+      return iconConfig[objectType];
+    }
+    
+    // Try case-insensitive match
+    const objectTypeLower = objectType.toLowerCase();
+    for (const key in iconConfig) {
+      if (key.toLowerCase() === objectTypeLower) {
+        const iconName = iconConfig[key];
+        if (iconName && iconName.trim().length > 0) {
+          return iconName;
+        }
+      }
+    }
+    
+    // Try default icon (key: "*" or "default")
+    const defaultIcon = iconConfig['*'] || iconConfig['default'];
+    if (defaultIcon && defaultIcon.trim().length > 0) {
+      return defaultIcon;
+    }
+    
+    return null;
+  }
+
+  /**
+   * @description Check if any rows have icons configured
+   * Used to conditionally render icon column
+   * @return {Boolean} True if any row has an icon
+   */
+  get hasRowIcons() {
+    if (!this.rows || this.rows.length === 0) {
+      return false;
+    }
+    
+    return this.rows.some(row => row.rowIcon && row.rowIcon.trim().length > 0);
   }
 
   /**
@@ -736,6 +781,15 @@ export default class HM_ConfigurableList extends NavigationMixin(
    */
   get subtitle() {
     return this.componentConfig?.subtitle || null;
+  }
+
+  /**
+   * @description Get header icon from config
+   * Returns icon name if exists and not blank, null otherwise
+   */
+  get headerIcon() {
+    const iconName = this.componentConfig?.iconName;
+    return iconName && iconName.trim().length > 0 ? iconName : null;
   }
 
   /**

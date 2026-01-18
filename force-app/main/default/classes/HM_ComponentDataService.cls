@@ -389,6 +389,10 @@ public with sharing class HM_ComponentDataService {
     }
 
     try {
+      // Extract method name from full signature if needed
+      // Handles patterns like "public static List<X> methodName()" → "methodName"
+      String extractedMethodName = extractMethodName(methodName);
+
       // Get Type for the class (already validated in executeComponentQuery)
       Type classType = Type.forName(className);
       if (classType == null) {
@@ -399,7 +403,7 @@ public with sharing class HM_ComponentDataService {
 
       // Call the method using Callable interface
       // All classes must implement Callable interface for dynamic invocation
-      Object result = callMethodDynamically(classType, methodName, params);
+      Object result = callMethodDynamically(classType, extractedMethodName, params);
 
       // Convert result to List<Map<String, Object>>
       List<Map<String, Object>> resultList = convertToResultList(result);
@@ -413,6 +417,48 @@ public with sharing class HM_ComponentDataService {
   }
 
   // ==================== HELPER METHODS ====================
+
+  /**
+   * @description Extract method name from full method signature
+   * Handles patterns like "public static List<X> methodName()" → "methodName"
+   * If methodName is already just a method name, returns it as-is
+   * @param methodSignature Full method signature or just method name
+   * @return String Extracted method name
+   */
+  private static String extractMethodName(String methodSignature) {
+    if (String.isBlank(methodSignature)) {
+      return methodSignature;
+    }
+
+    // If it doesn't contain spaces or parentheses, assume it's already just the method name
+    if (!methodSignature.contains(' ') && !methodSignature.contains('(')) {
+      return methodSignature;
+    }
+
+    // Pattern: "public static ReturnType methodName()" or "ReturnType methodName()"
+    // Find the last word before the opening parenthesis
+    String trimmed = methodSignature.trim();
+    
+    // Find the last space before the opening parenthesis
+    Integer parenIndex = trimmed.indexOf('(');
+    if (parenIndex > 0) {
+      String beforeParen = trimmed.substring(0, parenIndex).trim();
+      // Get the last word (method name)
+      List<String> parts = beforeParen.split('\\s+');
+      if (!parts.isEmpty()) {
+        return parts[parts.size() - 1];
+      }
+    }
+    
+    // Fallback: if no parenthesis, try to get last word
+    List<String> parts = trimmed.split('\\s+');
+    if (!parts.isEmpty()) {
+      return parts[parts.size() - 1];
+    }
+
+    // If all else fails, return original
+    return methodSignature;
+  }
 
   /**
    * @description Normalize SOQL query by removing line breaks and excessive whitespace
@@ -629,7 +675,7 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Convert method result to List<Map<String, Object>>
-   * Handles various return types: List<Map>, List<Object>, Map<String, List>, SObject, null
+   * Handles various return types: List<Map>, List<Object>, List<WrapperRecord>, Map<String, List>, SObject, null
    * @param result Result object from Apex method call
    * @return List<Map<String, Object>> Converted result list, empty list if result is null or unsupported type
    */
@@ -643,13 +689,71 @@ public with sharing class HM_ComponentDataService {
     }
 
     if (result instanceof List<Object>) {
-      List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-      for (Object item : (List<Object>) result) {
-        if (item instanceof Map<String, Object>) {
-          resultList.add((Map<String, Object>) item);
+      List<Object> objectList = (List<Object>) result;
+      
+      // Check if list is empty
+      if (objectList.isEmpty()) {
+        return new List<Map<String, Object>>();
+      }
+
+      // Check first item to determine type
+      Object firstItem = objectList[0];
+      
+      // If all items are Maps, return as-is
+      Boolean allMaps = true;
+      for (Object item : objectList) {
+        if (!(item instanceof Map<String, Object>)) {
+          allMaps = false;
+          break;
         }
       }
-      return resultList;
+      if (allMaps) {
+        List<Map<String, Object>> resultList = new List<Map<String, Object>>();
+        for (Object item : objectList) {
+          resultList.add((Map<String, Object>) item);
+        }
+        return resultList;
+      }
+
+      // If all items are SObjects, convert them
+      Boolean allSObjects = true;
+      for (Object item : objectList) {
+        if (!(item instanceof SObject)) {
+          allSObjects = false;
+          break;
+        }
+      }
+      if (allSObjects) {
+        // Infer object type from first SObject
+        String objectType = firstItem instanceof SObject 
+          ? String.valueOf(((SObject) firstItem).getSObjectType())
+          : 'Unknown';
+        return convertSObjectListToMapList((List<SObject>) objectList, objectType);
+      }
+
+      // If items are neither Maps nor SObjects, they're likely wrapper classes
+      // Use JSON serialization to convert wrappers to Maps
+      // Infer object type from wrapper class name if possible
+      // IMPORTANT: Keep the full class name (including "Wrapper" if present) so it matches
+      // the Detail Map configuration where users specify the full class name
+      String objectType = 'Custom';
+      if (firstItem != null) {
+        try {
+          // Get string representation and extract class name
+          String itemString = String.valueOf(firstItem);
+          // Pattern: "ClassName:[field=value, ...]" or just "ClassName"
+          String className = itemString.split(':')[0].trim();
+          
+          // Use the full class name as-is (don't remove "Wrapper" suffix)
+          // This ensures it matches what users configure in Detail Maps
+          // Example: "AccountActivityWrapper" stays as "AccountActivityWrapper"
+          objectType = className;
+        } catch (Exception ex) {
+          // If parsing fails, use default
+          objectType = 'Custom';
+        }
+      }
+      return convertWrapperListToMapList(objectList, objectType);
     }
 
     if (result instanceof Map<String, Object>) {
@@ -763,6 +867,125 @@ public with sharing class HM_ComponentDataService {
       }
       // Skip unsupported types (non-SObject, non-Map items) - only SObject and Map are supported
     }
+    return resultList;
+  }
+
+  /**
+   * @description Convert a List of wrapper objects to List<Map<String, Object>> with object type metadata
+   * Uses JSON serialization to convert wrapper classes (with @AuraEnabled properties) to Maps
+   * @param wrapperList List of wrapper objects to convert
+   * @param objectType Object type name to add to each record (defaults to "Custom" if not provided)
+   * @return List<Map<String, Object>> Converted list with object type metadata
+   */
+  private static List<Map<String, Object>> convertWrapperListToMapList(List<Object> wrapperList, String objectType) {
+    List<Map<String, Object>> resultList = new List<Map<String, Object>>();
+    
+    if (wrapperList == null || wrapperList.isEmpty()) {
+      return resultList;
+    }
+
+    // Use default object type if not provided
+    String finalObjectType = String.isNotBlank(objectType) ? objectType : 'Custom';
+
+    try {
+      // Serialize the entire list to JSON, then deserialize using a workaround
+      // JSON.deserialize() doesn't support List<Map<String, Object>>.class directly
+      // So we deserialize as List<Object> and then convert each item
+      String jsonString = JSON.serialize(wrapperList);
+      
+      // Deserialize as List<Object> first (this works in Apex)
+      List<Object> deserializedObjects = (List<Object>) JSON.deserializeUntyped(jsonString);
+
+      // Convert each Object to Map<String, Object>
+      Integer index = 0;
+      for (Object obj : deserializedObjects) {
+        Map<String, Object> recordMap;
+        
+        if (obj instanceof Map<String, Object>) {
+          recordMap = (Map<String, Object>) obj;
+        } else {
+          // If it's not already a Map, serialize and deserialize the individual object
+          String objJson = JSON.serialize(obj);
+          recordMap = (Map<String, Object>) JSON.deserializeUntyped(objJson);
+        }
+        
+        if (recordMap == null || recordMap.isEmpty()) {
+          continue;
+        }
+        
+        // Validate that the record has at least one non-null, non-empty value
+        // Skip records that are essentially empty (all values are null/empty)
+        Boolean hasValidData = false;
+        for (String key : recordMap.keySet()) {
+          Object value = recordMap.get(key);
+          if (value != null) {
+            // Check if it's a non-empty string, non-zero number, or non-empty collection
+            if (value instanceof String) {
+              if (String.isNotBlank((String) value)) {
+                hasValidData = true;
+                break;
+              }
+            } else if (value instanceof Decimal || value instanceof Integer) {
+              // Numbers are valid even if 0
+              hasValidData = true;
+              break;
+            } else {
+              // Other types (Id, Boolean, etc.) are valid if not null
+              hasValidData = true;
+              break;
+            }
+          }
+        }
+        
+        if (!hasValidData) {
+          continue;
+        }
+
+        // Dynamically find ID field - look for any field ending in 'Id' or 'ID' (case-insensitive)
+        // This avoids hardcoding specific field names
+        if (!recordMap.containsKey('Id')) {
+          Boolean idFound = false;
+          
+          // Search for ID fields dynamically
+          for (String key : recordMap.keySet()) {
+            String keyLower = key.toLowerCase();
+            // Check if field ends with 'id' (but not just 'id' itself, and longer than 2 chars)
+            // This catches: accountId, contactId, opportunityId, caseId, recordId, etc.
+            if ((keyLower.endsWith('id') && keyLower.length() > 2) || keyLower.equals('id')) {
+              Object idValue = recordMap.get(key);
+              if (idValue != null) {
+                recordMap.put('Id', idValue);
+                idFound = true;
+                break;
+              }
+            }
+          }
+          
+          // If no ID field found, create synthetic ID from index
+          // LWC needs Id or recordId for row identification
+          if (!idFound) {
+            recordMap.put('Id', 'wrapper-' + index);
+          }
+        }
+
+        // Add object type metadata
+        recordMap.put('attributes', new Map<String, Object>{
+          'type' => finalObjectType
+        });
+        recordMap.put('recordType', finalObjectType);
+        
+        resultList.add(recordMap);
+        index++;
+      }
+    } catch (JSONException ex) {
+      // JSON serialization/deserialization failed
+      // Return empty list to prevent breaking the component
+      return new List<Map<String, Object>>();
+    } catch (Exception ex) {
+      // Other unexpected errors
+      return new List<Map<String, Object>>();
+    }
+
     return resultList;
   }
 

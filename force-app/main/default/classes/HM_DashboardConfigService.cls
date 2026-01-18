@@ -282,24 +282,15 @@ public with sharing class HM_DashboardConfigService {
         throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_COMPONENT);
       }
 
-      HM_Dashboard_Component__c component = [
-        SELECT
-          Id,
-          Name,
-          HM_Display_Order__c,
-          HM_Type__c,
-          HM_Title__c,
-          HM_Subtitle__c,
-          HM_Icon_Name__c,
-          HM_Active__c,
-          HM_Row_Icon_Configuration__c,
-          HM_Enable_List_Pagination__c,
-          HM_Records_Per_Page__c,
-          HM_Enable_Column_Sorting__c
-        FROM HM_Dashboard_Component__c
-        WHERE Id = :componentId AND HM_Active__c = TRUE
-        LIMIT 1
-      ];
+      // Build dynamic SOQL query based on field existence and accessibility
+      List<String> queryFields = buildComponentQueryFields();
+      String soqlQuery = 'SELECT ' + String.join(queryFields, ', ') + 
+        ' FROM HM_Dashboard_Component__c' +
+        ' WHERE Id = :componentId AND HM_Active__c = TRUE' +
+        ' LIMIT 1';
+      
+      List<HM_Dashboard_Component__c> components = Database.query(soqlQuery);
+      HM_Dashboard_Component__c component = components.isEmpty() ? null : components[0];
 
       if (component == null) {
         return null;
@@ -428,12 +419,30 @@ public with sharing class HM_DashboardConfigService {
     mapData.put('type', component.HM_Type__c);
     mapData.put('title', component.HM_Title__c);
     mapData.put('subtitle', component.HM_Subtitle__c);
-    mapData.put('iconName', component.HM_Icon_Name__c);
     mapData.put('active', component.HM_Active__c);
     
-    // Parse row icon configuration from comma-separated format
-    Map<String, String> iconMap = parseRowIconConfiguration(component.HM_Row_Icon_Configuration__c);
-    mapData.put('rowIconConfiguration', iconMap);
+    // Only set iconName if field exists and has value
+    try {
+      String iconName = (String) component.get('HM_Icon_Name__c');
+      mapData.put('iconName', String.isNotBlank(iconName) ? iconName : null);
+    } catch (Exception ex) {
+      // Field doesn't exist - set to null
+      mapData.put('iconName', null);
+    }
+    
+    // Only set rowIconConfiguration if field exists and has value
+    try {
+      String rowIconConfig = (String) component.get('HM_Row_Icon_Configuration__c');
+      if (String.isNotBlank(rowIconConfig)) {
+        Map<String, String> iconMap = parseRowIconConfiguration(rowIconConfig);
+        mapData.put('rowIconConfiguration', iconMap);
+      } else {
+        mapData.put('rowIconConfiguration', null);
+      }
+    } catch (Exception ex) {
+      // Field doesn't exist - set to null
+      mapData.put('rowIconConfiguration', null);
+    }
     
     // Pagination configuration
     mapData.put('enablePagination', component.HM_Enable_List_Pagination__c == true);
@@ -468,11 +477,13 @@ public with sharing class HM_DashboardConfigService {
   }
 
   /**
-   * @description Parse comma-separated row icon configuration string
-   * Format: "ObjectType:IconName,ObjectType:IconName"
-   * Example: "Opportunity:standard:opportunity,Case:standard:case"
-   * @param configString Comma-separated configuration string
-   * @return Map<String, String> Map of object type to icon name
+   * @description Parse row icon configuration string
+   * Supports three formats:
+   * 1. Single icon value: "utility:moneybag" (applies to all object types)
+   * 2. JSON format: "{\"Account\":\"standard:account\",\"Contact\":\"standard:contact\"}"
+   * 3. Comma-separated format: "ObjectType:IconName,ObjectType:IconName"
+   * @param configString Configuration string in any supported format
+   * @return Map<String, String> Map of object type to icon name, with '*' key for default icon
    */
   private static Map<String, String> parseRowIconConfiguration(String configString) {
     Map<String, String> iconMap = new Map<String, String>();
@@ -481,19 +492,50 @@ public with sharing class HM_DashboardConfigService {
       return iconMap;
     }
     
+    String trimmed = configString.trim();
+    
+    // Check if it's JSON format (starts with {)
+    if (trimmed.startsWith('{')) {
+      try {
+        Map<String, Object> jsonMap = (Map<String, Object>) JSON.deserializeUntyped(trimmed);
+        for (String key : jsonMap.keySet()) {
+          Object value = jsonMap.get(key);
+          if (value != null && value instanceof String) {
+            String iconName = (String) value;
+            if (String.isNotBlank(iconName)) {
+              iconMap.put(key, iconName);
+            }
+          }
+        }
+        return iconMap;
+      } catch (Exception ex) {
+        // JSON parsing failed - fall through to comma-separated parsing
+      }
+    }
+    
+    // Check if it's a single icon value (no colon, or colon is part of icon name like "utility:moneybag")
+    // Single value means: no comma AND colon is only in icon namespace (utility:, standard:, etc.)
+    if (!trimmed.contains(PARSE_DELIMITER_COMMA)) {
+      // Single icon value - treat as default for all object types
+      if (String.isNotBlank(trimmed)) {
+        iconMap.put('*', trimmed);
+      }
+      return iconMap;
+    }
+    
     // Parse comma-separated pairs (format: "ObjectType:IconName,ObjectType:IconName")
-    List<String> pairs = configString.split(PARSE_DELIMITER_COMMA);
+    List<String> pairs = trimmed.split(PARSE_DELIMITER_COMMA);
     
     for (String pair : pairs) {
-      String trimmed = pair.trim();
-      if (String.isBlank(trimmed)) {
+      String pairTrimmed = pair.trim();
+      if (String.isBlank(pairTrimmed)) {
         continue;
       }
       
-      Integer colonIndex = trimmed.indexOf(PARSE_DELIMITER_COLON);
-      if (colonIndex > 0 && colonIndex < trimmed.length() - 1) {
-        String objectType = trimmed.substring(0, colonIndex).trim();
-        String iconName = trimmed.substring(colonIndex + 1).trim();
+      Integer colonIndex = pairTrimmed.indexOf(PARSE_DELIMITER_COLON);
+      if (colonIndex > 0 && colonIndex < pairTrimmed.length() - 1) {
+        String objectType = pairTrimmed.substring(0, colonIndex).trim();
+        String iconName = pairTrimmed.substring(colonIndex + 1).trim();
         
         if (String.isNotBlank(objectType) && String.isNotBlank(iconName)) {
           iconMap.put(objectType, iconName);
@@ -503,6 +545,50 @@ public with sharing class HM_DashboardConfigService {
     }
     
     return iconMap;
+  }
+
+  /**
+   * @description Build list of field names for component SOQL query
+   * Dynamically checks field existence and FLS accessibility
+   * @return List<String> Field names to include in SOQL query
+   */
+  private static List<String> buildComponentQueryFields() {
+    List<String> fields = new List<String>{
+      'Id',
+      'Name',
+      'HM_Display_Order__c',
+      'HM_Type__c',
+      'HM_Title__c',
+      'HM_Subtitle__c',
+      'HM_Active__c',
+      'HM_Enable_List_Pagination__c',
+      'HM_Records_Per_Page__c',
+      'HM_Enable_Column_Sorting__c'
+    };
+    
+    // Check if HM_Icon_Name__c exists and is accessible
+    try {
+      Schema.DescribeFieldResult iconNameField = Schema.sObjectType.HM_Dashboard_Component__c
+        .fields.HM_Icon_Name__c.getDescribe();
+      if (iconNameField.isAccessible()) {
+        fields.add('HM_Icon_Name__c');
+      }
+    } catch (Exception ex) {
+      // Field doesn't exist or not accessible - skip it
+    }
+    
+    // Check if HM_Row_Icon_Configuration__c exists and is accessible
+    try {
+      Schema.DescribeFieldResult rowIconField = Schema.sObjectType.HM_Dashboard_Component__c
+        .fields.HM_Row_Icon_Configuration__c.getDescribe();
+      if (rowIconField.isAccessible()) {
+        fields.add('HM_Row_Icon_Configuration__c');
+      }
+    } catch (Exception ex) {
+      // Field doesn't exist or not accessible - skip it
+    }
+    
+    return fields;
   }
 
   /**

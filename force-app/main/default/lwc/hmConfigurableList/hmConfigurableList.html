@@ -4,7 +4,17 @@
       <template if:true={componentConfig}>
         <div class="cc-card-header">
           <div>
-            <h2 class="cc-card-title">{title}</h2>
+            <div class="cc-header-title-row">
+              <template if:true={headerIcon}>
+                <lightning-icon
+                  icon-name={headerIcon}
+                  size="small"
+                  class="cc-header-icon"
+                  alternative-text=""
+                ></lightning-icon>
+              </template>
+              <h2 class="cc-card-title">{title}</h2>
+            </div>
             <template if:true={subtitle}>
               <p class="cc-card-subtitle">{subtitle}</p>
             </template>
@@ -42,7 +52,9 @@
         <template if:false={errorMessage}>
           <!-- Table Header -->
           <div class="cc-table-header">
-            <div class="cc-col-icon"></div>
+            <template if:true={hasRowIcons}>
+              <div class="cc-col-icon"></div>
+            </template>
             <template for:each={visibleColumns} for:item="column">
               <div
                 key={column.key}
@@ -76,15 +88,17 @@
                   data-object-type={row.objectType}
                 >
                   <!-- Row Icon -->
-                  <div class="cc-col-icon">
-                    <template if:true={row.rowIcon}>
-                      <lightning-icon
-                        icon-name={row.rowIcon}
-                        size="small"
-                        alternative-text={row.objectType}
-                      ></lightning-icon>
-                    </template>
-                  </div>
+                  <template if:true={hasRowIcons}>
+                    <div class="cc-col-icon">
+                      <template if:true={row.rowIcon}>
+                        <lightning-icon
+                          icon-name={row.rowIcon}
+                          size="small"
+                          alternative-text={row.objectType}
+                        ></lightning-icon>
+                      </template>
+                    </div>
+                  </template>
 
                   <!-- Row Cells -->
                   <template for:each={row.visibleCells} for:item="cell">
