@@ -1,0 +1,236 @@
+/* ==================== CSS CUSTOM PROPERTIES ==================== */
+:host {
+  --cc-spacing-xs: 4px;
+  --cc-spacing-sm: 8px;
+  --cc-spacing-md: 16px;
+  --cc-spacing-lg: 24px;
+  --cc-spacing-xl: 32px;
+  --cc-radius-sm: 6px;
+  --cc-radius-md: 8px;
+  --cc-radius-lg: 12px;
+  --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hm-tile-container {
+  /* Container wrapper for dark mode support */
+}
+
+/* ==================== KPI CARD ==================== */
+.cc-kpi-card {
+  background: #ffffff;
+  border-radius: var(--cc-radius-lg);
+  padding: 20px;
+  box-shadow: var(--cc-shadow-sm);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.3s ease,
+    border-color 0.3s ease;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.cc-dark .cc-kpi-card {
+  background: #1e1e1e;
+  border-color: #2a2a2a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.cc-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--cc-shadow-md);
+}
+
+.cc-dark .cc-kpi-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border-color: #3a3a3a;
+}
+
+.cc-kpi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.cc-kpi-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--cc-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cc-kpi-icon--brand {
+  background: rgba(1, 118, 211, 0.15);
+}
+
+.cc-kpi-icon--brand lightning-icon {
+  --lwc-colorTextIconDefault: #0176d3;
+}
+
+.cc-dark .cc-kpi-icon--brand {
+  background: rgba(27, 150, 255, 0.2);
+}
+
+.cc-dark .cc-kpi-icon--brand lightning-icon {
+  --lwc-colorTextIconDefault: #1b96ff;
+}
+
+.cc-kpi-icon--alert {
+  background: rgba(234, 0, 30, 0.15);
+}
+
+.cc-kpi-icon--alert lightning-icon {
+  --lwc-colorTextIconDefault: #ea001e;
+}
+
+.cc-dark .cc-kpi-icon--alert {
+  background: rgba(255, 82, 82, 0.2);
+}
+
+.cc-dark .cc-kpi-icon--alert lightning-icon {
+  --lwc-colorTextIconDefault: #ff5252;
+}
+
+.cc-kpi-change {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 20px;
+}
+
+.cc-kpi-change--up {
+  background: rgba(46, 132, 74, 0.15);
+  color: #2e844a;
+}
+
+.cc-kpi-change--up lightning-icon {
+  --lwc-colorTextIconDefault: #2e844a;
+}
+
+.cc-dark .cc-kpi-change--up {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.cc-dark .cc-kpi-change--up lightning-icon {
+  --lwc-colorTextIconDefault: #4caf50;
+}
+
+.cc-kpi-change--down {
+  background: rgba(234, 0, 30, 0.15);
+  color: #ea001e;
+}
+
+.cc-kpi-change--down lightning-icon {
+  --lwc-colorTextIconDefault: #ea001e;
+}
+
+.cc-dark .cc-kpi-change--down {
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+}
+
+.cc-dark .cc-kpi-change--down lightning-icon {
+  --lwc-colorTextIconDefault: #ff5252;
+}
+
+/* ==================== KPI BADGE ==================== */
+.cc-kpi-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 20px;
+}
+
+.cc-kpi-badge--up {
+  background: rgba(46, 132, 74, 0.15);
+  color: #2e844a;
+}
+
+.cc-kpi-badge--up lightning-icon {
+  --lwc-colorTextIconDefault: #2e844a;
+}
+
+.cc-dark .cc-kpi-badge--up {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.cc-dark .cc-kpi-badge--up lightning-icon {
+  --lwc-colorTextIconDefault: #4caf50;
+}
+
+.cc-kpi-badge--down {
+  background: rgba(234, 0, 30, 0.15);
+  color: #ea001e;
+}
+
+.cc-kpi-badge--down lightning-icon {
+  --lwc-colorTextIconDefault: #ea001e;
+}
+
+.cc-dark .cc-kpi-badge--down {
+  background: rgba(255, 82, 82, 0.2);
+  color: #ff5252;
+}
+
+.cc-dark .cc-kpi-badge--down lightning-icon {
+  --lwc-colorTextIconDefault: #ff5252;
+}
+
+.cc-kpi-label {
+  font-size: 0.875rem;
+  color: #747474;
+  margin: 0 0 4px 0;
+  transition: color 0.3s ease;
+}
+
+.cc-dark .cc-kpi-label {
+  color: #a0a0a0;
+}
+
+.cc-kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #181818;
+  margin: 0 0 4px 0;
+  transition: color 0.3s ease;
+}
+
+.cc-dark .cc-kpi-value {
+  color: #ffffff;
+}
+
+.cc-kpi-subtitle {
+  font-size: 0.75rem;
+  color: #747474;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.cc-dark .cc-kpi-subtitle {
+  color: #808080;
+}
+
+.cc-error-message {
+  padding: var(--cc-spacing-md);
+  color: #ea001e;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.cc-dark .cc-error-message {
+  color: #ff5252;
+}

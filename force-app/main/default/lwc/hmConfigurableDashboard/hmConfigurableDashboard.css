@@ -1,0 +1,157 @@
+/* ==================== CSS CUSTOM PROPERTIES ==================== */
+:host {
+  --cc-spacing-xs: 4px;
+  --cc-spacing-sm: 8px;
+  --cc-spacing-md: 16px;
+  --cc-spacing-lg: 24px;
+  --cc-spacing-xl: 32px;
+  --cc-radius-sm: 6px;
+  --cc-radius-md: 8px;
+  --cc-radius-lg: 12px;
+  --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ==================== CONTAINER ==================== */
+.cc-container {
+  padding: var(--cc-spacing-lg);
+  background: #f3f3f3;
+  min-height: 100%;
+  transition: background 0.3s ease;
+}
+
+.cc-container.cc-dark {
+  background: #121212;
+}
+
+/* ==================== WELCOME BANNER ==================== */
+.cc-welcome {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--cc-spacing-lg);
+}
+
+.cc-welcome-heading {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #181818;
+  margin: 0 0 4px 0;
+  transition: color 0.3s ease;
+}
+
+.cc-dark .cc-welcome-heading {
+  color: #ffffff;
+}
+
+.cc-welcome-subtext {
+  font-size: 0.875rem;
+  color: #747474;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+.cc-dark .cc-welcome-subtext {
+  color: #a0a0a0;
+}
+
+/* Actions Menu Button - Light Mode */
+/* Square button with rounded corners (modern look) */
+.cc-actions-menu {
+  --slds-c-button-color-background: #ffffff;
+  --slds-c-button-color-border: #aeaeae;
+  --slds-c-button-text-color: #444444;
+  --slds-c-button-radius-border: 0.25rem;
+  --slds-c-button-sizing-height: 44px;
+  --slds-c-button-sizing-width: 44px;
+  --slds-c-button-icon-sizing-height: 44px;
+  --slds-c-button-icon-sizing-width: 44px;
+  transition: all 0.2s ease;
+  display: inline-block;
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+}
+
+.cc-actions-menu--open {
+  --slds-c-button-color-background: #0176d3;
+  --slds-c-button-color-border: #0176d3;
+  --slds-c-button-text-color: #ffffff;
+}
+
+/* Actions Menu Button - Dark Mode */
+:host(.cc-dark) .cc-actions-menu,
+.cc-dark .cc-actions-menu {
+  --slds-c-button-color-background: #1e1e1e;
+  --slds-c-button-color-border: #333;
+  --slds-c-button-text-color: #a0a0a0;
+}
+
+:host(.cc-dark) .cc-actions-menu--open,
+.cc-dark .cc-actions-menu--open {
+  --slds-c-button-color-background: #1b96ff;
+  --slds-c-button-color-border: #1b96ff;
+  --slds-c-button-text-color: #ffffff;
+}
+
+/* Menu Dropdown Styling - Global styles for popover (rendered outside shadow DOM) */
+:host {
+  /* Light mode menu defaults */
+}
+
+:host(.cc-dark) {
+  /* Dark mode - these CSS variables may be picked up by menu items */
+  --slds-c-menu-color-background: #1e1e1e;
+  --slds-c-menu-color-border: #333;
+  --slds-c-menu-text-color: #ffffff;
+}
+
+/* Note: Menu dropdown styling is limited due to shadow DOM.
+   The variant="border-inverse" should handle dark mode button styling.
+   Menu dropdown items may need to be styled via global CSS or theme settings. */
+
+/* ==================== DASHBOARD GROUPS ==================== */
+.cc-dashboard-group {
+  margin-bottom: var(--cc-spacing-lg);
+}
+
+.cc-dashboard-group:last-child {
+  margin-bottom: 0;
+}
+
+/* ==================== LOADING & ERROR ==================== */
+.cc-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--cc-spacing-xl);
+  min-height: 400px;
+}
+
+.cc-error-message {
+  padding: var(--cc-spacing-lg);
+  color: #ea001e;
+  font-size: 0.875rem;
+  text-align: center;
+  background: #ffffff;
+  border-radius: var(--cc-radius-md);
+  border: 1px solid rgba(234, 0, 30, 0.2);
+}
+
+.cc-dark .cc-error-message {
+  color: #ff5252;
+  background: #1e1e1e;
+  border-color: rgba(255, 82, 82, 0.2);
+}
+
+.cc-empty-dashboard {
+  padding: var(--cc-spacing-xl);
+  text-align: center;
+  color: #747474;
+  font-size: 0.875rem;
+}
+
+.cc-dark .cc-empty-dashboard {
+  color: #a0a0a0;
+}

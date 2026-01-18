@@ -1,0 +1,41 @@
+<template>
+  <div class={containerClass}>
+    <div class={tileClass} onclick={handleTileClick}>
+      <template if:true={isLoading}>
+        <lightning-spinner
+          alternative-text="Loading"
+          size="small"
+        ></lightning-spinner>
+      </template>
+
+      <template if:false={isLoading}>
+        <template if:true={error}>
+          <div class="cc-error-message">{errorMessage}</div>
+        </template>
+
+        <template if:false={error}>
+          <div class="cc-kpi-header">
+            <div class={tileData.iconClass}>
+              <lightning-icon
+                icon-name={tileData.iconName}
+                size="x-small"
+              ></lightning-icon>
+            </div>
+            <template if:true={tileData.badge}>
+              <div class={tileData.badge.class}>
+                <lightning-icon
+                  icon-name={tileData.badge.icon}
+                  size="xx-small"
+                ></lightning-icon>
+                <span>{tileData.badge.text}</span>
+              </div>
+            </template>
+          </div>
+          <p class="cc-kpi-label">{title}</p>
+          <p class="cc-kpi-value">{tileData.value}</p>
+          <p class="cc-kpi-subtitle">{tileData.subtitle}</p>
+        </template>
+      </template>
+    </div>
+  </div>
+</template>

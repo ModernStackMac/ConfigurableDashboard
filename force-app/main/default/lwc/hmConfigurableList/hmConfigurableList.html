@@ -1,0 +1,189 @@
+<template>
+  <div class={containerClass}>
+    <div class="cc-card">
+      <template if:true={componentConfig}>
+        <div class="cc-card-header">
+          <div>
+            <h2 class="cc-card-title">{title}</h2>
+            <template if:true={subtitle}>
+              <p class="cc-card-subtitle">{subtitle}</p>
+            </template>
+          </div>
+          <template if:true={showFilters}>
+            <div class="cc-filter-group">
+              <template for:each={filters} for:item="filter">
+                <button
+                  key={filter.value}
+                  class={filter.class}
+                  onclick={handleFilterClick}
+                  data-filter={filter.value}
+                >
+                  {filter.label} ({filter.count})
+                </button>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <template if:true={isLoading}>
+        <div class="cc-loading">
+          <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+        </div>
+      </template>
+
+      <template if:false={isLoading}>
+        <template if:true={errorMessage}>
+          <div class="cc-error">
+            Error loading list data: {errorMessage}
+          </div>
+        </template>
+
+        <template if:false={errorMessage}>
+          <!-- Table Header -->
+          <div class="cc-table-header">
+            <div class="cc-col-icon"></div>
+            <template for:each={visibleColumns} for:item="column">
+              <div
+                key={column.key}
+                class={column.headerClass}
+                onclick={handleColumnSort}
+                data-column-key={column.key}
+                title={column.title}
+              >
+                <span class="cc-col-label">{column.label}</span>
+                <template if:true={column.sortIcon}>
+                  <lightning-icon
+                    icon-name={column.sortIcon}
+                    size="xx-small"
+                    class="cc-sort-icon"
+                    alternative-text={column.sortAlternativeText}
+                  ></lightning-icon>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <!-- Table Body -->
+          <div class="cc-table-body">
+            <template if:true={paginatedRows.length}>
+              <template for:each={paginatedRows} for:item="row">
+                <div
+                  key={row.id}
+                  class="cc-table-row"
+                  onclick={handleRowClick}
+                  data-record-id={row.recordId}
+                  data-object-type={row.objectType}
+                >
+                  <!-- Row Icon -->
+                  <div class="cc-col-icon">
+                    <template if:true={row.rowIcon}>
+                      <lightning-icon
+                        icon-name={row.rowIcon}
+                        size="small"
+                        alternative-text={row.objectType}
+                      ></lightning-icon>
+                    </template>
+                  </div>
+
+                  <!-- Row Cells -->
+                  <template for:each={row.visibleCells} for:item="cell">
+                    <div key={cell.key} class="cc-col-data">
+                      <template if:true={cell.applicable}>
+                        <div class="cc-cell-content">
+                          <template if:false={cell.hasBadgeType}>
+                            <span class="cc-cell-value">{cell.value}</span>
+                          </template>
+                          <template if:true={cell.hasBadgeType}>
+                            <template if:true={cell.badge}>
+                              <div class={cell.badge.className}>
+                                <template if:true={cell.badge.icon}>
+                                  <lightning-icon
+                                    icon-name={cell.badge.icon}
+                                    size="xx-small"
+                                    class="cc-badge-icon"
+                                  ></lightning-icon>
+                                </template>
+                                <span class="cc-badge-text">{cell.badge.text}</span>
+                              </div>
+                            </template>
+                            <template if:false={cell.badge}>
+                              <span class="cc-cell-value">{cell.value}</span>
+                            </template>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </template>
+            <template if:false={paginatedRows.length}>
+              <div class="cc-empty">
+                <p>No records found</p>
+              </div>
+            </template>
+          </div>
+
+          <!-- Pagination - Simplified design with page info on left -->
+          <template if:true={enablePagination}>
+            <template if:true={filteredRows.length}>
+              <div class="cc-pagination">
+                <div class="cc-pagination-info">
+                  {paginationInfo}
+                </div>
+
+                <div class="cc-pagination-controls">
+                  <button
+                    class="cc-pagination-btn"
+                    onclick={handlePreviousPage}
+                    disabled={isPreviousDisabled}
+                    title="Previous page"
+                  >
+                    <lightning-icon
+                      icon-name="utility:chevronleft"
+                      size="x-small"
+                      alternative-text="Previous"
+                    ></lightning-icon>
+                  </button>
+
+                  <div class="cc-pagination-pages">
+                    <template for:each={pageNumbers} for:item="page">
+                      <template if:true={page.number}>
+                        <button
+                          key={page.number}
+                          class={page.class}
+                          onclick={handlePageChange}
+                          data-page={page.number}
+                          aria-label={page.ariaLabel}
+                        >
+                          {page.number}
+                        </button>
+                      </template>
+                      <template if:false={page.number}>
+                        <span key={page.type} class="cc-pagination-ellipsis" aria-hidden="true">...</span>
+                      </template>
+                    </template>
+                  </div>
+
+                  <button
+                    class="cc-pagination-btn"
+                    onclick={handleNextPage}
+                    disabled={isNextDisabled}
+                    title="Next page"
+                  >
+                    <lightning-icon
+                      icon-name="utility:chevronright"
+                      size="x-small"
+                      alternative-text="Next"
+                    ></lightning-icon>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </template>
+        </template>
+      </template>
+    </div>
+  </div>
+</template>

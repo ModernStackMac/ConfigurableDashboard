@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Field_API_Name__c</fullName>
+    <externalId>false</externalId>
+    <inlineHelpText>API name of the field from the data source (Apex method or SOQL query result). This must match a key in the returned data. For nested fields, use dot notation (e.g., Account.Name). Examples: pipelineValue, name, amount, accountName.</inlineHelpText>
+    <label>Field API Name</label>
+    <length>255</length>
+    <required>true</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

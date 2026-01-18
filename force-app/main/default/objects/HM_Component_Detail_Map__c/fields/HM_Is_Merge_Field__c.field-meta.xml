@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Is_Merge_Field__c</fullName>
+    <defaultValue>false</defaultValue>
+    <inlineHelpText>Check this box if the field value should be merged into text. For example, if the value is a count (e.g., 5), checking this will display it as &quot;5 open opportunities&quot; when used in a subtitle. Useful for Tile Subtitle mappings.</inlineHelpText>
+    <label>Is Merge Field</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

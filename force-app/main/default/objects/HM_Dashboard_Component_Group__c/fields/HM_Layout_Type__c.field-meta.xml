@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Layout_Type__c</fullName>
+    <inlineHelpText>Select how components in this group should be arranged. Horizontal: side-by-side in a row (best for KPI tiles). Vertical: stacked top-to-bottom (best for lists). Grid: multi-column grid layout.</inlineHelpText>
+    <label>Layout Type</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Horizontal</fullName>
+                <default>true</default>
+                <label>Horizontal</label>
+            </value>
+            <value>
+                <fullName>Vertical</fullName>
+                <default>false</default>
+                <label>Vertical</label>
+            </value>
+            <value>
+                <fullName>Grid</fullName>
+                <default>false</default>
+                <label>Grid</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

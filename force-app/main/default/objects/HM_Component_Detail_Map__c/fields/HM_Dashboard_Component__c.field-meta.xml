@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Dashboard_Component__c</fullName>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <inlineHelpText>Select the dashboard component this detail map belongs to. Detail maps define how data fields are displayed in tiles or list columns.</inlineHelpText>
+    <label>Dashboard Component</label>
+    <referenceTo>HM_Dashboard_Component__c</referenceTo>
+    <relationshipLabel>Component Detail Maps</relationshipLabel>
+    <relationshipName>Component_Detail_Maps</relationshipName>
+    <required>true</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

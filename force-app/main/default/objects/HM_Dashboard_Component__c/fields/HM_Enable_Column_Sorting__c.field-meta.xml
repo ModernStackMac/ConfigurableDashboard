@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Enable_Column_Sorting__c</fullName>
+    <defaultValue>false</defaultValue>
+    <inlineHelpText>Enable column sorting for list components. When enabled, users can click column headers to sort data by that column (ascending/descending).</inlineHelpText>
+    <label>Enable Column Sorting</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Label__c</fullName>
+    <externalId>false</externalId>
+    <inlineHelpText>Display label for this field. For list columns, this appears as the column header. For tiles, leave blank unless you need a custom label. If blank, the Field API Name will be used.</inlineHelpText>
+    <label>Label</label>
+    <length>255</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

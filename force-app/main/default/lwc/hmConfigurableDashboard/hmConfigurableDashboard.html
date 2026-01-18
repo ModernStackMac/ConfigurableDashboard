@@ -1,0 +1,73 @@
+<template>
+  <div class={containerClass}>
+    <!-- Welcome Banner -->
+    <div class="cc-welcome">
+      <div class="cc-welcome-text">
+        <h1 class="cc-welcome-heading">Welcome back, {userName}</h1>
+        <p class="cc-welcome-subtext">Here's what needs your attention today</p>
+      </div>
+      <template if:true={showActionsMenu}>
+        <lightning-button-menu
+          alternative-text="Actions"
+          icon-name="utility:settings"
+          variant={menuButtonVariant}
+          menu-alignment="right"
+          onselect={handleMenuSelect}
+          onopen={handleMenuOpen}
+          onclose={handleMenuClose}
+          class={menuButtonClass}
+          data-menu-id="hm-dashboard-actions-menu"
+        >
+          <template for:each={menuItems} for:item="item">
+            <lightning-menu-item
+              key={item.value}
+              label={item.label}
+              icon-name={item.iconName}
+              value={item.value}
+            >
+            </lightning-menu-item>
+          </template>
+        </lightning-button-menu>
+      </template>
+    </div>
+
+    <!-- Loading State -->
+    <template if:true={isLoading}>
+      <div class="cc-loading-container">
+        <lightning-spinner
+          alternative-text="Loading dashboard"
+          size="large"
+        ></lightning-spinner>
+      </div>
+    </template>
+
+    <!-- Error State -->
+    <template if:false={isLoading}>
+      <template if:true={error}>
+        <div class="cc-error-message">
+          Error loading dashboard: {errorMessage}
+        </div>
+      </template>
+
+      <!-- Dashboard Groups -->
+      <template if:false={error}>
+        <template if:true={groups.length}>
+          <template for:each={groups} for:item="group">
+            <div key={group.id} class="cc-dashboard-group">
+              <c-hm-configurable-component-group
+                component-group-id={group.id}
+                is-dark-mode={isDarkMode}
+              >
+              </c-hm-configurable-component-group>
+            </div>
+          </template>
+        </template>
+        <template if:false={groups.length}>
+          <div class="cc-empty-dashboard">
+            <p>No component groups configured for this dashboard</p>
+          </div>
+        </template>
+      </template>
+    </template>
+  </div>
+</template>

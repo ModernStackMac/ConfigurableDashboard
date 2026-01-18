@@ -1,0 +1,75 @@
+/* ==================== CSS CUSTOM PROPERTIES ==================== */
+:host {
+  --cc-spacing-xs: 4px;
+  --cc-spacing-sm: 8px;
+  --cc-spacing-md: 16px;
+  --cc-spacing-lg: 24px;
+  --cc-radius-sm: 6px;
+  --cc-radius-md: 8px;
+  --cc-radius-lg: 12px;
+}
+
+/* ==================== LAYOUTS ==================== */
+.hm-group-layout-horizontal {
+  display: flex;
+  flex-direction: row;
+  gap: var(--cc-spacing-md);
+  flex-wrap: wrap;
+}
+
+.hm-group-layout-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cc-spacing-md);
+}
+
+.hm-group-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--cc-spacing-md);
+}
+
+.hm-group-item {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ==================== LOADING & ERROR ==================== */
+.hm-group-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--cc-spacing-xl);
+  min-height: 100px;
+}
+
+.hm-group-container {
+  /* Container wrapper for dark mode support */
+}
+
+.hm-group-error {
+  padding: var(--cc-spacing-md);
+  color: #ea001e;
+  font-size: 0.875rem;
+  text-align: center;
+  background: #ffffff;
+  border-radius: var(--cc-radius-md);
+  border: 1px solid rgba(234, 0, 30, 0.2);
+}
+
+.cc-dark .hm-group-error {
+  color: #ff5252;
+  background: #1e1e1e;
+  border-color: rgba(255, 82, 82, 0.2);
+}
+
+.hm-group-empty {
+  padding: var(--cc-spacing-lg);
+  text-align: center;
+  color: #747474;
+  font-size: 0.875rem;
+}
+
+.cc-dark .hm-group-empty {
+  color: #a0a0a0;
+}

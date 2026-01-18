@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Tile</fullName>
+    <active>true</active>
+    <label>Tile</label>
+    <picklistValues>
+        <picklist>HM_Column_Badge_Type__c</picklist>
+        <values>
+            <fullName>Days Until%2FOver</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>HM_Column_Badge_Variant__c</picklist>
+        <values>
+            <fullName>Auto</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>Error</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Success</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Warning</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>HM_Format_Type__c</picklist>
+        <values>
+            <fullName>Currency</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Date</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Number</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Percent</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Text</fullName>
+            <default>true</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>HM_Map_Type__c</picklist>
+        <values>
+            <fullName>Tile Badge</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Tile Change</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Tile Icon</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Tile Subtitle</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Tile Value</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+</RecordType>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Show_New_Case_Action__c</fullName>
+    <defaultValue>false</defaultValue>
+    <inlineHelpText>When enabled, shows &quot;Create Support Case&quot; action in the actions dropdown menu.</inlineHelpText>
+    <label>Show New Case Action</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

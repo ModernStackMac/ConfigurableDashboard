@@ -1,0 +1,50 @@
+<template>
+  <div class={containerClass}>
+    <template if:true={isLoading}>
+      <div class="hm-group-loading">
+        <lightning-spinner
+          alternative-text="Loading"
+          size="small"
+        ></lightning-spinner>
+      </div>
+    </template>
+
+    <template if:false={isLoading}>
+      <template if:true={error}>
+        <div class="hm-group-error">
+          Error loading component group: {errorMessage}
+        </div>
+      </template>
+
+      <template if:false={error}>
+        <template if:true={hasComponents}>
+          <div class={layoutClass}>
+            <template for:each={components} for:item="component">
+              <div key={component.id} class="hm-group-item">
+                <template if:true={component.isTile}>
+                  <c-hm-configurable-tile
+                    component-id={component.id}
+                    is-dark-mode={isDarkMode}
+                  >
+                  </c-hm-configurable-tile>
+                </template>
+                <template if:false={component.isTile}>
+                  <c-hm-configurable-list
+                    component-id={component.id}
+                    is-dark-mode={isDarkMode}
+                  >
+                  </c-hm-configurable-list>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template if:false={hasComponents}>
+          <div class="hm-group-empty">
+            No components configured for this group
+          </div>
+        </template>
+      </template>
+    </template>
+  </div>
+</template>
