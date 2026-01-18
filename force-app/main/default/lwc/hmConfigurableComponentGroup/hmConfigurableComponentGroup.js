@@ -9,7 +9,6 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
   // ==================== CONSTANTS ====================
   static COMPONENT_TYPES = {
     TILE: "Tile",
-    MINI_TILE: "Mini-Tile",
     LIST: "List"
   };
 
@@ -122,8 +121,7 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
       })
       .map((comp) => ({
         ...comp,
-        isTile: comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.TILE || 
-                comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.MINI_TILE,
+        isTile: comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.TILE,
         isList: comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.LIST
       }));
 
