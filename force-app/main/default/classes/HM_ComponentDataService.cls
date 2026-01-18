@@ -23,6 +23,17 @@ public with sharing class HM_ComponentDataService {
   private static final String DATA_SOURCE_TYPE_APEX = 'Apex';
   private static final String DATA_SOURCE_TYPE_SOQL = 'SOQL';
   
+  private static final String RETURN_TYPE_AGGREGATE = 'Aggregate';
+  private static final String RETURN_TYPE_LIST = 'List';
+  private static final String RETURN_TYPE_MULTI_OBJECT = 'Multi-Object';
+  
+  private static final String SHAPE_AGGREGATE = 'AGGREGATE';
+  private static final String SHAPE_LIST = 'LIST';
+  private static final String SHAPE_MULTI_OBJECT = 'MULTI_OBJECT';
+  
+  private static final String COMPONENT_TYPE_TILE = 'Tile';
+  private static final String COMPONENT_TYPE_LIST = 'List';
+  
   private static final String SOQL_KEYWORD_SELECT = 'SELECT';
   private static final String SOQL_KEYWORD_FROM = 'FROM';
   
@@ -71,16 +82,18 @@ public with sharing class HM_ComponentDataService {
   private static final String ERROR_CLASS_TYPE_NULL = 'Class type is null';
   private static final String ERROR_CALLABLE_INTERFACE_REQUIRED = 'Class must implement Callable interface: {0}. Error: {1}';
   private static final String ERROR_INVOKING_METHOD = 'Error invoking method dynamically: {0}';
+  private static final String ERROR_RETURN_TYPE_INCOMPATIBLE = 'Return type {0} is not compatible with component type {1}';
+  private static final String ERROR_RETURN_TYPE_REQUIRED = 'Return type is required for data source';
   
   /**
    * @description Execute component query (SOQL or Apex) based on Data Source configuration
    * Processes all active Data Sources for the Component in order and combines results
    * @param componentId Component record ID
    * @param context Additional context parameters (recordId, filters, etc.)
-   * @return List of Map<String, Object> containing component data from all Data Sources
+   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
    */
   @AuraEnabled(cacheable=true)
-  public static List<Map<String, Object>> executeComponentQuery(
+  public static Map<String, Object> executeComponentQuery(
     Id componentId,
     Map<String, Object> context
   ) {
@@ -98,16 +111,16 @@ public with sharing class HM_ComponentDataService {
         throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_COMPONENT);
       }
 
-      // Verify component exists and is active
+      // Verify component exists and is active, get component type
       HM_Dashboard_Component__c component = [
-        SELECT Id, HM_Active__c
+        SELECT Id, HM_Active__c, HM_Type__c
         FROM HM_Dashboard_Component__c
         WHERE Id = :componentId AND HM_Active__c = TRUE
         LIMIT 1
       ];
 
       if (component == null) {
-        return new List<Map<String, Object>>();
+        return buildEmptyResponse();
       }
 
       // Check object accessibility
@@ -123,6 +136,7 @@ public with sharing class HM_ComponentDataService {
           HM_SOQL_Query__c,
           HM_Apex_Class_Name__c,
           HM_Apex_Method_Name__c,
+          HM_Return_Type__c,
           HM_Active__c,
           HM_Order__c
         FROM HM_Dashboard_Data_Source__c
@@ -132,21 +146,19 @@ public with sharing class HM_ComponentDataService {
       ];
 
       if (dataSources.isEmpty()) {
-        // Component has no active Data Sources - return empty list
-        return new List<Map<String, Object>>();
+        // Component has no active Data Sources - return empty response
+        return buildEmptyResponse();
       }
 
-      // Process all Data Sources in order and combine results
-      List<Map<String, Object>> allResults = new List<Map<String, Object>>();
-      
-      for (HM_Dashboard_Data_Source__c dataSource : dataSources) {
-        List<Map<String, Object>> dataSourceResults = processDataSource(dataSource, context);
-        if (!dataSourceResults.isEmpty()) {
-          allResults.addAll(dataSourceResults);
-        }
+      // Process all data sources and combine results
+      // For List components: combine all LIST and MULTI_OBJECT sources
+      // For Tile components: use first AGGREGATE or first LIST source
+      if (component.HM_Type__c == COMPONENT_TYPE_LIST) {
+        return processMultipleDataSourcesForList(dataSources, context, component.HM_Type__c);
+      } else {
+        // Tile component - process first data source only
+        return processDataSource(dataSources[0], context, component.HM_Type__c);
       }
-
-      return allResults;
     } catch (AuraHandledException ex) {
       // Re-throw AuraHandledException as-is (already user-friendly)
       throw ex;
@@ -163,11 +175,13 @@ public with sharing class HM_ComponentDataService {
    * @description Process a single Data Source and return its results
    * @param dataSource Data Source record to process
    * @param context Context parameters for merge fields and Apex methods
-   * @return List of Map<String, Object> containing data from this Data Source
+   * @param componentType Component type (Tile, List, etc.) for validation
+   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
    */
-  private static List<Map<String, Object>> processDataSource(
+  private static Map<String, Object> processDataSource(
     HM_Dashboard_Data_Source__c dataSource,
-    Map<String, Object> context
+    Map<String, Object> context,
+    String componentType
   ) {
     // Guard clause: validate data source type
     if (dataSource.HM_Type__c != DATA_SOURCE_TYPE_APEX && dataSource.HM_Type__c != DATA_SOURCE_TYPE_SOQL) {
@@ -176,24 +190,34 @@ public with sharing class HM_ComponentDataService {
       );
     }
 
+    // Validate return type is set
+    if (String.isBlank(dataSource.HM_Return_Type__c)) {
+      throw new AuraHandledException(ERROR_RETURN_TYPE_REQUIRED);
+    }
+
+    // Validate return type is compatible with component type
+    validateReturnType(dataSource.HM_Return_Type__c, componentType);
+
     // Process Apex type
     if (dataSource.HM_Type__c == DATA_SOURCE_TYPE_APEX) {
-      return processApexDataSource(dataSource, context);
+      return processApexDataSource(dataSource, context, componentType);
     }
 
     // Process SOQL type
-    return processSOQLDataSource(dataSource, context);
+    return processSOQLDataSource(dataSource, context, componentType);
   }
 
   /**
    * @description Process Apex data source
    * @param dataSource Data Source record
    * @param context Context parameters
-   * @return List of Map<String, Object> containing data
+   * @param componentType Component type for validation
+   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
    */
-  private static List<Map<String, Object>> processApexDataSource(
+  private static Map<String, Object> processApexDataSource(
     HM_Dashboard_Data_Source__c dataSource,
-    Map<String, Object> context
+    Map<String, Object> context,
+    String componentType
   ) {
     // Validate Apex configuration
     if (String.isBlank(dataSource.HM_Apex_Class_Name__c)) {
@@ -222,7 +246,8 @@ public with sharing class HM_ComponentDataService {
     return executeApexMethod(
       dataSource.HM_Apex_Class_Name__c,
       dataSource.HM_Apex_Method_Name__c,
-      context != null ? context : new Map<String, Object>()
+      context != null ? context : new Map<String, Object>(),
+      dataSource.HM_Return_Type__c
     );
   }
 
@@ -230,11 +255,13 @@ public with sharing class HM_ComponentDataService {
    * @description Process SOQL data source
    * @param dataSource Data Source record
    * @param context Context parameters
-   * @return List of Map<String, Object> containing data
+   * @param componentType Component type for validation
+   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
    */
-  private static List<Map<String, Object>> processSOQLDataSource(
+  private static Map<String, Object> processSOQLDataSource(
     HM_Dashboard_Data_Source__c dataSource,
-    Map<String, Object> context
+    Map<String, Object> context,
+    String componentType
   ) {
     // Validate SOQL configuration
     if (String.isBlank(dataSource.HM_SOQL_Query__c)) {
@@ -267,7 +294,7 @@ public with sharing class HM_ComponentDataService {
     validateSOQLSyntax(normalizedQuery);
 
     // Execute SOQL query (don't normalize again - already normalized)
-    return executeSOQLQuery(normalizedQuery, context, false);
+    return executeSOQLQuery(normalizedQuery, context, false, dataSource.HM_Return_Type__c);
   }
 
   /**
@@ -275,16 +302,18 @@ public with sharing class HM_ComponentDataService {
    * @param soqlQuery SOQL query string (may contain merge fields)
    * @param context Context for merge field replacement
    * @param normalizeQuery Whether to normalize the query (default true, set false if already normalized)
-   * @return List of Map<String, Object> containing query results
+   * @param returnType Expected return type (Aggregate, List, Multi-Object)
+   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
    */
-  public static List<Map<String, Object>> executeSOQLQuery(
+  public static Map<String, Object> executeSOQLQuery(
     String soqlQuery,
     Map<String, Object> context,
-    Boolean normalizeQuery
+    Boolean normalizeQuery,
+    String returnType
   ) {
     // Input validation
     if (String.isBlank(soqlQuery)) {
-      return new List<Map<String, Object>>();
+      return buildEmptyResponse();
     }
     if (context == null) {
       context = new Map<String, Object>();
@@ -308,13 +337,42 @@ public with sharing class HM_ComponentDataService {
       );
       List<SObject> accessibleRecords = decision.getRecords();
 
-      // Convert to List<Map<String, Object>>
-      List<Map<String, Object>> result = new List<Map<String, Object>>();
-      for (SObject record : accessibleRecords) {
-        result.add(convertSObjectToMap(record));
+      // Process based on return type
+      if (returnType == RETURN_TYPE_AGGREGATE) {
+        if (accessibleRecords instanceof List<AggregateResult> && !accessibleRecords.isEmpty()) {
+          AggregateResult ar = (AggregateResult) accessibleRecords[0];
+          Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
+          
+          // Try "totalWon" alias first, then first key
+          Object value = fields.containsKey('totalWon') 
+            ? fields.get('totalWon') 
+            : fields.values()[0];
+          
+          // If numeric and null, return 0
+          if (value == null) {
+            value = 0;
+          }
+          
+          return buildAggregateResponse(value);
+        } else {
+          throw new AuraHandledException('Aggregate return type requires aggregate query');
+        }
+      } else if (returnType == RETURN_TYPE_LIST) {
+        // Convert to LIST (handles both SObject and AggregateResult)
+        if (accessibleRecords instanceof List<AggregateResult>) {
+          return buildListResponseFromAggregate((List<AggregateResult>) accessibleRecords);
+        } else {
+          List<Map<String, Object>> rows = new List<Map<String, Object>>();
+          for (SObject record : accessibleRecords) {
+            rows.add(convertSObjectToMap(record));
+          }
+          return buildListResponse(rows);
+        }
+      } else if (returnType == RETURN_TYPE_MULTI_OBJECT) {
+        throw new AuraHandledException('SOQL cannot return Multi-Object type');
+      } else {
+        throw new AuraHandledException('Invalid return type: ' + returnType);
       }
-
-      return result;
     } catch (QueryException ex) {
       // Provide more helpful error message with the actual query
       String errorMsg = ex.getMessage();
@@ -352,30 +410,20 @@ public with sharing class HM_ComponentDataService {
     }
   }
 
-  /**
-   * @description Execute SOQL query with merge field replacement (overload with default normalize=true)
-   * @param soqlQuery SOQL query string (may contain merge fields)
-   * @param context Context for merge field replacement
-   * @return List of Map<String, Object> containing query results
-   */
-  public static List<Map<String, Object>> executeSOQLQuery(
-    String soqlQuery,
-    Map<String, Object> context
-  ) {
-    return executeSOQLQuery(soqlQuery, context, true);
-  }
 
   /**
    * @description Execute Apex method dynamically
    * @param className Name of the Apex class
    * @param methodName Name of the method to call
    * @param params Parameters to pass to the method
-   * @return List of Map<String, Object> from method execution
+   * @param returnType Expected return type (Aggregate, List, Multi-Object)
+   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
    */
-  public static List<Map<String, Object>> executeApexMethod(
+  public static Map<String, Object> executeApexMethod(
     String className,
     String methodName,
-    Map<String, Object> params
+    Map<String, Object> params,
+    String returnType
   ) {
     // Input validation
     if (String.isBlank(className)) {
@@ -405,10 +453,8 @@ public with sharing class HM_ComponentDataService {
       // All classes must implement Callable interface for dynamic invocation
       Object result = callMethodDynamically(classType, extractedMethodName, params);
 
-      // Convert result to List<Map<String, Object>>
-      List<Map<String, Object>> resultList = convertToResultList(result);
-
-      return resultList;
+      // Process result based on specified return type
+      return processResultByReturnType(result, returnType);
     } catch (Exception ex) {
       throw new AuraHandledException(
         String.format(ERROR_EXECUTING_APEX_METHOD, new List<String>{ ex.getMessage() })
@@ -973,6 +1019,7 @@ public with sharing class HM_ComponentDataService {
           'type' => finalObjectType
         });
         recordMap.put('recordType', finalObjectType);
+        recordMap.put('objectType', finalObjectType);
         
         resultList.add(recordMap);
         index++;
@@ -987,6 +1034,294 @@ public with sharing class HM_ComponentDataService {
     }
 
     return resultList;
+  }
+
+  // ==================== RESPONSE BUILDING METHODS ====================
+
+  /**
+   * @description Build empty response map
+   * @return Map<String, Object> Empty response with success=false
+   */
+  private static Map<String, Object> buildEmptyResponse() {
+    return new Map<String, Object>{
+      'success' => false,
+      'shape' => SHAPE_LIST,
+      'aggregateValue' => null,
+      'aggregateType' => null,
+      'rows' => new List<Map<String, Object>>(),
+      'multiObjectData' => null,
+      'errorMessage' => null
+    };
+  }
+
+  /**
+   * @description Build aggregate response
+   * @param value Aggregate value (Decimal, Integer, String, Boolean, Date, Datetime)
+   * @return Map<String, Object> Response with AGGREGATE shape
+   */
+  private static Map<String, Object> buildAggregateResponse(Object value) {
+    return new Map<String, Object>{
+      'success' => true,
+      'shape' => SHAPE_AGGREGATE,
+      'aggregateValue' => value,
+      'aggregateType' => determineAggregateType(value),
+      'rows' => null,
+      'multiObjectData' => null,
+      'errorMessage' => null
+    };
+  }
+
+  /**
+   * @description Build aggregate response from AggregateResult
+   * @param ar AggregateResult to extract value from
+   * @return Map<String, Object> Response with AGGREGATE shape
+   */
+  private static Map<String, Object> buildAggregateResponseFromAggregate(AggregateResult ar) {
+    Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
+    
+    // Try "totalWon" alias first, then first key
+    Object value = fields.containsKey('totalWon') 
+      ? fields.get('totalWon') 
+      : fields.values()[0];
+    
+    // If null, return 0
+    if (value == null) {
+      value = 0;
+    }
+    
+    return buildAggregateResponse(value);
+  }
+
+  /**
+   * @description Build list response
+   * @param rows List of Map<String, Object> rows
+   * @return Map<String, Object> Response with LIST shape
+   */
+  private static Map<String, Object> buildListResponse(List<Map<String, Object>> rows) {
+    return new Map<String, Object>{
+      'success' => true,
+      'shape' => SHAPE_LIST,
+      'aggregateValue' => null,
+      'aggregateType' => null,
+      'rows' => rows,
+      'multiObjectData' => null,
+      'errorMessage' => null
+    };
+  }
+
+  /**
+   * @description Build list response from AggregateResult
+   * @param arList List of AggregateResult to convert
+   * @return Map<String, Object> Response with LIST shape
+   */
+  private static Map<String, Object> buildListResponseFromAggregate(List<AggregateResult> arList) {
+    List<Map<String, Object>> rows = new List<Map<String, Object>>();
+    
+    for (AggregateResult ar : arList) {
+      Map<String, Object> row = new Map<String, Object>();
+      Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
+      
+      for (String key : fields.keySet()) {
+        row.put(key, fields.get(key));
+      }
+      
+      // Add synthetic Id if not present
+      if (!row.containsKey('Id')) {
+        row.put('Id', 'aggregate-' + rows.size());
+      }
+      
+      rows.add(row);
+    }
+    
+    return buildListResponse(rows);
+  }
+
+  /**
+   * @description Build multi-object response
+   * @param multiObjectData Map<String, List<Object>> structure
+   * @return Map<String, Object> Response with MULTI_OBJECT shape
+   */
+  private static Map<String, Object> buildMultiObjectResponse(Map<String, Object> multiObjectData) {
+    return new Map<String, Object>{
+      'success' => true,
+      'shape' => SHAPE_MULTI_OBJECT,
+      'aggregateValue' => null,
+      'aggregateType' => null,
+      'rows' => null,
+      'multiObjectData' => multiObjectData,
+      'errorMessage' => null
+    };
+  }
+
+  /**
+   * @description Validate return type is compatible with component type
+   * @param returnType Return type value (Aggregate, List, Multi-Object)
+   * @param componentType Component type (Tile, List)
+   * @throws AuraHandledException if incompatible
+   */
+  private static void validateReturnType(String returnType, String componentType) {
+    if (componentType == COMPONENT_TYPE_TILE) {
+      if (returnType != RETURN_TYPE_AGGREGATE && returnType != RETURN_TYPE_LIST) {
+        throw new AuraHandledException(
+          String.format(ERROR_RETURN_TYPE_INCOMPATIBLE, new List<String>{ returnType, componentType })
+        );
+      }
+    } else if (componentType == COMPONENT_TYPE_LIST) {
+      if (returnType != RETURN_TYPE_LIST && returnType != RETURN_TYPE_MULTI_OBJECT) {
+        throw new AuraHandledException(
+          String.format(ERROR_RETURN_TYPE_INCOMPATIBLE, new List<String>{ returnType, componentType })
+        );
+      }
+    }
+  }
+
+  /**
+   * @description Extract aggregate value from various types
+   * @param result Result object from Apex method
+   * @return Object Extracted aggregate value
+   */
+  private static Object extractAggregateValue(Object result) {
+    if (result instanceof AggregateResult) {
+      AggregateResult ar = (AggregateResult) result;
+      Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
+      
+      // Try "totalWon" alias first, then first key
+      Object value = fields.containsKey('totalWon') 
+        ? fields.get('totalWon') 
+        : fields.values()[0];
+      
+      // If numeric and null, return 0
+      if (value == null && (value instanceof Decimal || value instanceof Integer)) {
+        value = 0;
+      }
+      
+      return value;
+    }
+    
+    return result;
+  }
+
+  /**
+   * @description Determine aggregate type string from value
+   * @param value Aggregate value
+   * @return String Type string (DECIMAL, INTEGER, STRING, BOOLEAN, DATE, DATETIME)
+   */
+  private static String determineAggregateType(Object value) {
+    if (value instanceof Decimal) {
+      return 'DECIMAL';
+    } else if (value instanceof Integer) {
+      return 'INTEGER';
+    } else if (value instanceof String) {
+      return 'STRING';
+    } else if (value instanceof Boolean) {
+      return 'BOOLEAN';
+    } else if (value instanceof Date) {
+      return 'DATE';
+    } else if (value instanceof Datetime) {
+      return 'DATETIME';
+    }
+    return 'STRING';
+  }
+
+  /**
+   * @description Process result by return type
+   * @param result Result object from Apex method
+   * @param returnType Expected return type (Aggregate, List, Multi-Object)
+   * @return Map<String, Object> Response with appropriate shape
+   */
+  private static Map<String, Object> processResultByReturnType(Object result, String returnType) {
+    if (returnType == RETURN_TYPE_AGGREGATE) {
+      // Extract aggregate value from various types
+      if (result instanceof Decimal || result instanceof Integer || 
+          result instanceof String || result instanceof Boolean ||
+          result instanceof Date || result instanceof Datetime) {
+        return buildAggregateResponse(result);
+      }
+      
+      if (result instanceof AggregateResult) {
+        return buildAggregateResponseFromAggregate((AggregateResult) result);
+      }
+      
+      if (result instanceof List<AggregateResult>) {
+        List<AggregateResult> arList = (List<AggregateResult>) result;
+        if (!arList.isEmpty()) {
+          return buildAggregateResponseFromAggregate(arList[0]);
+        }
+      }
+      
+      throw new AuraHandledException('Result type does not match Aggregate return type');
+    } else if (returnType == RETURN_TYPE_LIST) {
+      // Convert to LIST (handles List<SObject>, List<Wrapper>, AggregateResult, etc.)
+      List<Map<String, Object>> rows = convertToResultList(result);
+      return buildListResponse(rows);
+    } else if (returnType == RETURN_TYPE_MULTI_OBJECT) {
+      if (result instanceof Map<String, Object>) {
+        Map<String, Object> resultMap = (Map<String, Object>) result;
+        // Validate it contains lists
+        Boolean hasLists = false;
+        for (Object value : resultMap.values()) {
+          if (value instanceof List<Object> || value instanceof List<SObject>) {
+            hasLists = true;
+            break;
+          }
+        }
+        if (hasLists) {
+          return buildMultiObjectResponse(resultMap);
+        }
+      }
+      throw new AuraHandledException('Result type does not match Multi-Object return type');
+    } else {
+      throw new AuraHandledException('Invalid return type: ' + returnType);
+    }
+  }
+
+  /**
+   * @description Process multiple data sources for List components
+   * Combines LIST sources into a single LIST response, or uses MULTI_OBJECT if present
+   * @param dataSources List of data sources to process
+   * @param context Context parameters
+   * @param componentType Component type (should be List)
+   * @return Map<String, Object> Combined response
+   */
+  private static Map<String, Object> processMultipleDataSourcesForList(
+    List<HM_Dashboard_Data_Source__c> dataSources,
+    Map<String, Object> context,
+    String componentType
+  ) {
+    List<Map<String, Object>> allRows = new List<Map<String, Object>>();
+    Map<String, Object> multiObjectData = null;
+    Boolean hasMultiObject = false;
+
+    // Process each data source
+    for (HM_Dashboard_Data_Source__c dataSource : dataSources) {
+      Map<String, Object> response = processDataSource(dataSource, context, componentType);
+      
+      if (response != null && response.get('success') == true) {
+        String shape = (String) response.get('shape');
+        
+        if (shape == SHAPE_MULTI_OBJECT) {
+          // MULTI_OBJECT takes precedence - use it and stop processing
+          multiObjectData = (Map<String, Object>) response.get('multiObjectData');
+          hasMultiObject = true;
+          break;
+        } else if (shape == SHAPE_LIST) {
+          // Combine LIST rows
+          List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
+          if (rows != null && !rows.isEmpty()) {
+            allRows.addAll(rows);
+          }
+        }
+      }
+    }
+
+    // Return MULTI_OBJECT if found, otherwise return combined LIST
+    if (hasMultiObject && multiObjectData != null) {
+      return buildMultiObjectResponse(multiObjectData);
+    } else if (!allRows.isEmpty()) {
+      return buildListResponse(allRows);
+    } else {
+      return buildEmptyResponse();
+    }
   }
 
 }

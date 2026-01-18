@@ -93,14 +93,22 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
     try {
       // Execute component query to get data
-      const data = await executeComponentQuery({
+      const response = await executeComponentQuery({
         componentId: this.componentId,
         context: {}
       });
 
-      if (data && data.length > 0) {
-        // Process data based on detail maps
-        this.processTileData(data[0]);
+      if (response && response.success) {
+        if (response.shape === 'AGGREGATE') {
+          // Use aggregate value directly
+          this.processAggregateData(response.aggregateValue, response.aggregateType);
+        } else if (response.shape === 'LIST' && response.rows && response.rows.length > 0) {
+          // Fallback: use first row (backward compatibility)
+          this.processTileData(response.rows[0]);
+        } else {
+          // Set default/empty values
+          this.tileData = this.getDefaultTileData();
+        }
       } else {
         // Set default/empty values
         this.tileData = this.getDefaultTileData();
@@ -150,6 +158,71 @@ export default class HM_ConfigurableTile extends NavigationMixin(
     }
 
     return mapIndex;
+  }
+
+  /**
+   * @description Process aggregate value into tile display format
+   * @param {Object} aggregateValue - The aggregate value (Decimal, Integer, String, Boolean, Date, Datetime)
+   * @param {String} aggregateType - Type of aggregate (DECIMAL, INTEGER, STRING, BOOLEAN, DATE, DATETIME)
+   */
+  processAggregateData(aggregateValue, aggregateType) {
+    const detailMaps = this.componentConfig.detailMaps || [];
+    const mapIndex = this.buildDetailMapIndex(detailMaps);
+    
+    // Format the aggregate value based on type
+    let formattedValue = this.formatAggregateValue(aggregateValue, aggregateType);
+    
+    // Extract other tile properties from detail maps if available
+    const changeData = this.extractTileChange(mapIndex, { value: aggregateValue });
+    const subtitle = this.extractTileSubtitle(mapIndex, { value: aggregateValue });
+    const badgeData = this.extractTileBadge(mapIndex, { value: aggregateValue });
+    const iconName =
+      this.extractTileIcon(mapIndex, { value: aggregateValue }) ||
+      this.componentConfig.iconName ||
+      HM_ConfigurableTile.DEFAULT_ICON;
+
+    // Determine icon class based on icon name or default
+    const iconClass = this.getIconClass(iconName);
+
+    // Set tile data
+    this.tileData = {
+      value: formattedValue || HM_ConfigurableTile.DEFAULT_VALUE,
+      change: changeData.change || "",
+      subtitle: subtitle || "",
+      badge: badgeData.badge,
+      changeClass: changeData.changeClass,
+      trendIcon: changeData.trendIcon,
+      iconName: iconName,
+      iconClass: iconClass
+    };
+  }
+
+  /**
+   * @description Format aggregate value based on type
+   * @param {Object} value - Aggregate value
+   * @param {String} type - Aggregate type (DECIMAL, INTEGER, STRING, BOOLEAN, DATE, DATETIME)
+   * @return {String} Formatted value string
+   */
+  formatAggregateValue(value, type) {
+    if (value === null || value === undefined) {
+      return "0";
+    }
+
+    switch (type) {
+      case 'DECIMAL':
+      case 'INTEGER':
+        return this.formatNumber(value);
+      case 'STRING':
+        return String(value);
+      case 'BOOLEAN':
+        return value ? 'Yes' : 'No';
+      case 'DATE':
+        return this.formatDate(value);
+      case 'DATETIME':
+        return this.formatDateTime(value);
+      default:
+        return String(value);
+    }
   }
 
   /**
@@ -450,6 +523,45 @@ export default class HM_ConfigurableTile extends NavigationMixin(
   formatPercent(value) {
     const num = this.parseNumber(value);
     return `${num.toFixed(1)}%`;
+  }
+
+  /**
+   * @description Format datetime value
+   * @param {*} value - Datetime value to format
+   * @return {String} Formatted datetime string
+   */
+  formatDateTime(value) {
+    if (!value) return "";
+    
+    // Handle Date objects
+    if (value instanceof Date) {
+      if (isNaN(value.getTime())) return "";
+      return value.toLocaleString();
+    }
+    
+    // Handle string datetimes from Salesforce
+    if (typeof value === "string") {
+      // Try parsing directly
+      let date = new Date(value);
+      
+      // If that fails, try parsing as ISO format
+      if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+        date = new Date(value);
+      }
+      
+      // If still invalid, try parsing as timestamp
+      if (isNaN(date.getTime()) && /^\d+$/.test(value)) {
+        date = new Date(parseInt(value, 10));
+      }
+      
+      if (isNaN(date.getTime())) {
+        return value;
+      }
+      
+      return date.toLocaleString();
+    }
+    
+    return String(value);
   }
 
   /**

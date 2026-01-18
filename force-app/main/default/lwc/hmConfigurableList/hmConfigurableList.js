@@ -198,12 +198,39 @@ export default class HM_ConfigurableList extends NavigationMixin(
     this.errorMessage = null;
 
     try {
-      const data = await executeComponentQuery({
+      const response = await executeComponentQuery({
         componentId: this.componentId,
         context: {}
       });
 
-      this.rows = this.formatRows(data || []);
+      if (response && response.success) {
+        if (response.shape === 'LIST') {
+          this.rows = this.formatRows(response.rows || []);
+        } else if (response.shape === 'MULTI_OBJECT') {
+          // Flatten multiObjectData into rows
+          this.rows = this.formatRowsFromMultiObject(response.multiObjectData);
+        } else if (response.shape === 'AGGREGATE') {
+          // Error: List component received aggregate
+          this.errorMessage = 'List component requires LIST or MULTI_OBJECT shape';
+          const defaultData = this.getDefaultListData();
+          this.rows = defaultData.rows;
+          this.filteredRows = defaultData.filteredRows;
+          this.filters = defaultData.filters;
+          return;
+        } else {
+          // Unknown shape
+          this.errorMessage = 'Unknown response shape: ' + response.shape;
+          const defaultData = this.getDefaultListData();
+          this.rows = defaultData.rows;
+          this.filteredRows = defaultData.filteredRows;
+          this.filters = defaultData.filters;
+          return;
+        }
+      } else {
+        // Response indicates failure or no data
+        this.rows = this.formatRows([]);
+      }
+
       this.buildFilters();
       this.applyFilter();
       this.updatePagination();
@@ -216,6 +243,56 @@ export default class HM_ConfigurableList extends NavigationMixin(
     } finally {
       this.isLoading = false;
     }
+  }
+
+  /**
+   * @description Format multi-object data (Map<String, List<Object>>) into rows
+   * @param {Object} multiObjectData - Map with object type keys and arrays of records
+   * @return {Array} Formatted rows array
+   */
+  formatRowsFromMultiObject(multiObjectData) {
+    if (!multiObjectData || typeof multiObjectData !== 'object') {
+      return [];
+    }
+
+    // Flatten all object types into a single array
+    const allRecords = [];
+    for (const objectType in multiObjectData) {
+      const records = multiObjectData[objectType];
+      if (Array.isArray(records)) {
+        // Create new plain objects from records to avoid proxy issues
+        records.forEach(record => {
+          if (record && typeof record === 'object') {
+            // Create a new plain object with all properties from the record
+            // Use Object.assign for shallow copy, but handle nested objects
+            const plainRecord = Object.assign({}, record);
+            
+            // Deep copy nested objects like 'attributes'
+            if (record.attributes && typeof record.attributes === 'object') {
+              plainRecord.attributes = Object.assign({}, record.attributes);
+            }
+            
+            // Add object type metadata (only if not already present)
+            if (!plainRecord.recordType && !plainRecord.objectType) {
+              plainRecord.recordType = objectType;
+              plainRecord.objectType = objectType;
+            }
+            
+            // Ensure attributes.type is set if we have objectType
+            if (plainRecord.objectType && (!plainRecord.attributes || !plainRecord.attributes.type)) {
+              if (!plainRecord.attributes) {
+                plainRecord.attributes = {};
+              }
+              plainRecord.attributes.type = plainRecord.objectType;
+            }
+            
+            allRecords.push(plainRecord);
+          }
+        });
+      }
+    }
+
+    return this.formatRows(allRecords);
   }
 
   /**
@@ -414,6 +491,10 @@ export default class HM_ConfigurableList extends NavigationMixin(
     // Try recordType field
     if (record.recordType) {
       return record.recordType;
+    }
+    // Try objectType field (set by formatRowsFromMultiObject and wrapper conversion)
+    if (record.objectType) {
+      return record.objectType;
     }
     // Try to infer from Id prefix
     if (record.Id) {

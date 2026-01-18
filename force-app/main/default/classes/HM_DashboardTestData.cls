@@ -36,6 +36,9 @@ public with sharing class HM_DashboardTestData implements Callable {
       when 'getCaseList' {
         return getCaseList();
       }
+      when 'getTotalWonAmount' {
+        return getTotalWonAmount();
+      }
       when else {
         throw new AuraHandledException(
           String.format(ERROR_METHOD_NOT_FOUND, new List<String>{ action })
@@ -100,8 +103,7 @@ public with sharing class HM_DashboardTestData implements Callable {
     List<AggregateResult> results = [
       SELECT SUM(Amount) totalWon
       FROM Opportunity
-      WHERE IsWon = true
-      AND OwnerId = :UserInfo.getUserId()
+      WHERE OwnerId = :UserInfo.getUserId()
   ];
 
   Decimal totalWonAmount = (Decimal) results[0].get('totalWon');

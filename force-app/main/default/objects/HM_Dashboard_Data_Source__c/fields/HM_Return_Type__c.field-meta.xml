@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Return_Type__c</fullName>
+    <inlineHelpText>Expected return type from this data source. Aggregate for scalar values/metrics, List for record lists, Multi-Object for Map&lt;String, List&lt;SObject&gt;&gt;</inlineHelpText>
+    <label>Return Type</label>
+    <required>true</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Aggregate</fullName>
+                <default>false</default>
+                <label>Aggregate</label>
+            </value>
+            <value>
+                <fullName>List</fullName>
+                <default>false</default>
+                <label>List</label>
+            </value>
+            <value>
+                <fullName>Multi-Object</fullName>
+                <default>false</default>
+                <label>Multi-Object</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

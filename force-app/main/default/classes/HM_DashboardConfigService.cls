@@ -310,6 +310,7 @@ public with sharing class HM_DashboardConfigService {
           HM_SOQL_Query__c,
           HM_Apex_Class_Name__c,
           HM_Apex_Method_Name__c,
+          HM_Return_Type__c,
           HM_Active__c,
           HM_Order__c
         FROM HM_Dashboard_Data_Source__c
@@ -471,6 +472,7 @@ public with sharing class HM_DashboardConfigService {
     mapData.put('soqlQuery', dataSource.HM_SOQL_Query__c);
     mapData.put('apexClassName', dataSource.HM_Apex_Class_Name__c);
     mapData.put('apexMethodName', dataSource.HM_Apex_Method_Name__c);
+    mapData.put('returnType', dataSource.HM_Return_Type__c);
     mapData.put('active', dataSource.HM_Active__c);
     mapData.put('order', dataSource.HM_Order__c);
     return mapData;
@@ -514,8 +516,26 @@ public with sharing class HM_DashboardConfigService {
     }
     
     // Check if it's a single icon value (no colon, or colon is part of icon name like "utility:moneybag")
-    // Single value means: no comma AND colon is only in icon namespace (utility:, standard:, etc.)
+    // OR if it's a single ObjectType:IconName pair (no comma)
     if (!trimmed.contains(PARSE_DELIMITER_COMMA)) {
+      // Check if it contains a colon
+      Integer colonIndex = trimmed.indexOf(PARSE_DELIMITER_COLON);
+      if (colonIndex > 0 && colonIndex < trimmed.length() - 1) {
+        String beforeColon = trimmed.substring(0, colonIndex).trim();
+        String afterColon = trimmed.substring(colonIndex + 1).trim();
+        
+        // Known icon namespaces are short: utility, standard, custom, action
+        // If the part before colon is longer or doesn't match known namespaces, it's likely an object type
+        Set<String> iconNamespaces = new Set<String>{ 'utility', 'standard', 'custom', 'action' };
+        Boolean isIconNamespace = iconNamespaces.contains(beforeColon.toLowerCase());
+        
+        if (!isIconNamespace && String.isNotBlank(beforeColon) && String.isNotBlank(afterColon)) {
+          // This is ObjectType:IconName format (e.g., "AccountActivityWrapper:utility:moneybag")
+          iconMap.put(beforeColon, afterColon);
+          return iconMap;
+        }
+      }
+      
       // Single icon value - treat as default for all object types
       if (String.isNotBlank(trimmed)) {
         iconMap.put('*', trimmed);
@@ -569,7 +589,7 @@ public with sharing class HM_DashboardConfigService {
     // Check if HM_Icon_Name__c exists and is accessible
     try {
       Schema.DescribeFieldResult iconNameField = Schema.sObjectType.HM_Dashboard_Component__c
-        .fields.HM_Icon_Name__c.getDescribe();
+        .fields.HM_Icon_Name__c;
       if (iconNameField.isAccessible()) {
         fields.add('HM_Icon_Name__c');
       }
@@ -580,7 +600,7 @@ public with sharing class HM_DashboardConfigService {
     // Check if HM_Row_Icon_Configuration__c exists and is accessible
     try {
       Schema.DescribeFieldResult rowIconField = Schema.sObjectType.HM_Dashboard_Component__c
-        .fields.HM_Row_Icon_Configuration__c.getDescribe();
+        .fields.HM_Row_Icon_Configuration__c;
       if (rowIconField.isAccessible()) {
         fields.add('HM_Row_Icon_Configuration__c');
       }
