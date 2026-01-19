@@ -1,5 +1,4 @@
 import { LightningElement, api, wire } from "lwc";
-import { NavigationMixin } from "lightning/navigation";
 import getComponentConfiguration from "@salesforce/apex/HM_DashboardConfigService.getComponentConfiguration";
 import executeComponentQuery from "@salesforce/apex/HM_ComponentDataService.executeComponentQuery";
 
@@ -7,9 +6,7 @@ import executeComponentQuery from "@salesforce/apex/HM_ComponentDataService.exec
  * @description Configurable tile component for displaying KPI metrics
  * Accepts componentId and retrieves configuration and data dynamically
  */
-export default class HM_ConfigurableTile extends NavigationMixin(
-  LightningElement
-) {
+export default class HM_ConfigurableTile extends LightningElement {
   // ==================== CONSTANTS ====================
   static MAP_TYPES = {
     TILE_VALUE: "Tile Value",
@@ -772,12 +769,4 @@ export default class HM_ConfigurableTile extends NavigationMixin(
     return "cc-kpi-card";
   }
 
-  /**
-   * @description Handle tile click event
-   * Placeholder for future navigation functionality
-   * Currently no-op, can be extended for record navigation
-   */
-  handleTileClick() {
-    // Navigation logic can be added here if needed in the future
-  }
 }

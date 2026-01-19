@@ -215,16 +215,6 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Row_Icon_Configuration__c</fieldItem>
-                <identifier>RecordHM_Row_Icon_Configuration_cField</identifier>
-            </fieldInstance>
-        </itemInstances>
-        <itemInstances>
-            <fieldInstance>
-                <fieldInstanceProperties>
-                    <name>uiBehavior</name>
-                    <value>none</value>
-                </fieldInstanceProperties>
                 <fieldItem>Record.HM_Enable_Column_Sorting__c</fieldItem>
                 <identifier>RecordHM_Enable_Column_Sorting_cField</identifier>
             </fieldInstance>

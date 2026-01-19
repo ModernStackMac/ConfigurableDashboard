@@ -137,7 +137,8 @@ public with sharing class HM_ComponentDataService {
           HM_Apex_Method_Name__c,
           HM_Return_Type__c,
           HM_Active__c,
-          HM_Order__c
+          HM_Order__c,
+          HM_Row_Icon_Name__c
         FROM HM_Dashboard_Data_Source__c
         WHERE HM_Dashboard_Component__c = :componentId
           AND HM_Active__c = TRUE
@@ -311,12 +312,17 @@ public with sharing class HM_ComponentDataService {
     }
 
     // Execute Apex method
-    return executeApexMethod(
+    Map<String, Object> response = executeApexMethod(
       dataSource.HM_Apex_Class_Name__c,
       dataSource.HM_Apex_Method_Name__c,
       context != null ? context : new Map<String, Object>(),
       dataSource.HM_Return_Type__c
     );
+    
+    // Add data source icon to rows if present
+    addDataSourceIconToRows(response, dataSource);
+    
+    return response;
   }
 
   /**
@@ -362,7 +368,12 @@ public with sharing class HM_ComponentDataService {
     validateSOQLSyntax(normalizedQuery);
 
     // Execute SOQL query (don't normalize again - already normalized)
-    return executeSOQLQuery(normalizedQuery, context, false, dataSource.HM_Return_Type__c);
+    Map<String, Object> response = executeSOQLQuery(normalizedQuery, context, false, dataSource.HM_Return_Type__c);
+    
+    // Add data source icon to rows if present
+    addDataSourceIconToRows(response, dataSource);
+    
+    return response;
   }
 
   /**
@@ -906,7 +917,6 @@ public with sharing class HM_ComponentDataService {
       String className = itemString.split(':')[0].trim();
       return String.isNotBlank(className) ? className : 'Custom';
     } catch (Exception ex) {
-      // Graceful degradation: return default when string operations fail
       return 'Custom';
     }
   }
@@ -1050,10 +1060,8 @@ public with sharing class HM_ComponentDataService {
       
       return resultList;
     } catch (JSONException ex) {
-      // Graceful degradation: return empty list when JSON parsing fails
       return new List<Map<String, Object>>();
     } catch (Exception ex) {
-      // Graceful degradation: return empty list on unexpected errors
       return new List<Map<String, Object>>();
     }
   }
@@ -1072,7 +1080,6 @@ public with sharing class HM_ComponentDataService {
       String objJson = JSON.serialize(obj);
       return (Map<String, Object>) JSON.deserializeUntyped(objJson);
     } catch (Exception ex) {
-      // Graceful degradation: return null when JSON conversion fails
       return null;
     }
   }
@@ -1263,32 +1270,6 @@ public with sharing class HM_ComponentDataService {
   }
 
   /**
-   * @description Extract aggregate value from various types
-   * @param result Result object from Apex method
-   * @return Object Extracted aggregate value
-   */
-  private static Object extractAggregateValue(Object result) {
-    if (result instanceof AggregateResult) {
-      AggregateResult ar = (AggregateResult) result;
-      Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
-      
-      // Try "totalWon" alias first, then first key
-      Object value = fields.containsKey('totalWon') 
-        ? fields.get('totalWon') 
-        : fields.values()[0];
-      
-      // If null, return 0 (for numeric types)
-      if (value == null) {
-        value = 0;
-      }
-      
-      return value;
-    }
-    
-    return result;
-  }
-
-  /**
    * @description Determine aggregate type string from value
    * @param value Aggregate value
    * @return String Type string (DECIMAL, INTEGER, STRING, BOOLEAN, DATE, DATETIME)
@@ -1377,31 +1358,31 @@ public with sharing class HM_ComponentDataService {
     Map<String, Object> context,
     String componentType
   ) {
+    if (dataSources == null || dataSources.isEmpty()) {
+      return buildEmptyResponse();
+    }
+    
     List<Map<String, Object>> allRows = new List<Map<String, Object>>();
 
-    // Process each data source
     for (HM_Dashboard_Data_Source__c dataSource : dataSources) {
       Map<String, Object> response = processDataSource(dataSource, context, componentType);
       
-      if (response != null && response.get('success') == true) {
-        String shape = (String) response.get('shape');
-        
-        if (shape == SHAPE_LIST) {
-          // Combine LIST rows
-          List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
-          if (rows != null && !rows.isEmpty()) {
-            allRows.addAll(rows);
-          }
-        }
+      if (response == null || response.get('success') != true) {
+        continue;
+      }
+      
+      String shape = (String) response.get('shape');
+      if (shape != SHAPE_LIST) {
+        continue;
+      }
+      
+      List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
+      if (rows != null && !rows.isEmpty()) {
+        allRows.addAll(rows);
       }
     }
 
-    // Return combined LIST
-    if (!allRows.isEmpty()) {
-      return buildListResponse(allRows);
-    } else {
-      return buildEmptyResponse();
-    }
+    return allRows.isEmpty() ? buildEmptyResponse() : buildListResponse(allRows);
   }
 
   /**
@@ -1430,6 +1411,58 @@ public with sharing class HM_ComponentDataService {
   }
 
   /**
+   * @description Add data source icon to rows in response if icon is configured
+   * @param response Response map that may contain rows
+   * @param dataSource Data source record with icon configuration
+   */
+  private static void addDataSourceIconToRows(
+    Map<String, Object> response,
+    HM_Dashboard_Data_Source__c dataSource
+  ) {
+    if (response == null || dataSource == null) {
+      return;
+    }
+    
+    String shape = (String) response.get('shape');
+    if (shape != SHAPE_LIST) {
+      return;
+    }
+    
+    String rowIconName = getFieldValueSafely(dataSource, 'HM_Row_Icon_Name__c');
+    if (String.isBlank(rowIconName)) {
+      return;
+    }
+    
+    List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
+    if (rows == null || rows.isEmpty()) {
+      return;
+    }
+    
+    for (Map<String, Object> row : rows) {
+      row.put('dataSourceIcon', rowIconName);
+    }
+  }
+
+  /**
+   * @description Safely get field value from SObject, returning null if field doesn't exist
+   * @param record SObject to get field from
+   * @param fieldName API name of field
+   * @return String Field value, or null if field doesn't exist or is not accessible
+   */
+  private static String getFieldValueSafely(SObject record, String fieldName) {
+    if (record == null || String.isBlank(fieldName)) {
+      return null;
+    }
+    
+    try {
+      return (String) record.get(fieldName);
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist or not accessible
+      return null;
+    }
+  }
+
+  /**
    * @description Process subtitle data source and extract/formatted value
    * @param subtitleDetailMap Component Detail Map with Map Type "Subtitle"
    * @param dataSources List of all data sources for the component
@@ -1443,7 +1476,7 @@ public with sharing class HM_ComponentDataService {
     Map<String, Object> context,
     String componentType
   ) {
-    if (dataSources == null || dataSources.isEmpty()) {
+    if (dataSources == null || dataSources.isEmpty() || subtitleDetailMap == null) {
       return null;
     }
     
@@ -1481,10 +1514,8 @@ public with sharing class HM_ComponentDataService {
       
       return null;
     } catch (AuraHandledException ex) {
-      // Re-throw AuraHandledException to preserve user-friendly error messages
       throw ex;
     } catch (Exception ex) {
-      // Graceful degradation: return null on unexpected errors to prevent dashboard failure
       return null;
     }
   }
@@ -1503,7 +1534,7 @@ public with sharing class HM_ComponentDataService {
     Map<String, Object> context,
     String componentType
   ) {
-    if (dataSources == null || dataSources.isEmpty()) {
+    if (dataSources == null || dataSources.isEmpty() || badgeDetailMap == null) {
       return null;
     }
     
@@ -1556,10 +1587,8 @@ public with sharing class HM_ComponentDataService {
       
       return null;
     } catch (AuraHandledException ex) {
-      // Re-throw AuraHandledException to preserve user-friendly error messages
       throw ex;
     } catch (Exception ex) {
-      // Graceful degradation: return null on unexpected errors to prevent dashboard failure
       return null;
     }
   }
@@ -1585,32 +1614,32 @@ public with sharing class HM_ComponentDataService {
       return response.get('aggregateValue');
     }
     
-    if (shape == SHAPE_LIST) {
-      List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
-      if (rows == null || rows.isEmpty()) {
-        return null;
-      }
-      
-      Map<String, Object> firstRow = rows[0];
-      
-      // Use field API name if specified
-      if (String.isNotBlank(fieldApiName)) {
-        return extractNestedFieldValue(firstRow, fieldApiName);
-      }
-      
-      // Try common aggregate aliases or first non-Id value
-      if (firstRow.containsKey('expr0')) {
-        return firstRow.get('expr0');
-      }
-      if (firstRow.containsKey('totalWon')) {
-        return firstRow.get('totalWon');
-      }
-      if (!firstRow.isEmpty()) {
-        for (String key : firstRow.keySet()) {
-          if (key != 'Id') {
-            return firstRow.get(key);
-          }
-        }
+    if (shape != SHAPE_LIST) {
+      return null;
+    }
+    
+    List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
+    if (rows == null || rows.isEmpty()) {
+      return null;
+    }
+    
+    Map<String, Object> firstRow = rows[0];
+    
+    if (String.isNotBlank(fieldApiName)) {
+      return extractNestedFieldValue(firstRow, fieldApiName);
+    }
+    
+    if (firstRow.containsKey('expr0')) {
+      return firstRow.get('expr0');
+    }
+    
+    if (firstRow.containsKey('totalWon')) {
+      return firstRow.get('totalWon');
+    }
+    
+    for (String key : firstRow.keySet()) {
+      if (key != 'Id') {
+        return firstRow.get(key);
       }
     }
     
@@ -1632,10 +1661,14 @@ public with sharing class HM_ComponentDataService {
     Object value = dataMap;
     
     for (String part : parts) {
-      if (value instanceof Map<String, Object>) {
-        Map<String, Object> nestedMap = (Map<String, Object>) value;
-        value = nestedMap.get(part);
-      } else {
+      if (!(value instanceof Map<String, Object>)) {
+        return null;
+      }
+      
+      Map<String, Object> nestedMap = (Map<String, Object>) value;
+      value = nestedMap.get(part);
+      
+      if (value == null) {
         return null;
       }
     }
