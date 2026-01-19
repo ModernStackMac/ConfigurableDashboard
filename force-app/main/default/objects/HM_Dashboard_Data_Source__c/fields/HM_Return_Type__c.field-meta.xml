@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>HM_Return_Type__c</fullName>
-    <inlineHelpText>Expected return type from this data source. Aggregate for scalar values/metrics, List for record lists, Multi-Object for Map&lt;String, List&lt;SObject&gt;&gt;</inlineHelpText>
+    <inlineHelpText>Expected return type from this data source. Aggregate for scalar values/metrics, List for record lists</inlineHelpText>
     <label>Return Type</label>
     <required>true</required>
     <trackHistory>false</trackHistory>
@@ -20,11 +20,6 @@
                 <fullName>List</fullName>
                 <default>false</default>
                 <label>List</label>
-            </value>
-            <value>
-                <fullName>Multi-Object</fullName>
-                <default>false</default>
-                <label>Multi-Object</label>
             </value>
         </valueSetDefinition>
     </valueSet>

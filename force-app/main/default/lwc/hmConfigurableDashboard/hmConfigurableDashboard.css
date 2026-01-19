@@ -10,6 +10,8 @@
   --cc-radius-lg: 12px;
   --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: block;
+  width: 100%;
 }
 
 /* ==================== CONTAINER ==================== */
@@ -18,6 +20,8 @@
   background: #f3f3f3;
   min-height: 100%;
   transition: background 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cc-container.cc-dark {
@@ -114,6 +118,8 @@
 /* ==================== DASHBOARD GROUPS ==================== */
 .cc-dashboard-group {
   margin-bottom: var(--cc-spacing-lg);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cc-dashboard-group:last-child {

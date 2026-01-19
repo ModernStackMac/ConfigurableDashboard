@@ -25,11 +25,9 @@ public with sharing class HM_ComponentDataService {
   
   private static final String RETURN_TYPE_AGGREGATE = 'Aggregate';
   private static final String RETURN_TYPE_LIST = 'List';
-  private static final String RETURN_TYPE_MULTI_OBJECT = 'Multi-Object';
   
   private static final String SHAPE_AGGREGATE = 'AGGREGATE';
   private static final String SHAPE_LIST = 'LIST';
-  private static final String SHAPE_MULTI_OBJECT = 'MULTI_OBJECT';
   
   private static final String COMPONENT_TYPE_TILE = 'Tile';
   private static final String COMPONENT_TYPE_LIST = 'List';
@@ -90,7 +88,7 @@ public with sharing class HM_ComponentDataService {
    * Processes all active Data Sources for the Component in order and combines results
    * @param componentId Component record ID
    * @param context Additional context parameters (recordId, filters, etc.)
-   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
+   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
   @AuraEnabled(cacheable=true)
   public static Map<String, Object> executeComponentQuery(
@@ -192,7 +190,7 @@ public with sharing class HM_ComponentDataService {
       }
 
       // Process all data sources and combine results
-      // For List components: combine all LIST and MULTI_OBJECT sources
+      // For List components: combine all LIST sources
       // For Tile components: use first AGGREGATE or first LIST source
       Map<String, Object> mainResponse;
       if (component.HM_Type__c == COMPONENT_TYPE_LIST) {
@@ -246,7 +244,7 @@ public with sharing class HM_ComponentDataService {
    * @param dataSource Data Source record to process
    * @param context Context parameters for merge fields and Apex methods
    * @param componentType Component type (Tile, List, etc.) for validation
-   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
+   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
   private static Map<String, Object> processDataSource(
     HM_Dashboard_Data_Source__c dataSource,
@@ -282,7 +280,7 @@ public with sharing class HM_ComponentDataService {
    * @param dataSource Data Source record
    * @param context Context parameters
    * @param componentType Component type for validation
-   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
+   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
   private static Map<String, Object> processApexDataSource(
     HM_Dashboard_Data_Source__c dataSource,
@@ -326,7 +324,7 @@ public with sharing class HM_ComponentDataService {
    * @param dataSource Data Source record
    * @param context Context parameters
    * @param componentType Component type for validation
-   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
+   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
   private static Map<String, Object> processSOQLDataSource(
     HM_Dashboard_Data_Source__c dataSource,
@@ -372,8 +370,8 @@ public with sharing class HM_ComponentDataService {
    * @param soqlQuery SOQL query string (may contain merge fields)
    * @param context Context for merge field replacement
    * @param normalizeQuery Whether to normalize the query (default true, set false if already normalized)
-   * @param returnType Expected return type (Aggregate, List, Multi-Object)
-   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
+   * @param returnType Expected return type (Aggregate, List)
+   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
   public static Map<String, Object> executeSOQLQuery(
     String soqlQuery,
@@ -446,8 +444,6 @@ public with sharing class HM_ComponentDataService {
           }
           return buildListResponse(rows);
         }
-      } else if (returnType == RETURN_TYPE_MULTI_OBJECT) {
-        throw new AuraHandledException('SOQL cannot return Multi-Object type');
       } else {
         throw new AuraHandledException('Invalid return type: ' + returnType);
       }
@@ -494,8 +490,8 @@ public with sharing class HM_ComponentDataService {
    * @param className Name of the Apex class
    * @param methodName Name of the method to call
    * @param params Parameters to pass to the method
-   * @param returnType Expected return type (Aggregate, List, Multi-Object)
-   * @return Map<String, Object> with shape, aggregateValue, rows, multiObjectData, etc.
+   * @param returnType Expected return type (Aggregate, List)
+   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
   public static Map<String, Object> executeApexMethod(
     String className,
@@ -589,18 +585,14 @@ public with sharing class HM_ComponentDataService {
    * Handles queries with \r\n, \n, and multiple spaces to prevent syntax errors
    * @param query Raw SOQL query string
    * @return String Normalized query with single spaces and no line breaks
-   * @throws AuraHandledException if query is null (handled by String.isBlank check)
    */
   private static String normalizeSOQLQuery(String query) {
     if (String.isBlank(query)) {
       return query;
     }
 
-    // Replace line breaks with spaces
-    String normalized = query.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ');
-    
-    // Replace multiple spaces with single space
-    normalized = normalized.replaceAll('\\s+', ' ');
+    // Replace all whitespace (line breaks, tabs, multiple spaces) with single space in one pass
+    String normalized = query.replaceAll('\\s+', ' ');
     
     // Trim leading and trailing whitespace
     return normalized.trim();
@@ -900,6 +892,7 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Extract object type name from wrapper class string representation
+   * Gracefully handles extraction failures by returning default value
    * @param wrapperItem Wrapper object to extract type from
    * @return String Object type name, defaults to 'Custom' if extraction fails
    */
@@ -913,6 +906,7 @@ public with sharing class HM_ComponentDataService {
       String className = itemString.split(':')[0].trim();
       return String.isNotBlank(className) ? className : 'Custom';
     } catch (Exception ex) {
+      // Graceful degradation: return default when string operations fail
       return 'Custom';
     }
   }
@@ -1056,8 +1050,10 @@ public with sharing class HM_ComponentDataService {
       
       return resultList;
     } catch (JSONException ex) {
+      // Graceful degradation: return empty list when JSON parsing fails
       return new List<Map<String, Object>>();
     } catch (Exception ex) {
+      // Graceful degradation: return empty list on unexpected errors
       return new List<Map<String, Object>>();
     }
   }
@@ -1076,6 +1072,7 @@ public with sharing class HM_ComponentDataService {
       String objJson = JSON.serialize(obj);
       return (Map<String, Object>) JSON.deserializeUntyped(objJson);
     } catch (Exception ex) {
+      // Graceful degradation: return null when JSON conversion fails
       return null;
     }
   }
@@ -1158,7 +1155,6 @@ public with sharing class HM_ComponentDataService {
       'aggregateValue' => null,
       'aggregateType' => null,
       'rows' => new List<Map<String, Object>>(),
-      'multiObjectData' => null,
       'errorMessage' => null
     };
   }
@@ -1175,7 +1171,6 @@ public with sharing class HM_ComponentDataService {
       'aggregateValue' => value,
       'aggregateType' => determineAggregateType(value),
       'rows' => null,
-      'multiObjectData' => null,
       'errorMessage' => null
     };
   }
@@ -1213,7 +1208,6 @@ public with sharing class HM_ComponentDataService {
       'aggregateValue' => null,
       'aggregateType' => null,
       'rows' => rows,
-      'multiObjectData' => null,
       'errorMessage' => null
     };
   }
@@ -1245,26 +1239,10 @@ public with sharing class HM_ComponentDataService {
     return buildListResponse(rows);
   }
 
-  /**
-   * @description Build multi-object response
-   * @param multiObjectData Map<String, List<Object>> structure
-   * @return Map<String, Object> Response with MULTI_OBJECT shape
-   */
-  private static Map<String, Object> buildMultiObjectResponse(Map<String, Object> multiObjectData) {
-    return new Map<String, Object>{
-      'success' => true,
-      'shape' => SHAPE_MULTI_OBJECT,
-      'aggregateValue' => null,
-      'aggregateType' => null,
-      'rows' => null,
-      'multiObjectData' => multiObjectData,
-      'errorMessage' => null
-    };
-  }
 
   /**
    * @description Validate return type is compatible with component type
-   * @param returnType Return type value (Aggregate, List, Multi-Object)
+   * @param returnType Return type value (Aggregate, List)
    * @param componentType Component type (Tile, List)
    * @throws AuraHandledException if incompatible
    */
@@ -1276,7 +1254,7 @@ public with sharing class HM_ComponentDataService {
         );
       }
     } else if (componentType == COMPONENT_TYPE_LIST) {
-      if (returnType != RETURN_TYPE_LIST && returnType != RETURN_TYPE_MULTI_OBJECT) {
+      if (returnType != RETURN_TYPE_LIST) {
         throw new AuraHandledException(
           String.format(ERROR_RETURN_TYPE_INCOMPATIBLE, new List<String>{ returnType, componentType })
         );
@@ -1335,7 +1313,7 @@ public with sharing class HM_ComponentDataService {
   /**
    * @description Process result by return type
    * @param result Result object from Apex method
-   * @param returnType Expected return type (Aggregate, List, Multi-Object)
+   * @param returnType Expected return type (Aggregate, List)
    * @return Map<String, Object> Response with appropriate shape
    */
   private static Map<String, Object> processResultByReturnType(Object result, String returnType) {
@@ -1366,24 +1344,21 @@ public with sharing class HM_ComponentDataService {
       throw new AuraHandledException('Result type does not match Aggregate return type');
     } else if (returnType == RETURN_TYPE_LIST) {
       // Convert to LIST (handles List<SObject>, List<Wrapper>, AggregateResult, etc.)
-      List<Map<String, Object>> rows = convertToResultList(result);
-      return buildListResponse(rows);
-    } else if (returnType == RETURN_TYPE_MULTI_OBJECT) {
+      // First, check if result is a Map<String, List<SObject>> pattern and reject it
       if (result instanceof Map<String, Object>) {
         Map<String, Object> resultMap = (Map<String, Object>) result;
-        // Validate it contains lists
-        Boolean hasLists = false;
+        // Check if it contains lists (deprecated Multi-Object pattern) - short-circuit on first match
         for (Object value : resultMap.values()) {
           if (value instanceof List<Object> || value instanceof List<SObject>) {
-            hasLists = true;
-            break;
+            throw new AuraHandledException(
+              'Multi-Object return type (Map<String, List<SObject>>) is no longer supported. ' +
+              'Please define multiple HM_Dashboard_Data_Source__c records instead (one per object or dataset).'
+            );
           }
         }
-        if (hasLists) {
-          return buildMultiObjectResponse(resultMap);
-        }
       }
-      throw new AuraHandledException('Result type does not match Multi-Object return type');
+      List<Map<String, Object>> rows = convertToResultList(result);
+      return buildListResponse(rows);
     } else {
       throw new AuraHandledException('Invalid return type: ' + returnType);
     }
@@ -1391,7 +1366,7 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Process multiple data sources for List components
-   * Combines LIST sources into a single LIST response, or uses MULTI_OBJECT if present
+   * Combines LIST sources into a single LIST response
    * @param dataSources List of data sources to process
    * @param context Context parameters
    * @param componentType Component type (should be List)
@@ -1403,8 +1378,6 @@ public with sharing class HM_ComponentDataService {
     String componentType
   ) {
     List<Map<String, Object>> allRows = new List<Map<String, Object>>();
-    Map<String, Object> multiObjectData = null;
-    Boolean hasMultiObject = false;
 
     // Process each data source
     for (HM_Dashboard_Data_Source__c dataSource : dataSources) {
@@ -1413,12 +1386,7 @@ public with sharing class HM_ComponentDataService {
       if (response != null && response.get('success') == true) {
         String shape = (String) response.get('shape');
         
-        if (shape == SHAPE_MULTI_OBJECT) {
-          // MULTI_OBJECT takes precedence - use it and stop processing
-          multiObjectData = (Map<String, Object>) response.get('multiObjectData');
-          hasMultiObject = true;
-          break;
-        } else if (shape == SHAPE_LIST) {
+        if (shape == SHAPE_LIST) {
           // Combine LIST rows
           List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
           if (rows != null && !rows.isEmpty()) {
@@ -1428,14 +1396,37 @@ public with sharing class HM_ComponentDataService {
       }
     }
 
-    // Return MULTI_OBJECT if found, otherwise return combined LIST
-    if (hasMultiObject && multiObjectData != null) {
-      return buildMultiObjectResponse(multiObjectData);
-    } else if (!allRows.isEmpty()) {
+    // Return combined LIST
+    if (!allRows.isEmpty()) {
       return buildListResponse(allRows);
     } else {
       return buildEmptyResponse();
     }
+  }
+
+  /**
+   * @description Find data source by name or return first available
+   * @param dataSources List of data sources to search
+   * @param dataSourceName Optional name to search for
+   * @return HM_Dashboard_Data_Source__c Found data source or null if list is empty
+   */
+  private static HM_Dashboard_Data_Source__c findDataSourceByName(
+    List<HM_Dashboard_Data_Source__c> dataSources,
+    String dataSourceName
+  ) {
+    if (dataSources == null || dataSources.isEmpty()) {
+      return null;
+    }
+    
+    if (String.isNotBlank(dataSourceName)) {
+      for (HM_Dashboard_Data_Source__c ds : dataSources) {
+        if (ds.Name == dataSourceName) {
+          return ds;
+        }
+      }
+    }
+    
+    return dataSources[0];
   }
 
   /**
@@ -1452,26 +1443,18 @@ public with sharing class HM_ComponentDataService {
     Map<String, Object> context,
     String componentType
   ) {
+    if (dataSources == null || dataSources.isEmpty()) {
+      return null;
+    }
+    
     try {
-      // Determine which data source to use for subtitle
-      HM_Dashboard_Data_Source__c subtitleDataSource = null;
+      HM_Dashboard_Data_Source__c subtitleDataSource = findDataSourceByName(
+        dataSources,
+        subtitleDetailMap.HM_Data_Source_Name__c
+      );
       
-      if (String.isNotBlank(subtitleDetailMap.HM_Data_Source_Name__c)) {
-        // Find data source by name
-        for (HM_Dashboard_Data_Source__c ds : dataSources) {
-          if (ds.Name == subtitleDetailMap.HM_Data_Source_Name__c) {
-            subtitleDataSource = ds;
-            break;
-          }
-        }
-        
-        // If not found, use first data source (graceful degradation)
-        if (subtitleDataSource == null) {
-          subtitleDataSource = dataSources[0];
-        }
-      } else {
-        // No data source name specified, use first data source
-        subtitleDataSource = dataSources[0];
+      if (subtitleDataSource == null) {
+        return null;
       }
       
       // Process the subtitle data source
@@ -1485,40 +1468,11 @@ public with sharing class HM_ComponentDataService {
         return null;
       }
       
-      // Extract value from response based on shape
-      Object rawValue = null;
-      String shape = (String) subtitleResponse.get('shape');
-      
-      if (shape == SHAPE_AGGREGATE) {
-        // For aggregate, use aggregateValue directly
-        rawValue = subtitleResponse.get('aggregateValue');
-      } else if (shape == SHAPE_LIST) {
-        // For list, get first row and extract field value
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) subtitleResponse.get('rows');
-        if (rows != null && !rows.isEmpty()) {
-          Map<String, Object> firstRow = rows[0];
-          
-          // Use field API name from detail map if specified
-          if (String.isNotBlank(subtitleDetailMap.HM_Field_API_Name__c)) {
-            rawValue = extractNestedFieldValue(firstRow, subtitleDetailMap.HM_Field_API_Name__c);
-          } else {
-            // If no field specified, try common aggregate aliases or first value
-            if (firstRow.containsKey('expr0')) {
-              rawValue = firstRow.get('expr0');
-            } else if (firstRow.containsKey('totalWon')) {
-              rawValue = firstRow.get('totalWon');
-            } else if (!firstRow.isEmpty()) {
-              // Get first non-Id value
-              for (String key : firstRow.keySet()) {
-                if (key != 'Id') {
-                  rawValue = firstRow.get(key);
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
+      // Extract raw value from response
+      Object rawValue = extractValueFromResponse(
+        subtitleResponse,
+        subtitleDetailMap.HM_Field_API_Name__c
+      );
       
       // Format the value using format type from detail map
       if (rawValue != null) {
@@ -1526,8 +1480,11 @@ public with sharing class HM_ComponentDataService {
       }
       
       return null;
+    } catch (AuraHandledException ex) {
+      // Re-throw AuraHandledException to preserve user-friendly error messages
+      throw ex;
     } catch (Exception ex) {
-      // Graceful degradation - return null on error
+      // Graceful degradation: return null on unexpected errors to prevent dashboard failure
       return null;
     }
   }
@@ -1546,26 +1503,18 @@ public with sharing class HM_ComponentDataService {
     Map<String, Object> context,
     String componentType
   ) {
+    if (dataSources == null || dataSources.isEmpty()) {
+      return null;
+    }
+    
     try {
-      // Determine which data source to use for badge
-      HM_Dashboard_Data_Source__c badgeDataSource = null;
+      HM_Dashboard_Data_Source__c badgeDataSource = findDataSourceByName(
+        dataSources,
+        badgeDetailMap.HM_Data_Source_Name__c
+      );
       
-      if (String.isNotBlank(badgeDetailMap.HM_Data_Source_Name__c)) {
-        // Find data source by name
-        for (HM_Dashboard_Data_Source__c ds : dataSources) {
-          if (ds.Name == badgeDetailMap.HM_Data_Source_Name__c) {
-            badgeDataSource = ds;
-            break;
-          }
-        }
-        
-        // If not found, use first data source (graceful degradation)
-        if (badgeDataSource == null) {
-          badgeDataSource = dataSources[0];
-        }
-      } else {
-        // No data source name specified, use first data source
-        badgeDataSource = dataSources[0];
+      if (badgeDataSource == null) {
+        return null;
       }
       
       // Process the badge data source
@@ -1579,40 +1528,11 @@ public with sharing class HM_ComponentDataService {
         return null;
       }
       
-      // Extract value from response based on shape
-      Object rawValue = null;
-      String shape = (String) badgeResponse.get('shape');
-      
-      if (shape == SHAPE_AGGREGATE) {
-        // For aggregate, use aggregateValue directly
-        rawValue = badgeResponse.get('aggregateValue');
-      } else if (shape == SHAPE_LIST) {
-        // For list, get first row and extract field value
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) badgeResponse.get('rows');
-        if (rows != null && !rows.isEmpty()) {
-          Map<String, Object> firstRow = rows[0];
-          
-          // Use field API name from detail map if specified
-          if (String.isNotBlank(badgeDetailMap.HM_Field_API_Name__c)) {
-            rawValue = extractNestedFieldValue(firstRow, badgeDetailMap.HM_Field_API_Name__c);
-          } else {
-            // If no field specified, try common aggregate aliases or first value
-            if (firstRow.containsKey('expr0')) {
-              rawValue = firstRow.get('expr0');
-            } else if (firstRow.containsKey('totalWon')) {
-              rawValue = firstRow.get('totalWon');
-            } else if (!firstRow.isEmpty()) {
-              // Get first non-Id value
-              for (String key : firstRow.keySet()) {
-                if (key != 'Id') {
-                  rawValue = firstRow.get(key);
-                  break;
-                }
-              }
-            }
-          }
-        }
-      }
+      // Extract raw value from response
+      Object rawValue = extractValueFromResponse(
+        badgeResponse,
+        badgeDetailMap.HM_Field_API_Name__c
+      );
       
       // Return raw numeric value as string (not formatted) so frontend can determine direction
       // Frontend will format it after determining direction
@@ -1625,7 +1545,7 @@ public with sharing class HM_ComponentDataService {
           try {
             Decimal numValue = Decimal.valueOf((String) rawValue);
             return String.valueOf(numValue);
-          } catch (Exception e) {
+          } catch (Exception ex) {
             // If can't parse, return as-is
             return (String) rawValue;
           }
@@ -1635,10 +1555,66 @@ public with sharing class HM_ComponentDataService {
       }
       
       return null;
+    } catch (AuraHandledException ex) {
+      // Re-throw AuraHandledException to preserve user-friendly error messages
+      throw ex;
     } catch (Exception ex) {
-      // Graceful degradation - return null on error
+      // Graceful degradation: return null on unexpected errors to prevent dashboard failure
       return null;
     }
+  }
+
+  /**
+   * @description Extract value from component response based on shape
+   * Handles both AGGREGATE and LIST response shapes
+   * @param response Response map from processDataSource
+   * @param fieldApiName Optional field API name to extract from first row (for LIST shape)
+   * @return Object Extracted raw value, or null if not found
+   */
+  private static Object extractValueFromResponse(
+    Map<String, Object> response,
+    String fieldApiName
+  ) {
+    if (response == null) {
+      return null;
+    }
+    
+    String shape = (String) response.get('shape');
+    
+    if (shape == SHAPE_AGGREGATE) {
+      return response.get('aggregateValue');
+    }
+    
+    if (shape == SHAPE_LIST) {
+      List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
+      if (rows == null || rows.isEmpty()) {
+        return null;
+      }
+      
+      Map<String, Object> firstRow = rows[0];
+      
+      // Use field API name if specified
+      if (String.isNotBlank(fieldApiName)) {
+        return extractNestedFieldValue(firstRow, fieldApiName);
+      }
+      
+      // Try common aggregate aliases or first non-Id value
+      if (firstRow.containsKey('expr0')) {
+        return firstRow.get('expr0');
+      }
+      if (firstRow.containsKey('totalWon')) {
+        return firstRow.get('totalWon');
+      }
+      if (!firstRow.isEmpty()) {
+        for (String key : firstRow.keySet()) {
+          if (key != 'Id') {
+            return firstRow.get(key);
+          }
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**

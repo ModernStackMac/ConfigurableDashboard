@@ -1,7 +1,5 @@
 /**
  * @description Test data provider for dashboard components
- * Provides example methods demonstrating Map<String, List<SObject>> pattern
- * for multi-object list components
  * Implements Callable interface for dynamic invocation
  * @author High Meadows
  * @date 2024
@@ -27,9 +25,6 @@ public with sharing class HM_DashboardTestData implements Callable {
    */
   public Object call(String action, Map<String, Object> args) {
     switch on action {
-      when 'getMultiObjectTestData' {
-        return getMultiObjectTestData();
-      }
       when 'getAccountActivitySummary' {
         return getAccountActivitySummary();
       }
@@ -39,62 +34,24 @@ public with sharing class HM_DashboardTestData implements Callable {
       when 'getTotalWonAmount' {
         return getTotalWonAmount();
       }
+      when 'getPipelineValuePercentageChange' {
+        return getPipelineValuePercentageChange();
+      }
+      when 'getClosedOpportunitiesPercentageChange' {
+        return getClosedOpportunitiesPercentageChange();
+      }
+      when 'getCasesPendingActionPercentageChange' {
+        return getCasesPendingActionPercentageChange();
+      }
+      when 'getActiveAccountsCountDifference' {
+        return getActiveAccountsCountDifference();
+      }
       when else {
         throw new AuraHandledException(
           String.format(ERROR_METHOD_NOT_FOUND, new List<String>{ action })
         );
       }
     }
-  }
-
-  /**
-   * @description Get multi-object test data using Map<String, List<SObject>> pattern
-   * Demonstrates how to return data from multiple objects in a single call
-   * @return Map<String, List<SObject>> Map where keys are object API names and values are SObject lists
-   */
-  public static Map<String, List<SObject>> getMultiObjectTestData() {
-    // Check object accessibility
-    if (!Schema.sObjectType.Account.isAccessible()) {
-      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_ACCOUNT);
-    }
-    if (!Schema.sObjectType.Opportunity.isAccessible()) {
-      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_OPPORTUNITY);
-    }
-    if (!Schema.sObjectType.Case.isAccessible()) {
-      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_CASE);
-    }
-
-    Map<String, List<SObject>> buckets = new Map<String, List<SObject>>{
-      OBJECT_TYPE_ACCOUNT => new List<SObject>(),
-      OBJECT_TYPE_OPPORTUNITY => new List<SObject>(),
-      OBJECT_TYPE_CASE => new List<SObject>()
-    };
-
-    List<Account> accounts = [
-      SELECT Id, Name, Client_Code__c, Family_Status__c
-      FROM Account
-      WHERE Client_Code__c != null AND Family_Status__c != null
-      LIMIT :DEFAULT_RECORD_LIMIT
-    ];
-    buckets.get(OBJECT_TYPE_ACCOUNT).addAll(accounts);
-
-    List<Opportunity> opportunities = [
-      SELECT Id, Name, Account_Name__c, StageName, Amount, closedate
-      FROM Opportunity
-      WHERE Amount != null AND StageName != null AND OwnerId = :UserInfo.getUserId()
-      LIMIT :DEFAULT_RECORD_LIMIT
-    ];
-    buckets.get(OBJECT_TYPE_OPPORTUNITY).addAll(opportunities);
-
-    List<Case> cases = [
-      SELECT Id, CaseNumber, Account.Name, Priority, Origin
-      FROM Case
-      WHERE Priority != null AND Origin != null AND OwnerId = :UserInfo.getUserId()
-      LIMIT :DEFAULT_RECORD_LIMIT
-    ];
-    buckets.get(OBJECT_TYPE_CASE).addAll(cases);
-
-    return buckets;
   }
 
   /**
@@ -118,6 +75,177 @@ public with sharing class HM_DashboardTestData implements Callable {
 
     Decimal totalWonAmount = (Decimal) results[0].get('totalWon');
     return totalWonAmount == null ? 0 : totalWonAmount;
+  }
+
+  /**
+   * @description Get pipeline value percentage change (current month vs previous month)
+   * @return Decimal Percentage change, 0 if null or no records
+   */
+  public static Decimal getPipelineValuePercentageChange() {
+    if (!Schema.sObjectType.Opportunity.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_OPPORTUNITY);
+    }
+
+    Date currentMonthStart = Date.today().toStartOfMonth();
+    Date previousMonthStart = currentMonthStart.addMonths(-1);
+    Date previousMonthEnd = currentMonthStart.addDays(-1);
+
+    // Current month pipeline value
+    List<AggregateResult> currentResults = [
+      SELECT SUM(Amount) totalAmount
+      FROM Opportunity
+      WHERE OwnerId = :UserInfo.getUserId()
+        AND StageName != 'Closed Won'
+        AND StageName != 'Closed Lost'
+        AND CloseDate >= :currentMonthStart
+    ];
+
+    // Previous month pipeline value
+    List<AggregateResult> previousResults = [
+      SELECT SUM(Amount) totalAmount
+      FROM Opportunity
+      WHERE OwnerId = :UserInfo.getUserId()
+        AND StageName != 'Closed Won'
+        AND StageName != 'Closed Lost'
+        AND CloseDate >= :previousMonthStart
+        AND CloseDate <= :previousMonthEnd
+    ];
+
+    Decimal currentValue = currentResults.isEmpty() || currentResults[0].get('totalAmount') == null 
+      ? 0 : (Decimal) currentResults[0].get('totalAmount');
+    Decimal previousValue = previousResults.isEmpty() || previousResults[0].get('totalAmount') == null 
+      ? 0 : (Decimal) previousResults[0].get('totalAmount');
+
+    if (previousValue == 0) {
+      return currentValue > 0 ? 100 : 0;
+    }
+
+    return ((currentValue - previousValue) / previousValue) * 100;
+  }
+
+  /**
+   * @description Get closed opportunities percentage change (current month vs previous month)
+   * @return Decimal Percentage change, 0 if null or no records
+   */
+  public static Decimal getClosedOpportunitiesPercentageChange() {
+    if (!Schema.sObjectType.Opportunity.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_OPPORTUNITY);
+    }
+
+    Date currentMonthStart = Date.today().toStartOfMonth();
+    Date previousMonthStart = currentMonthStart.addMonths(-1);
+    Date previousMonthEnd = currentMonthStart.addDays(-1);
+
+    // Current month closed opportunities count
+    List<AggregateResult> currentResults = [
+      SELECT COUNT(Id) totalCount
+      FROM Opportunity
+      WHERE OwnerId = :UserInfo.getUserId()
+        AND (StageName = 'Closed Won' OR StageName = 'Closed Lost')
+        AND CloseDate >= :currentMonthStart
+    ];
+
+    // Previous month closed opportunities count
+    List<AggregateResult> previousResults = [
+      SELECT COUNT(Id) totalCount
+      FROM Opportunity
+      WHERE OwnerId = :UserInfo.getUserId()
+        AND (StageName = 'Closed Won' OR StageName = 'Closed Lost')
+        AND CloseDate >= :previousMonthStart
+        AND CloseDate <= :previousMonthEnd
+    ];
+
+    Decimal currentCount = currentResults.isEmpty() || currentResults[0].get('totalCount') == null 
+      ? 0 : (Decimal) currentResults[0].get('totalCount');
+    Decimal previousCount = previousResults.isEmpty() || previousResults[0].get('totalCount') == null 
+      ? 0 : (Decimal) previousResults[0].get('totalCount');
+
+    if (previousCount == 0) {
+      return currentCount > 0 ? 100 : 0;
+    }
+
+    return ((currentCount - previousCount) / previousCount) * 100;
+  }
+
+  /**
+   * @description Get cases pending action percentage change (current month vs previous month)
+   * @return Decimal Percentage change, 0 if null or no records
+   */
+  public static Decimal getCasesPendingActionPercentageChange() {
+    if (!Schema.sObjectType.Case.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_CASE);
+    }
+
+    Date currentMonthStart = Date.today().toStartOfMonth();
+    Date previousMonthStart = currentMonthStart.addMonths(-1);
+    Date previousMonthEnd = currentMonthStart.addDays(-1);
+
+    // Current month cases pending action count
+    List<AggregateResult> currentResults = [
+      SELECT COUNT(Id) totalCount
+      FROM Case
+      WHERE OwnerId = :UserInfo.getUserId()
+        AND Status != 'Closed'
+        AND CreatedDate >= :currentMonthStart
+    ];
+
+    // Previous month cases pending action count
+    List<AggregateResult> previousResults = [
+      SELECT COUNT(Id) totalCount
+      FROM Case
+      WHERE OwnerId = :UserInfo.getUserId()
+        AND Status != 'Closed'
+        AND CreatedDate >= :previousMonthStart
+        AND CreatedDate <= :previousMonthEnd
+    ];
+
+    Decimal currentCount = currentResults.isEmpty() || currentResults[0].get('totalCount') == null 
+      ? 0 : (Decimal) currentResults[0].get('totalCount');
+    Decimal previousCount = previousResults.isEmpty() || previousResults[0].get('totalCount') == null 
+      ? 0 : (Decimal) previousResults[0].get('totalCount');
+
+    if (previousCount == 0) {
+      return currentCount > 0 ? 100 : 0;
+    }
+
+    return ((currentCount - previousCount) / previousCount) * 100;
+  }
+
+  /**
+   * @description Get active accounts count difference (current month vs previous month)
+   * @return Decimal Count difference, 0 if null or no records
+   */
+  public static Decimal getActiveAccountsCountDifference() {
+    if (!Schema.sObjectType.Account.isAccessible()) {
+      throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_ACCOUNT);
+    }
+
+    Date currentMonthStart = Date.today().toStartOfMonth();
+    Date previousMonthStart = currentMonthStart.addMonths(-1);
+    Date previousMonthEnd = currentMonthStart.addDays(-1);
+
+    // Current month active accounts count
+    List<AggregateResult> currentResults = [
+      SELECT COUNT(Id) totalCount
+      FROM Account
+      WHERE LastActivityDate >= :currentMonthStart
+        OR CreatedDate >= :currentMonthStart
+    ];
+
+    // Previous month active accounts count
+    List<AggregateResult> previousResults = [
+      SELECT COUNT(Id) totalCount
+      FROM Account
+      WHERE (LastActivityDate >= :previousMonthStart AND LastActivityDate <= :previousMonthEnd)
+        OR (CreatedDate >= :previousMonthStart AND CreatedDate <= :previousMonthEnd)
+    ];
+
+    Decimal currentCount = currentResults.isEmpty() || currentResults[0].get('totalCount') == null 
+      ? 0 : (Decimal) currentResults[0].get('totalCount');
+    Decimal previousCount = previousResults.isEmpty() || previousResults[0].get('totalCount') == null 
+      ? 0 : (Decimal) previousResults[0].get('totalCount');
+
+    return currentCount - previousCount;
   }
 
   /**

@@ -7,6 +7,8 @@
   --cc-radius-sm: 6px;
   --cc-radius-md: 8px;
   --cc-radius-lg: 12px;
+  display: block;
+  width: 100%;
 }
 
 /* ==================== LAYOUTS ==================== */
@@ -15,6 +17,8 @@
   flex-direction: row;
   gap: var(--cc-spacing-md);
   flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hm-group-layout-vertical {
@@ -30,8 +34,16 @@
 }
 
 .hm-group-item {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* When there's only one item in horizontal layout, make it full width */
+.hm-group-layout-horizontal > .hm-group-item:only-child {
+  flex: 1 1 100%;
+  max-width: 100%;
 }
 
 /* ==================== LOADING & ERROR ==================== */
@@ -45,6 +57,8 @@
 
 .hm-group-container {
   /* Container wrapper for dark mode support */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hm-group-error {

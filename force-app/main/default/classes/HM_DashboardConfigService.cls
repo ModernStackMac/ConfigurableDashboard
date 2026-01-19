@@ -525,8 +525,12 @@ public with sharing class HM_DashboardConfigService {
           iconMap.put(key, (String) value);
         }
       }
-    } catch (Exception ex) {
-      // Return empty map on parse failure
+    } catch (JSONException ex) {
+      // Graceful degradation: return empty map when JSON parsing fails
+      return iconMap;
+    } catch (TypeException ex) {
+      // Graceful degradation: return empty map when type casting fails
+      return iconMap;
     }
     
     return iconMap;
@@ -612,9 +616,14 @@ public with sharing class HM_DashboardConfigService {
    * @return String Field value, or null if field doesn't exist or is not accessible
    */
   private static String getFieldValueSafely(SObject record, String fieldName) {
+    if (record == null || String.isBlank(fieldName)) {
+      return null;
+    }
+    
     try {
       return (String) record.get(fieldName);
-    } catch (Exception ex) {
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist or not accessible
       return null;
     }
   }
@@ -645,8 +654,8 @@ public with sharing class HM_DashboardConfigService {
       if (iconNameField.isAccessible()) {
         fields.add('HM_Icon_Name__c');
       }
-    } catch (Exception ex) {
-      // Field doesn't exist or not accessible - skip it
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist - skip it
     }
     
     // Check if HM_Row_Icon_Configuration__c exists and is accessible
@@ -656,8 +665,8 @@ public with sharing class HM_DashboardConfigService {
       if (rowIconField.isAccessible()) {
         fields.add('HM_Row_Icon_Configuration__c');
       }
-    } catch (Exception ex) {
-      // Field doesn't exist or not accessible - skip it
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist - skip it
     }
     
     // Check if HM_Icon_Background_Color__c exists and is accessible
@@ -667,8 +676,8 @@ public with sharing class HM_DashboardConfigService {
       if (iconBgColorField.isAccessible()) {
         fields.add('HM_Icon_Background_Color__c');
       }
-    } catch (Exception ex) {
-      // Field doesn't exist or not accessible - skip it
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist - skip it
     }
     
     return fields;
@@ -723,7 +732,8 @@ public with sharing class HM_DashboardConfigService {
         }
       }
     } catch (Exception ex) {
-      // Return empty list on parse error (applies to all)
+      // Graceful degradation: return empty list on parse error (applies to all object types)
+      return objectTypes;
     }
     
     return objectTypes;

@@ -1,6 +1,12 @@
 /* Container */
+:host {
+  display: block;
+  width: 100%;
+}
+
 .cc-container {
   width: 100%;
+  box-sizing: border-box;
 }
 
 /* Card */
@@ -10,6 +16,8 @@
   padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(0, 0, 0, 0.06);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cc-dark .cc-card {
@@ -141,10 +149,12 @@
 /* Table */
 .cc-table-header {
   display: flex;
+  width: 100%;
   border-bottom: 2px solid #e0e0e0;
   padding: 12px 0;
   font-weight: 600;
   color: #181818;
+  box-sizing: border-box;
 }
 
 .cc-dark .cc-table-header {
@@ -152,17 +162,27 @@
   color: #ffffff;
 }
 
+/* Ensure header columns match data columns width */
+.cc-table-header > .cc-col-data,
+.cc-table-header > .cc-col-sortable {
+  flex: 1 1 0;
+  min-width: 100px;
+}
+
 .cc-table-body {
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .cc-table-row {
   display: flex;
+  width: 100%;
   border-bottom: 1px solid #e0e0e0;
   padding: 12px 0;
   cursor: pointer;
   transition: background 0.2s;
+  box-sizing: border-box;
 }
 
 .cc-table-row:hover {
@@ -196,10 +216,12 @@
 }
 
 .cc-col-data {
-  flex: 1;
+  flex: 1 1 0;
   padding: 0 8px;
   min-width: 100px;
   color: #181818;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cc-dark .cc-col-data {
@@ -291,6 +313,8 @@
   justify-content: space-between;
   gap: 4px;
   transition: background-color 0.2s ease;
+  flex: 1 1 0;
+  min-width: 100px;
 }
 
 .cc-col-sortable:hover {
@@ -312,6 +336,9 @@
 
 .cc-col-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cc-sort-icon {
