@@ -4,6 +4,29 @@
     <active>true</active>
     <label>List</label>
     <picklistValues>
+        <picklist>HM_Icon_Background_Color__c</picklist>
+        <values>
+            <fullName>Alert</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Brand</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>None</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>Success</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Warning</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
         <picklist>HM_Type__c</picklist>
         <values>
             <fullName>List</fullName>

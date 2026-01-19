@@ -203,8 +203,8 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Is_Merge_Field__c</fieldItem>
-                <identifier>RecordHM_Is_Merge_Field_cField</identifier>
+                <fieldItem>Record.HM_Data_Source_Name__c</fieldItem>
+                <identifier>RecordHM_Data_Source_Name_cField</identifier>
             </fieldInstance>
         </itemInstances>
         <name>Facet-60c391ee-d74b-4a7e-ae4e-ba596e74b581</name>

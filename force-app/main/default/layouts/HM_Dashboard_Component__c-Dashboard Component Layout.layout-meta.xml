@@ -69,6 +69,10 @@
                 <field>HM_Icon_Name__c</field>
             </layoutItems>
             <layoutItems>
+                <behavior>Edit</behavior>
+                <field>HM_Icon_Background_Color__c</field>
+            </layoutItems>
+            <layoutItems>
                 <behavior>Required</behavior>
                 <field>HM_Display_Order__c</field>
             </layoutItems>

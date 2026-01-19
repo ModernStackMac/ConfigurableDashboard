@@ -2,7 +2,7 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>HM_Subtitle__c</fullName>
     <externalId>false</externalId>
-    <inlineHelpText>Optional subtitle text displayed below the title. For lists, this appears as the card header subtitle. For tiles, this can be overridden by data from Detail Maps.</inlineHelpText>
+    <inlineHelpText>Optional subtitle text displayed below the title. For lists, this appears as the card header subtitle. Use {value} as a placeholder to insert a calculated value from a "Subtitle" Detail Map. For example: "{value} deals won" or "deals won: {value}". Works for both Tile and List components.</inlineHelpText>
     <label>Subtitle</label>
     <length>255</length>
     <required>false</required>
