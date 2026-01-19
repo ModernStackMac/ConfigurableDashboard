@@ -34,6 +34,10 @@
                 <behavior>Required</behavior>
                 <field>HM_Return_Type__c</field>
             </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>HM_Row_Icon_Name__c</field>
+            </layoutItems>
         </layoutColumns>
         <style>TwoColumnsTopToBottom</style>
     </layoutSections>

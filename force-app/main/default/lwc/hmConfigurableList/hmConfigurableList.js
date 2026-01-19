@@ -420,7 +420,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
     return data.map((record, index) => {
       const recordId = record.Id || record.recordId || `row-${index}`;
       const objectType = this.getObjectType(record);
-      const rowIcon = this.getRowIcon(objectType);
+      // Get icon from data source icon (set by Apex service)
+      const rowIcon = record.dataSourceIcon || null;
 
       // Build cells for this row - include all columns but set null for non-applicable ones
       const cells = this.columns.map((column) => {
@@ -602,12 +603,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
    * @param {Object} record - Record object to extract type from
    * @return {String} Object type name (Account, Contact, Opportunity, Case, or Unknown)
    */
-  /**
-   * @description Get object type from record
-   * Attempts multiple strategies: attributes.type, recordType field, objectType field, or Id prefix
-   * @param {Object} record - Record object to extract type from
-   * @return {String} Object type name (Account, Contact, Opportunity, Case, or Unknown)
-   */
   getObjectType(record) {
     // Try attributes.type first (from Apex)
     if (record.attributes?.type) {
@@ -637,53 +632,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     return HM_ConfigurableList.OBJECT_TYPES.UNKNOWN;
   }
 
-  /**
-   * @description Get row icon based on object type
-   * Supports case-insensitive lookup and default icon fallback
-   * @param {String} objectType Object type to get icon for
-   * @return {String|null} Icon name or null if no match
-   */
-  /**
-   * @description Get row icon based on object type
-   * Supports case-insensitive lookup and default icon fallback
-   * @param {String} objectType - Object type to get icon for
-   * @return {String|null} Icon name or null if no match
-   */
-  getRowIcon(objectType) {
-    if (!this.componentConfig?.rowIconConfiguration || !objectType) {
-      return null;
-    }
-
-    const iconConfig = this.componentConfig.rowIconConfiguration;
-    
-    if (!iconConfig || typeof iconConfig !== 'object') {
-      return null;
-    }
-    
-    // Try exact match first
-    if (iconConfig[objectType] && iconConfig[objectType].trim().length > 0) {
-      return iconConfig[objectType];
-    }
-    
-    // Try case-insensitive match
-    const objectTypeLower = objectType.toLowerCase();
-    for (const key in iconConfig) {
-      if (key.toLowerCase() === objectTypeLower) {
-        const iconName = iconConfig[key];
-        if (iconName && iconName.trim().length > 0) {
-          return iconName;
-        }
-      }
-    }
-    
-    // Try default icon (key: "*" or "default")
-    const defaultIcon = iconConfig['*'] || iconConfig['default'];
-    if (defaultIcon && defaultIcon.trim().length > 0) {
-      return defaultIcon;
-    }
-    
-    return null;
-  }
 
   /**
    * @description Check if any rows have icons configured
@@ -712,19 +660,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     }
     // Check if objectType is in the list
     return column.objectType.includes(objectType);
-  }
-
-  /**
-   * @description Get cell for a specific column from a row
-   * @param {Object} row - Row object containing cells array
-   * @param {Object} column - Column definition object
-   * @return {Object|null} Cell object matching the column key, or null if not found
-   */
-  getCellForColumn(row, column) {
-    if (!row || !row.cells || !column) {
-      return null;
-    }
-    return row.cells.find((cell) => cell && cell.key === column.key) || null;
   }
 
   /**
