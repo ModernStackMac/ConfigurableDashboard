@@ -97,15 +97,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
   sortDirection = HM_ConfigurableList.SORT_DIRECTIONS.ASC;
   enableColumnSorting = false;
 
-  // Wired result for refresh
-  wiredConfigResult;
-
   /**
    * @description Wire component configuration
    */
   @wire(getComponentConfiguration, { componentId: "$componentId" })
   wiredConfig(result) {
-    this.wiredConfigResult = result;
     const { error, data } = result;
 
     if (data) {
@@ -377,13 +373,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
       return true;
     }
 
-    if (response.shape === 'MULTI_OBJECT') {
-      this.rows = this.formatRowsFromMultiObject(response.multiObjectData);
-      return true;
-    }
-
     if (response.shape === 'AGGREGATE') {
-      this.setErrorAndResetData('List component requires LIST or MULTI_OBJECT shape');
+      this.setErrorAndResetData('List component requires LIST shape');
       return false;
     }
 
@@ -415,55 +406,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     this.filters = defaultData.filters;
   }
 
-  /**
-   * @description Format multi-object data (Map<String, List<Object>>) into rows
-   * @param {Object} multiObjectData - Map with object type keys and arrays of records
-   * @return {Array} Formatted rows array
-   */
-  formatRowsFromMultiObject(multiObjectData) {
-    if (!multiObjectData || typeof multiObjectData !== 'object') {
-      return [];
-    }
-
-    // Flatten all object types into a single array
-    const allRecords = [];
-    for (const objectType in multiObjectData) {
-      const records = multiObjectData[objectType];
-      if (Array.isArray(records)) {
-        // Create new plain objects from records to avoid proxy issues
-        records.forEach(record => {
-          if (record && typeof record === 'object') {
-            // Create a new plain object with all properties from the record
-            // Use Object.assign for shallow copy, but handle nested objects
-            const plainRecord = Object.assign({}, record);
-            
-            // Deep copy nested objects like 'attributes'
-            if (record.attributes && typeof record.attributes === 'object') {
-              plainRecord.attributes = Object.assign({}, record.attributes);
-            }
-            
-            // Add object type metadata (only if not already present)
-            if (!plainRecord.recordType && !plainRecord.objectType) {
-              plainRecord.recordType = objectType;
-              plainRecord.objectType = objectType;
-            }
-            
-            // Ensure attributes.type is set if we have objectType
-            if (plainRecord.objectType && (!plainRecord.attributes || !plainRecord.attributes.type)) {
-              if (!plainRecord.attributes) {
-                plainRecord.attributes = {};
-              }
-              plainRecord.attributes.type = plainRecord.objectType;
-            }
-            
-            allRecords.push(plainRecord);
-          }
-        });
-      }
-    }
-
-    return this.formatRows(allRecords);
-  }
 
   /**
    * @description Format raw data into rows with cells
@@ -660,6 +602,12 @@ export default class HM_ConfigurableList extends NavigationMixin(
    * @param {Object} record - Record object to extract type from
    * @return {String} Object type name (Account, Contact, Opportunity, Case, or Unknown)
    */
+  /**
+   * @description Get object type from record
+   * Attempts multiple strategies: attributes.type, recordType field, objectType field, or Id prefix
+   * @param {Object} record - Record object to extract type from
+   * @return {String} Object type name (Account, Contact, Opportunity, Case, or Unknown)
+   */
   getObjectType(record) {
     // Try attributes.type first (from Apex)
     if (record.attributes?.type) {
@@ -669,7 +617,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
     if (record.recordType) {
       return record.recordType;
     }
-    // Try objectType field (set by formatRowsFromMultiObject and wrapper conversion)
+    // Try objectType field (set by wrapper conversion)
     if (record.objectType) {
       return record.objectType;
     }
@@ -693,6 +641,12 @@ export default class HM_ConfigurableList extends NavigationMixin(
    * @description Get row icon based on object type
    * Supports case-insensitive lookup and default icon fallback
    * @param {String} objectType Object type to get icon for
+   * @return {String|null} Icon name or null if no match
+   */
+  /**
+   * @description Get row icon based on object type
+   * Supports case-insensitive lookup and default icon fallback
+   * @param {String} objectType - Object type to get icon for
    * @return {String|null} Icon name or null if no match
    */
   getRowIcon(objectType) {

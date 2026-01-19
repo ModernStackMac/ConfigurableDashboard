@@ -16,8 +16,9 @@
   display: flex;
   flex-direction: row;
   gap: var(--cc-spacing-md);
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .hm-group-layout-vertical {
@@ -40,6 +41,13 @@
   display: flex;
   align-items: stretch;
   width: 100%;
+  box-sizing: border-box;
+}
+
+/* When there's only one item in horizontal layout, make it full width */
+.hm-group-layout-horizontal > .hm-group-item:only-child {
+  flex: 1 1 100%;
+  max-width: 100%;
 }
 
 /* ==================== LOADING & ERROR ==================== */
@@ -54,6 +62,7 @@
 .hm-group-container {
   /* Container wrapper for dark mode support */
   width: 100%;
+  box-sizing: border-box;
 }
 
 .hm-group-error {
