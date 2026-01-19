@@ -13,26 +13,26 @@ export default class HM_ConfigurableTile extends NavigationMixin(
   // ==================== CONSTANTS ====================
   static MAP_TYPES = {
     TILE_VALUE: "Tile Value",
-    TILE_CHANGE: "Tile Change",
-    TILE_SUBTITLE: "Tile Subtitle",
-    TILE_BADGE: "Tile Badge",
-    TILE_ICON: "Tile Icon"
+    TILE_BADGE: "Tile Badge"
   };
 
   static DEFAULT_ICON = "utility:info";
   static DEFAULT_VALUE = "0";
 
-  static CSS_CLASSES = {
-    CHANGE_UP: "cc-kpi-change cc-kpi-change--up",
-    CHANGE_DOWN: "cc-kpi-change cc-kpi-change--down",
-    ICON_BRAND: "cc-kpi-icon cc-kpi-icon--brand",
-    ICON_ALERT: "cc-kpi-icon cc-kpi-icon--alert",
-    BADGE_UP: "cc-kpi-badge cc-kpi-badge--up"
-  };
-
-  static TREND_ICONS = {
+  static BADGE_ICONS = {
     UP: "utility:arrowup",
     DOWN: "utility:arrowdown"
+  };
+
+  static CSS_CLASSES = {
+    ICON_BRAND: "cc-kpi-icon cc-kpi-icon--brand",
+    ICON_ALERT: "cc-kpi-icon cc-kpi-icon--alert",
+    ICON_SUCCESS: "cc-kpi-icon cc-kpi-icon--success",
+    ICON_WARNING: "cc-kpi-icon cc-kpi-icon--warning",
+    ICON_NO_BACKGROUND: "cc-kpi-icon cc-kpi-icon--no-background",
+    BADGE_UP: "cc-kpi-badge cc-kpi-badge--up",
+    BADGE_DOWN: "cc-kpi-badge cc-kpi-badge--down",
+    BADGE_ZERO: "cc-kpi-badge cc-kpi-badge--zero"
   };
 
   // ==================== PUBLIC PROPERTIES ====================
@@ -47,11 +47,8 @@ export default class HM_ConfigurableTile extends NavigationMixin(
   // Tile data
   tileData = {
     value: "",
-    change: "",
     subtitle: "",
     badge: null,
-    changeClass: "",
-    trendIcon: "",
     iconName: "",
     iconClass: ""
   };
@@ -99,12 +96,14 @@ export default class HM_ConfigurableTile extends NavigationMixin(
       });
 
       if (response && response.success) {
+        const subtitleValue = response.subtitleValue || null;
+        const badgeValue = response.badgeValue || null;
         if (response.shape === 'AGGREGATE') {
           // Use aggregate value directly
-          this.processAggregateData(response.aggregateValue, response.aggregateType);
+          this.processAggregateData(response.aggregateValue, response.aggregateType, subtitleValue, badgeValue);
         } else if (response.shape === 'LIST' && response.rows && response.rows.length > 0) {
           // Fallback: use first row (backward compatibility)
-          this.processTileData(response.rows[0]);
+          this.processTileData(response.rows[0], subtitleValue, badgeValue);
         } else {
           // Set default/empty values
           this.tileData = this.getDefaultTileData();
@@ -125,15 +124,13 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @return {Object} Default tile data object
    */
   getDefaultTileData() {
+    const iconName = this.componentConfig?.iconName || HM_ConfigurableTile.DEFAULT_ICON;
     return {
       value: HM_ConfigurableTile.DEFAULT_VALUE,
-      change: "",
       subtitle: "",
       badge: null,
-      changeClass: HM_ConfigurableTile.CSS_CLASSES.CHANGE_UP,
-      trendIcon: HM_ConfigurableTile.TREND_ICONS.UP,
-      iconName: this.componentConfig?.iconName || HM_ConfigurableTile.DEFAULT_ICON,
-      iconClass: HM_ConfigurableTile.CSS_CLASSES.ICON_BRAND
+      iconName: iconName,
+      iconClass: this.getIconClass(iconName)
     };
   }
 
@@ -164,34 +161,53 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @description Process aggregate value into tile display format
    * @param {Object} aggregateValue - The aggregate value (Decimal, Integer, String, Boolean, Date, Datetime)
    * @param {String} aggregateType - Type of aggregate (DECIMAL, INTEGER, STRING, BOOLEAN, DATE, DATETIME)
+   * @param {String} subtitleValue - Optional formatted subtitle value from backend
+   * @param {String} badgeValue - Optional formatted badge value from backend
    */
-  processAggregateData(aggregateValue, aggregateType) {
+  processAggregateData(aggregateValue, aggregateType, subtitleValue, badgeValue) {
     const detailMaps = this.componentConfig.detailMaps || [];
     const mapIndex = this.buildDetailMapIndex(detailMaps);
+    const dataSources = this.componentConfig.dataSources || [];
     
-    // Format the aggregate value based on type
-    let formattedValue = this.formatAggregateValue(aggregateValue, aggregateType);
+    // Extract tile properties from detail maps
+    const valueMap = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_VALUE);
+    let formattedValue;
     
-    // Extract other tile properties from detail maps if available
-    const changeData = this.extractTileChange(mapIndex, { value: aggregateValue });
-    const subtitle = this.extractTileSubtitle(mapIndex, { value: aggregateValue });
-    const badgeData = this.extractTileBadge(mapIndex, { value: aggregateValue });
-    const iconName =
-      this.extractTileIcon(mapIndex, { value: aggregateValue }) ||
-      this.componentConfig.iconName ||
-      HM_ConfigurableTile.DEFAULT_ICON;
-
-    // Determine icon class based on icon name or default
+    if (valueMap) {
+      // Use formatType from the detail map (Currency, Number, Percent, Date, etc.)
+      // This respects the Format Type field on the Component Detail Map
+      formattedValue = this.formatValue(aggregateValue, valueMap.formatType);
+    } else {
+      // Fallback: format based on aggregate type if no mapping exists
+      formattedValue = this.formatAggregateValue(aggregateValue, aggregateType);
+    }
+    
+    // Extract badge - use badgeValue if provided (different data source), otherwise extract from aggregate
+    const badgeMap = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_BADGE);
+    let badgeData = { badge: null };
+    
+    if (badgeMap) {
+      // If badgeValue is provided, badge comes from different data source
+      if (badgeValue != null) {
+        badgeData = this.extractTileBadge(mapIndex, null, dataSources, badgeValue);
+      } else {
+        // Badge from same data source - extract from aggregate value
+        badgeData = this.extractTileBadge(mapIndex, { value: aggregateValue }, dataSources, null);
+      }
+    }
+    
+    const iconName = this.componentConfig.iconName || HM_ConfigurableTile.DEFAULT_ICON;
     const iconClass = this.getIconClass(iconName);
+
+    // Process subtitle with value replacement
+    const subtitleTemplate = this.componentConfig.subtitle || "";
+    const processedSubtitle = this.processSubtitle(subtitleTemplate, subtitleValue);
 
     // Set tile data
     this.tileData = {
       value: formattedValue || HM_ConfigurableTile.DEFAULT_VALUE,
-      change: changeData.change || "",
-      subtitle: subtitle || "",
+      subtitle: processedSubtitle,
       badge: badgeData.badge,
-      changeClass: changeData.changeClass,
-      trendIcon: changeData.trendIcon,
       iconName: iconName,
       iconClass: iconClass
     };
@@ -227,34 +243,46 @@ export default class HM_ConfigurableTile extends NavigationMixin(
 
   /**
    * @description Process raw data into tile display format
-   * Extracts value, change, subtitle, badge, and icon from detail maps
+   * Extracts value and badge from detail maps, uses component fields for subtitle and icon
    * @param {Object} data - Data object containing field values
+   * @param {String} subtitleValue - Optional formatted subtitle value from backend
+   * @param {String} badgeValue - Optional formatted badge value from backend
    */
-  processTileData(data) {
+  processTileData(data, subtitleValue, badgeValue) {
     const detailMaps = this.componentConfig.detailMaps || [];
     const mapIndex = this.buildDetailMapIndex(detailMaps);
+    const dataSources = this.componentConfig.dataSources || [];
 
     // Extract values from detail maps using indexed lookup
-    const value = this.extractTileValue(mapIndex, data);
-    const changeData = this.extractTileChange(mapIndex, data);
-    const subtitle = this.extractTileSubtitle(mapIndex, data);
-    const badgeData = this.extractTileBadge(mapIndex, data);
-    const iconName =
-      this.extractTileIcon(mapIndex, data) ||
-      this.componentConfig.iconName ||
-      HM_ConfigurableTile.DEFAULT_ICON;
-
-    // Determine icon class based on icon name or default
+    const value = this.extractTileValue(mapIndex, data, dataSources);
+    
+    // Extract badge - use badgeValue if provided (different data source), otherwise extract from data
+    const badgeMap = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_BADGE);
+    let badgeData = { badge: null };
+    
+    if (badgeMap) {
+      // If badgeValue is provided, badge comes from different data source
+      if (badgeValue != null) {
+        badgeData = this.extractTileBadge(mapIndex, null, dataSources, badgeValue);
+      } else {
+        // Badge from same data source - extract from data object
+        badgeData = this.extractTileBadge(mapIndex, data, dataSources, null);
+      }
+    }
+    
+    // Use component fields for subtitle and icon
+    const iconName = this.componentConfig.iconName || HM_ConfigurableTile.DEFAULT_ICON;
     const iconClass = this.getIconClass(iconName);
+
+    // Process subtitle with value replacement
+    const subtitleTemplate = this.componentConfig.subtitle || "";
+    const processedSubtitle = this.processSubtitle(subtitleTemplate, subtitleValue);
 
     // Set initial tile data
     this.tileData = {
       value: value || HM_ConfigurableTile.DEFAULT_VALUE,
-      change: changeData.change || "",
-      subtitle: subtitle || "",
+      subtitle: processedSubtitle,
       badge: badgeData.badge,
-      changeClass: changeData.changeClass,
-      trendIcon: changeData.trendIcon,
       iconName: iconName,
       iconClass: iconClass
     };
@@ -264,171 +292,200 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @description Extract tile value from detail maps using indexed lookup
    * @param {Map} mapIndex - Indexed map of detail maps by map type
    * @param {Object} data - Data object containing field values
+   * @param {Array} dataSources - Array of data sources for validation
    * @return {String} Formatted tile value
    */
-  extractTileValue(mapIndex, data) {
+  extractTileValue(mapIndex, data, dataSources) {
     const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_VALUE);
     if (!map) {
       return "";
+    }
+
+    // Validate data source if specified (graceful degradation if not found)
+    if (map.dataSourceName && dataSources.length > 0) {
+      const matchedDataSource = dataSources.find(ds => ds.name === map.dataSourceName);
+      if (!matchedDataSource || (dataSources[0] && matchedDataSource.name !== dataSources[0].name)) {
+        // Use first data source as fallback
+      }
     }
 
     const fieldValue = this.getFieldValue(data, map.fieldApiName);
     return this.formatValue(fieldValue, map.formatType);
   }
 
-  /**
-   * @description Determine trend direction (up/down) based on numeric value
-   * @param {Number} value - Numeric value to evaluate
-   * @return {Object} Object with changeClass and trendIcon properties
-   */
-  determineTrendDirection(value) {
-    const numValue = this.parseNumber(value);
-
-    if (numValue < 0) {
-      return {
-        changeClass: HM_ConfigurableTile.CSS_CLASSES.CHANGE_DOWN,
-        trendIcon: HM_ConfigurableTile.TREND_ICONS.DOWN
-      };
-    }
-
-    // Default to up for zero or positive values
-    return {
-      changeClass: HM_ConfigurableTile.CSS_CLASSES.CHANGE_UP,
-      trendIcon: HM_ConfigurableTile.TREND_ICONS.UP
-    };
-  }
-
-  /**
-   * @description Extract tile change from detail maps using indexed lookup
-   * @param {Map} mapIndex - Indexed map of detail maps by map type
-   * @param {Object} data - Data object containing field values
-   * @return {Object} Object with change, changeClass, and trendIcon properties
-   */
-  extractTileChange(mapIndex, data) {
-    const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_CHANGE);
-    if (!map) {
-      return {
-        change: "",
-        changeClass: HM_ConfigurableTile.CSS_CLASSES.CHANGE_UP,
-        trendIcon: HM_ConfigurableTile.TREND_ICONS.UP
-      };
-    }
-
-    const fieldValue = this.getFieldValue(data, map.fieldApiName);
-    const change = this.formatChange(fieldValue, map.formatType);
-    const trendDirection = this.determineTrendDirection(fieldValue);
-
-    return {
-      change,
-      changeClass: trendDirection.changeClass,
-      trendIcon: trendDirection.trendIcon
-    };
-  }
-
-  /**
-   * @description Extract tile subtitle from detail maps using indexed lookup
-   * @param {Map} mapIndex - Indexed map of detail maps by map type
-   * @param {Object} data - Data object containing field values
-   * @return {String} Tile subtitle text
-   */
-  extractTileSubtitle(mapIndex, data) {
-    const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_SUBTITLE);
-    if (!map) {
-      return "";
-    }
-
-    const fieldValue = this.getFieldValue(data, map.fieldApiName);
-    const subtitle = String(fieldValue || "");
-    // Check for formatted subtitle fields (pipelineSubtitle, closedWonSubtitle, etc.)
-    const formattedSubtitle = this.getFormattedSubtitle(data);
-    return formattedSubtitle || subtitle;
-  }
 
   /**
    * @description Extract tile badge from detail maps using indexed lookup
    * @param {Map} mapIndex - Indexed map of detail maps by map type
    * @param {Object} data - Data object containing field values
+   * @param {Array} dataSources - Array of data sources for validation
+   * @param {String} badgeValue - Optional formatted badge value from backend (when from different data source)
    * @return {Object} Badge object with text, class, and icon, or null
    */
-  extractTileBadge(mapIndex, data) {
+  extractTileBadge(mapIndex, data, dataSources, badgeValue) {
     const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_BADGE);
     if (!map) {
       return { badge: null };
     }
 
-    // Use value from data (date range calculation removed)
-    const fieldValue = this.getFieldValue(data, map.fieldApiName);
-    // Note: badgeType field removed, badges will use field value directly
-    if (fieldValue !== null && fieldValue !== undefined) {
-      return {
-        badge: {
-          text: String(fieldValue),
-          class: HM_ConfigurableTile.CSS_CLASSES.BADGE_UP,
-          icon: HM_ConfigurableTile.DEFAULT_ICON
-        }
-      };
+    // Validate data source if specified (graceful degradation if not found)
+    if (map.dataSourceName && dataSources.length > 0) {
+      const matchedDataSource = dataSources.find(ds => ds.name === map.dataSourceName);
+      if (!matchedDataSource || (dataSources[0] && matchedDataSource.name !== dataSources[0].name)) {
+        // Use first data source as fallback
+      }
     }
 
-    return { badge: null };
+    // Get raw value - prefer badgeValue from backend if provided (different data source), otherwise extract from data
+    let rawValue = null;
+    if (badgeValue != null) {
+      // Badge value from different data source - parse it to get numeric value
+      rawValue = this.parseNumericValue(badgeValue);
+    } else {
+      // Badge from same data source - extract from data object
+      rawValue = this.getFieldValue(data, map.fieldApiName);
+      // Convert to number if it's a string
+      if (rawValue != null && typeof rawValue === 'string') {
+        rawValue = this.parseNumericValue(rawValue);
+      }
+    }
+
+    if (rawValue === null || rawValue === undefined) {
+      return { badge: null };
+    }
+
+    // Determine badge direction and styling
+    const direction = this.determineBadgeDirection(rawValue);
+    
+    // Format the value using formatType from detail map
+    let formattedText = this.formatValue(rawValue, map.formatType);
+    
+    // For percentage values, ensure sign is included for positive values
+    // Negative values should already have the sign from formatPercent
+    if (map.formatType === 'Percent') {
+      if (rawValue > 0 && !formattedText.startsWith('+')) {
+        formattedText = '+' + formattedText;
+      }
+      // Negative values should already have '-' sign from formatPercent
+    }
+
+    // Build badge object based on direction
+    let badgeClass = HM_ConfigurableTile.CSS_CLASSES.BADGE_ZERO;
+    let badgeIcon = null;
+
+    if (direction.direction === 'up') {
+      badgeClass = HM_ConfigurableTile.CSS_CLASSES.BADGE_UP;
+      badgeIcon = HM_ConfigurableTile.BADGE_ICONS.UP;
+    } else if (direction.direction === 'down') {
+      badgeClass = HM_ConfigurableTile.CSS_CLASSES.BADGE_DOWN;
+      badgeIcon = HM_ConfigurableTile.BADGE_ICONS.DOWN;
+    }
+    // else: zero - use default grey styling, no icon
+
+    return {
+      badge: {
+        text: formattedText,
+        class: badgeClass,
+        icon: badgeIcon
+      }
+    };
   }
 
   /**
-   * @description Extract tile icon from detail maps using indexed lookup
-   * @param {Map} mapIndex - Indexed map of detail maps by map type
-   * @param {Object} data - Data object containing field values
-   * @return {String|null} Icon name or null if not found
+   * @description Parse numeric value from formatted string
+   * Handles percentages, currency, and plain numbers
+   * @param {String|Number} value - Formatted string or number
+   * @return {Number} Numeric value, or null if cannot parse
    */
-  extractTileIcon(mapIndex, data) {
-    const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_ICON);
-    if (!map) {
+  parseNumericValue(value) {
+    if (value === null || value === undefined) {
       return null;
     }
 
-    const fieldValue = this.getFieldValue(data, map.fieldApiName);
-    if (fieldValue) {
-      return String(fieldValue);
+    // If already a number, return it
+    if (typeof value === 'number') {
+      return value;
     }
 
-    return null;
+    // Convert to string for parsing
+    const str = String(value).trim();
+
+    // Remove currency symbols and commas
+    let cleaned = str.replace(/[$,\s]/g, '');
+
+    // Handle percentages - remove % and divide by 100 if needed
+    if (cleaned.includes('%')) {
+      cleaned = cleaned.replace('%', '');
+      // If value is already a percentage (0-100 range), keep as is
+      // If value is decimal (0-1 range), multiply by 100
+      const num = parseFloat(cleaned);
+      if (!isNaN(num)) {
+        // Check if it's likely a percentage (absolute value > 1) or decimal
+        if (Math.abs(num) <= 1 && num !== 0) {
+          return num * 100; // Convert decimal to percentage
+        }
+        return num;
+      }
+    }
+
+    // Parse as float
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? null : num;
   }
 
   /**
-   * @description Get icon class based on icon name
-   * Returns alert class for warning/alert icons, brand class otherwise
-   * @param {String} iconName - Icon name to check
+   * @description Determine badge direction and styling based on numeric value
+   * @param {Number} numericValue - Numeric value to evaluate
+   * @return {Object} Direction object with direction ('up'|'down'|'zero') and numericValue
+   */
+  determineBadgeDirection(numericValue) {
+    if (numericValue === null || numericValue === undefined || isNaN(numericValue)) {
+      return { direction: 'zero', numericValue: 0 };
+    }
+
+    const num = Number(numericValue);
+    
+    if (num > 0) {
+      return { direction: 'up', numericValue: num };
+    } else if (num < 0) {
+      return { direction: 'down', numericValue: num };
+    } else {
+      return { direction: 'zero', numericValue: 0 };
+    }
+  }
+
+  /**
+   * @description Get icon class based on icon background color configuration
+   * Uses component's iconBackgroundColor picklist value to determine styling
+   * @param {String} iconName - Icon name (for backwards compatibility, not used for class selection)
    * @return {String} CSS class for icon
    */
   getIconClass(iconName) {
-    if (
-      iconName &&
-      (iconName.includes("warning") || iconName.includes("alert"))
-    ) {
-      return "cc-kpi-icon cc-kpi-icon--alert";
+    const bgColor = this.componentConfig?.iconBackgroundColor;
+    
+    // If no background color or "None", return no-background class
+    if (!bgColor || bgColor === 'None') {
+      return HM_ConfigurableTile.CSS_CLASSES.ICON_NO_BACKGROUND;
     }
-    return "cc-kpi-icon cc-kpi-icon--brand";
+    
+    // Map background color to CSS class
+    const colorClassMap = {
+      'Brand': HM_ConfigurableTile.CSS_CLASSES.ICON_BRAND,
+      'Alert': HM_ConfigurableTile.CSS_CLASSES.ICON_ALERT,
+      'Success': HM_ConfigurableTile.CSS_CLASSES.ICON_SUCCESS,
+      'Warning': HM_ConfigurableTile.CSS_CLASSES.ICON_WARNING
+    };
+    
+    return colorClassMap[bgColor] || HM_ConfigurableTile.CSS_CLASSES.ICON_NO_BACKGROUND;
   }
 
-  /**
-   * @description Get formatted subtitle from data (checks for specific subtitle fields)
-   * Checks for pre-formatted subtitle fields from Apex methods
-   * @param {Object} data - Data object to check for subtitle fields
-   * @return {String|null} Formatted subtitle or null if not found
-   */
-  getFormattedSubtitle(data) {
-    // Check for formatted subtitle fields from Apex
-    if (data.pipelineSubtitle) return data.pipelineSubtitle;
-    if (data.closedWonSubtitle) return data.closedWonSubtitle;
-    if (data.casesPendingSubtitle) return data.casesPendingSubtitle;
-    if (data.activeAccountsSubtitle) return data.activeAccountsSubtitle;
-    return null;
-  }
 
 
   /**
    * @description Get field value from data object (supports dot notation)
-   * Supports nested fields like "Account.Name"
+   * Supports nested fields like "Account.Name" for parent relationships
    * @param {Object} data - Data object to get value from
-   * @param {String} fieldPath - Field path (supports dot notation)
+   * @param {String} fieldPath - Field path (supports dot notation for nested fields)
    * @return {*} Field value or null if not found
    */
   getFieldValue(data, fieldPath) {
@@ -458,11 +515,18 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    * @return {String} Formatted value string
    */
   formatValue(value, formatType) {
+    // Normalize formatType to handle case variations and null/undefined
+    const normalizedFormatType = formatType ? String(formatType).trim() : null;
+    
     if (value === null || value === undefined) {
+      // Return formatted zero based on format type
+      if (normalizedFormatType === "Currency") {
+        return "$0";
+      }
       return "0";
     }
 
-    switch (formatType) {
+    switch (normalizedFormatType) {
       case "Currency":
         return this.formatCurrency(value);
       case "Number":
@@ -472,29 +536,11 @@ export default class HM_ConfigurableTile extends NavigationMixin(
       case "Date":
         return this.formatDate(value);
       default:
+        // If formatType is not set or invalid, return as string
         return String(value);
     }
   }
 
-  /**
-   * @description Format change indicator with sign prefix
-   * @param {*} value - Numeric value to format as change
-   * @param {String} formatType - Format type (Percent or Number)
-   * @return {String} Formatted change string with + or - prefix
-   */
-  formatChange(value, formatType) {
-    if (value === null || value === undefined) {
-      return "0%";
-    }
-
-    const numValue = this.parseNumber(value);
-    const sign = numValue >= 0 ? "+" : "";
-
-    if (formatType === "Percent") {
-      return `${sign}${numValue}%`;
-    }
-    return `${sign}${numValue}`;
-  }
 
   /**
    * @description Parse number from value
@@ -516,12 +562,17 @@ export default class HM_ConfigurableTile extends NavigationMixin(
   /**
    * @description Format currency value
    * @param {*} value - Numeric value to format
-   * @return {String} Formatted currency string (e.g., $1.5M, $5K, $100)
+   * @return {String} Formatted currency string (e.g., $1.5M, $5K, $100, $0)
    */
   formatCurrency(value) {
     const num = this.parseNumber(value);
     if (isNaN(num)) {
-      return String(value);
+      // If value can't be parsed as number, return as string with $ prefix
+      return `$${String(value)}`;
+    }
+    // Handle zero explicitly
+    if (num === 0) {
+      return "$0";
     }
     if (num >= 1000000) {
       return `$${(num / 1000000).toFixed(1)}M`;
@@ -678,6 +729,33 @@ export default class HM_ConfigurableTile extends NavigationMixin(
    */
   get title() {
     return this.componentConfig?.title || "";
+  }
+
+  /**
+   * @description Get subtitle from configuration
+   */
+  get subtitle() {
+    return this.tileData?.subtitle || this.componentConfig?.subtitle || "";
+  }
+
+  /**
+   * @description Process subtitle template by replacing {value} placeholder
+   * @param {String} subtitleTemplate - Subtitle template with optional {value} placeholder
+   * @param {String} subtitleValue - Formatted value to replace {value} placeholder
+   * @return {String} Processed subtitle with value replaced, or template as-is if no value
+   */
+  processSubtitle(subtitleTemplate, subtitleValue) {
+    if (!subtitleTemplate) {
+      return "";
+    }
+    
+    // If no subtitle value provided, return template as-is
+    if (!subtitleValue) {
+      return subtitleTemplate;
+    }
+    
+    // Replace all occurrences of {value} with the formatted value
+    return subtitleTemplate.replace(/{value}/g, subtitleValue);
   }
 
   /**

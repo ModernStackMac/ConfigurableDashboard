@@ -132,6 +132,7 @@ public with sharing class HM_ComponentDataService {
       List<HM_Dashboard_Data_Source__c> dataSources = [
         SELECT
           Id,
+          Name,
           HM_Type__c,
           HM_SOQL_Query__c,
           HM_Apex_Class_Name__c,
@@ -150,15 +151,84 @@ public with sharing class HM_ComponentDataService {
         return buildEmptyResponse();
       }
 
+      // Query Component Detail Maps with Map Type "Subtitle" and "Tile Badge" for tile components
+      HM_Component_Detail_Map__c subtitleDetailMap = null;
+      HM_Component_Detail_Map__c badgeDetailMap = null;
+      if (component.HM_Type__c == COMPONENT_TYPE_TILE) {
+        // Check object accessibility for Component Detail Maps
+        if (Schema.sObjectType.HM_Component_Detail_Map__c.isAccessible()) {
+          // Query subtitle detail map
+          List<HM_Component_Detail_Map__c> subtitleMaps = [
+            SELECT
+              Id,
+              HM_Data_Source_Name__c,
+              HM_Field_API_Name__c,
+              HM_Format_Type__c
+            FROM HM_Component_Detail_Map__c
+            WHERE HM_Dashboard_Component__c = :componentId
+              AND HM_Map_Type__c = 'Subtitle'
+            LIMIT 1
+          ];
+          if (!subtitleMaps.isEmpty()) {
+            subtitleDetailMap = subtitleMaps[0];
+          }
+          
+          // Query badge detail map
+          List<HM_Component_Detail_Map__c> badgeMaps = [
+            SELECT
+              Id,
+              HM_Data_Source_Name__c,
+              HM_Field_API_Name__c,
+              HM_Format_Type__c
+            FROM HM_Component_Detail_Map__c
+            WHERE HM_Dashboard_Component__c = :componentId
+              AND HM_Map_Type__c = 'Tile Badge'
+            LIMIT 1
+          ];
+          if (!badgeMaps.isEmpty()) {
+            badgeDetailMap = badgeMaps[0];
+          }
+        }
+      }
+
       // Process all data sources and combine results
       // For List components: combine all LIST and MULTI_OBJECT sources
       // For Tile components: use first AGGREGATE or first LIST source
+      Map<String, Object> mainResponse;
       if (component.HM_Type__c == COMPONENT_TYPE_LIST) {
-        return processMultipleDataSourcesForList(dataSources, context, component.HM_Type__c);
+        mainResponse = processMultipleDataSourcesForList(dataSources, context, component.HM_Type__c);
       } else {
         // Tile component - process first data source only
-        return processDataSource(dataSources[0], context, component.HM_Type__c);
+        mainResponse = processDataSource(dataSources[0], context, component.HM_Type__c);
+        
+        // Process subtitle data source if different from main data source
+        if (subtitleDetailMap != null) {
+          String subtitleValue = processSubtitleDataSource(
+            subtitleDetailMap,
+            dataSources,
+            context,
+            component.HM_Type__c
+          );
+          if (subtitleValue != null) {
+            mainResponse.put('subtitleValue', subtitleValue);
+          }
+        }
+        
+        // Process badge data source if different from main data source
+        if (badgeDetailMap != null) {
+          String badgeValue = processBadgeDataSource(
+            badgeDetailMap,
+            dataSources,
+            context,
+            component.HM_Type__c
+          );
+          if (badgeValue != null) {
+            mainResponse.put('badgeValue', badgeValue);
+          }
+        }
       }
+
+      return mainResponse;
     } catch (AuraHandledException ex) {
       // Re-throw AuraHandledException as-is (already user-friendly)
       throw ex;
@@ -327,21 +397,15 @@ public with sharing class HM_ComponentDataService {
       // Replace merge fields
       processedQuery = replaceMergeFields(queryToProcess, context);
 
-      // Execute query and enforce field-level security
+      // Execute query
       List<SObject> records = Database.query(processedQuery);
       
-      // Strip inaccessible fields for FLS enforcement
-      SObjectAccessDecision decision = Security.stripInaccessible(
-        AccessType.READABLE,
-        records
-      );
-      List<SObject> accessibleRecords = decision.getRecords();
-
       // Process based on return type
       if (returnType == RETURN_TYPE_AGGREGATE) {
-        // Check if first record is AggregateResult (Apex doesn't support instanceof with generics)
-        if (!accessibleRecords.isEmpty() && accessibleRecords[0] instanceof AggregateResult) {
-          AggregateResult ar = (AggregateResult) accessibleRecords[0];
+        // For aggregate queries, results are AggregateResult which cannot use Security.stripInaccessible()
+        // Aggregate queries already respect data access through WHERE clauses
+        if (!records.isEmpty() && records[0] instanceof AggregateResult) {
+          AggregateResult ar = (AggregateResult) records[0];
           Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
           
           // Try "totalWon" alias first, then first key
@@ -359,15 +423,23 @@ public with sharing class HM_ComponentDataService {
           throw new AuraHandledException('Aggregate return type requires aggregate query');
         }
       } else if (returnType == RETURN_TYPE_LIST) {
-        // Convert to LIST (handles both SObject and AggregateResult)
-        // Check if first record is AggregateResult (Apex doesn't support instanceof with generics)
-        if (!accessibleRecords.isEmpty() && accessibleRecords[0] instanceof AggregateResult) {
+        // For LIST return type, check if results are AggregateResult
+        if (!records.isEmpty() && records[0] instanceof AggregateResult) {
+          // AggregateResult cannot use Security.stripInaccessible()
+          // Aggregate queries already respect data access through WHERE clauses
           List<AggregateResult> aggregateList = new List<AggregateResult>();
-          for (SObject record : accessibleRecords) {
+          for (SObject record : records) {
             aggregateList.add((AggregateResult) record);
           }
           return buildListResponseFromAggregate(aggregateList);
         } else {
+          // Regular SObject queries - enforce field-level security
+          SObjectAccessDecision decision = Security.stripInaccessible(
+            AccessType.READABLE,
+            records
+          );
+          List<SObject> accessibleRecords = decision.getRecords();
+          
           List<Map<String, Object>> rows = new List<Map<String, Object>>();
           for (SObject record : accessibleRecords) {
             rows.add(convertSObjectToMap(record));
@@ -1364,6 +1436,305 @@ public with sharing class HM_ComponentDataService {
     } else {
       return buildEmptyResponse();
     }
+  }
+
+  /**
+   * @description Process subtitle data source and extract/formatted value
+   * @param subtitleDetailMap Component Detail Map with Map Type "Subtitle"
+   * @param dataSources List of all data sources for the component
+   * @param context Context parameters for merge fields and Apex methods
+   * @param componentType Component type for validation
+   * @return String Formatted subtitle value, or null if processing fails
+   */
+  private static String processSubtitleDataSource(
+    HM_Component_Detail_Map__c subtitleDetailMap,
+    List<HM_Dashboard_Data_Source__c> dataSources,
+    Map<String, Object> context,
+    String componentType
+  ) {
+    try {
+      // Determine which data source to use for subtitle
+      HM_Dashboard_Data_Source__c subtitleDataSource = null;
+      
+      if (String.isNotBlank(subtitleDetailMap.HM_Data_Source_Name__c)) {
+        // Find data source by name
+        for (HM_Dashboard_Data_Source__c ds : dataSources) {
+          if (ds.Name == subtitleDetailMap.HM_Data_Source_Name__c) {
+            subtitleDataSource = ds;
+            break;
+          }
+        }
+        
+        // If not found, use first data source (graceful degradation)
+        if (subtitleDataSource == null) {
+          subtitleDataSource = dataSources[0];
+        }
+      } else {
+        // No data source name specified, use first data source
+        subtitleDataSource = dataSources[0];
+      }
+      
+      // Process the subtitle data source
+      Map<String, Object> subtitleResponse = processDataSource(
+        subtitleDataSource,
+        context,
+        componentType
+      );
+      
+      if (subtitleResponse == null || subtitleResponse.get('success') != true) {
+        return null;
+      }
+      
+      // Extract value from response based on shape
+      Object rawValue = null;
+      String shape = (String) subtitleResponse.get('shape');
+      
+      if (shape == SHAPE_AGGREGATE) {
+        // For aggregate, use aggregateValue directly
+        rawValue = subtitleResponse.get('aggregateValue');
+      } else if (shape == SHAPE_LIST) {
+        // For list, get first row and extract field value
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) subtitleResponse.get('rows');
+        if (rows != null && !rows.isEmpty()) {
+          Map<String, Object> firstRow = rows[0];
+          
+          // Use field API name from detail map if specified
+          if (String.isNotBlank(subtitleDetailMap.HM_Field_API_Name__c)) {
+            rawValue = extractNestedFieldValue(firstRow, subtitleDetailMap.HM_Field_API_Name__c);
+          } else {
+            // If no field specified, try common aggregate aliases or first value
+            if (firstRow.containsKey('expr0')) {
+              rawValue = firstRow.get('expr0');
+            } else if (firstRow.containsKey('totalWon')) {
+              rawValue = firstRow.get('totalWon');
+            } else if (!firstRow.isEmpty()) {
+              // Get first non-Id value
+              for (String key : firstRow.keySet()) {
+                if (key != 'Id') {
+                  rawValue = firstRow.get(key);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Format the value using format type from detail map
+      if (rawValue != null) {
+        return formatSubtitleValue(rawValue, subtitleDetailMap.HM_Format_Type__c);
+      }
+      
+      return null;
+    } catch (Exception ex) {
+      // Graceful degradation - return null on error
+      return null;
+    }
+  }
+
+  /**
+   * @description Process badge data source and extract/formatted value
+   * @param badgeDetailMap Component Detail Map with Map Type "Tile Badge"
+   * @param dataSources List of all data sources for the component
+   * @param context Context parameters for merge fields and Apex methods
+   * @param componentType Component type for validation
+   * @return String Formatted badge value, or null if processing fails
+   */
+  private static String processBadgeDataSource(
+    HM_Component_Detail_Map__c badgeDetailMap,
+    List<HM_Dashboard_Data_Source__c> dataSources,
+    Map<String, Object> context,
+    String componentType
+  ) {
+    try {
+      // Determine which data source to use for badge
+      HM_Dashboard_Data_Source__c badgeDataSource = null;
+      
+      if (String.isNotBlank(badgeDetailMap.HM_Data_Source_Name__c)) {
+        // Find data source by name
+        for (HM_Dashboard_Data_Source__c ds : dataSources) {
+          if (ds.Name == badgeDetailMap.HM_Data_Source_Name__c) {
+            badgeDataSource = ds;
+            break;
+          }
+        }
+        
+        // If not found, use first data source (graceful degradation)
+        if (badgeDataSource == null) {
+          badgeDataSource = dataSources[0];
+        }
+      } else {
+        // No data source name specified, use first data source
+        badgeDataSource = dataSources[0];
+      }
+      
+      // Process the badge data source
+      Map<String, Object> badgeResponse = processDataSource(
+        badgeDataSource,
+        context,
+        componentType
+      );
+      
+      if (badgeResponse == null || badgeResponse.get('success') != true) {
+        return null;
+      }
+      
+      // Extract value from response based on shape
+      Object rawValue = null;
+      String shape = (String) badgeResponse.get('shape');
+      
+      if (shape == SHAPE_AGGREGATE) {
+        // For aggregate, use aggregateValue directly
+        rawValue = badgeResponse.get('aggregateValue');
+      } else if (shape == SHAPE_LIST) {
+        // For list, get first row and extract field value
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) badgeResponse.get('rows');
+        if (rows != null && !rows.isEmpty()) {
+          Map<String, Object> firstRow = rows[0];
+          
+          // Use field API name from detail map if specified
+          if (String.isNotBlank(badgeDetailMap.HM_Field_API_Name__c)) {
+            rawValue = extractNestedFieldValue(firstRow, badgeDetailMap.HM_Field_API_Name__c);
+          } else {
+            // If no field specified, try common aggregate aliases or first value
+            if (firstRow.containsKey('expr0')) {
+              rawValue = firstRow.get('expr0');
+            } else if (firstRow.containsKey('totalWon')) {
+              rawValue = firstRow.get('totalWon');
+            } else if (!firstRow.isEmpty()) {
+              // Get first non-Id value
+              for (String key : firstRow.keySet()) {
+                if (key != 'Id') {
+                  rawValue = firstRow.get(key);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Return raw numeric value as string (not formatted) so frontend can determine direction
+      // Frontend will format it after determining direction
+      if (rawValue != null) {
+        // Convert to string representation of number
+        if (rawValue instanceof Decimal || rawValue instanceof Integer || rawValue instanceof Double) {
+          return String.valueOf(rawValue);
+        } else if (rawValue instanceof String) {
+          // Try to parse as number
+          try {
+            Decimal numValue = Decimal.valueOf((String) rawValue);
+            return String.valueOf(numValue);
+          } catch (Exception e) {
+            // If can't parse, return as-is
+            return (String) rawValue;
+          }
+        } else {
+          return String.valueOf(rawValue);
+        }
+      }
+      
+      return null;
+    } catch (Exception ex) {
+      // Graceful degradation - return null on error
+      return null;
+    }
+  }
+
+  /**
+   * @description Extract nested field value from map using dot notation
+   * @param dataMap Map containing field values
+   * @param fieldPath Field path (supports dot notation like "Account.Name")
+   * @return Object Field value or null if not found
+   */
+  private static Object extractNestedFieldValue(Map<String, Object> dataMap, String fieldPath) {
+    if (dataMap == null || String.isBlank(fieldPath)) {
+      return null;
+    }
+    
+    String[] parts = fieldPath.split('\\.');
+    Object value = dataMap;
+    
+    for (String part : parts) {
+      if (value instanceof Map<String, Object>) {
+        Map<String, Object> nestedMap = (Map<String, Object>) value;
+        value = nestedMap.get(part);
+      } else {
+        return null;
+      }
+    }
+    
+    return value;
+  }
+
+  /**
+   * @description Format subtitle value based on format type
+   * @param value Raw value to format
+   * @param formatType Format type (Currency, Number, Percent, Date, etc.)
+   * @return String Formatted value string
+   */
+  private static String formatSubtitleValue(Object value, String formatType) {
+    if (value == null) {
+      // Return "0" for numeric types, empty string for others
+      if (formatType == 'Currency' || formatType == 'Number' || formatType == 'Percent') {
+        return '0';
+      }
+      return '';
+    }
+    
+    // Normalize formatType
+    String normalizedFormatType = formatType != null ? formatType.trim() : null;
+    
+    if (normalizedFormatType == 'Currency') {
+      if (value instanceof Decimal || value instanceof Integer || value instanceof Double) {
+        Decimal decimalValue = value instanceof Decimal 
+          ? (Decimal) value 
+          : Decimal.valueOf(String.valueOf(value));
+        return '$' + decimalValue.setScale(2).toPlainString();
+      }
+      return String.valueOf(value);
+    } else if (normalizedFormatType == 'Percent') {
+      if (value instanceof Decimal || value instanceof Integer || value instanceof Double) {
+        Decimal decimalValue = value instanceof Decimal 
+          ? (Decimal) value 
+          : Decimal.valueOf(String.valueOf(value));
+        // Percent values are typically stored as decimals (0.125 = 12.5%)
+        // If value is already a percentage (e.g., 12.5), use as-is
+        // Otherwise multiply by 100
+        if (decimalValue.abs() <= 1) {
+          decimalValue = decimalValue * 100;
+        }
+        return decimalValue.setScale(1).toPlainString() + '%';
+      }
+      return String.valueOf(value) + '%';
+    } else if (normalizedFormatType == 'Number') {
+      if (value instanceof Decimal || value instanceof Integer || value instanceof Double) {
+        Decimal decimalValue = value instanceof Decimal 
+          ? (Decimal) value 
+          : Decimal.valueOf(String.valueOf(value));
+        // Format with thousand separators
+        return decimalValue.setScale(0).toPlainString();
+      }
+      return String.valueOf(value);
+    } else if (normalizedFormatType == 'Date') {
+      if (value instanceof Date) {
+        Date dateValue = (Date) value;
+        return dateValue.format();
+      } else if (value instanceof Datetime) {
+        Datetime dtValue = (Datetime) value;
+        return dtValue.date().format();
+      }
+      return String.valueOf(value);
+    } else if (normalizedFormatType == 'DateTime') {
+      if (value instanceof Datetime) {
+        Datetime dtValue = (Datetime) value;
+        return dtValue.format();
+      }
+      return String.valueOf(value);
+    }
+    
+    // Default: return string representation
+    return String.valueOf(value);
   }
 
 }

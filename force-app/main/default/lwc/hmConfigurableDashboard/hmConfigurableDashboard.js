@@ -20,12 +20,14 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   };
 
   static ACTION_TYPES = {
-    NAVIGATION: "navigation"
+    NAVIGATION: "navigation",
+    COMPONENT: "component"
   };
 
   static NAVIGATION_TYPES = {
     OBJECT_PAGE: "standard__objectPage",
-    RECORD_PAGE: "standard__recordPage"
+    RECORD_PAGE: "standard__recordPage",
+    COMPONENT: "standard__component"
   };
 
   static DEFAULT_VALUES = {
@@ -441,7 +443,7 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
 
   /**
    * @description Handle action click event
-   * Navigates to object or record page based on action configuration
+   * Navigates to object, record page, or Lightning Web Component based on action configuration
    * @param {Object} action - Action configuration object with type and target
    */
   handleActionClick(action) {
@@ -469,6 +471,34 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
             recordId: target.recordId,
             actionName: target.actionName || "view"
           }
+        });
+      }
+    } else if (action.type === HM_ConfigurableDashboard.ACTION_TYPES.COMPONENT && action.target) {
+      const target = action.target;
+      
+      // Navigate to Lightning Web Component
+      if (target.componentName) {
+        const componentName = target.componentName.startsWith('c__') 
+          ? target.componentName 
+          : 'c__' + target.componentName;
+        
+        const navAttributes = {
+          componentName: componentName
+        };
+        
+        // Add objectApiName if provided (for object-level actions)
+        if (target.objectApiName) {
+          navAttributes.objectApiName = target.objectApiName;
+        }
+        
+        // Add recordId if provided (for record-level actions)
+        if (target.recordId) {
+          navAttributes.recordId = target.recordId;
+        }
+        
+        this[NavigationMixin.Navigate]({
+          type: HM_ConfigurableDashboard.NAVIGATION_TYPES.COMPONENT,
+          attributes: navAttributes
         });
       }
     }

@@ -287,7 +287,7 @@ public with sharing class HM_DashboardConfigService {
           HM_Map_Type__c,
           HM_Display_Order__c,
           HM_Format_Type__c,
-          HM_Is_Merge_Field__c,
+          HM_Data_Source_Name__c,
           HM_Column_Badge_Type__c,
           HM_Column_Badge_Variant__c,
           HM_Object_Type__c
@@ -306,9 +306,19 @@ public with sharing class HM_DashboardConfigService {
       }
       result.put('dataSources', dataSourceMaps);
 
-      // Add Detail Maps
+      // Add Detail Maps with data source validation
       List<Map<String, Object>> maps = new List<Map<String, Object>>();
+      // Build set of data source names for validation
+      Set<String> dataSourceNames = new Set<String>();
+      for (HM_Dashboard_Data_Source__c ds : dataSources) {
+        if (String.isNotBlank(ds.Name)) {
+          dataSourceNames.add(ds.Name);
+        }
+      }
+      
       for (HM_Component_Detail_Map__c detailMap : detailMaps) {
+        // Note: Data source name validation happens at runtime during data processing
+        // If data source name doesn't match, component will gracefully degrade
         maps.add(buildDetailMapMap(detailMap));
       }
       result.put('detailMaps', maps);
@@ -416,6 +426,10 @@ public with sharing class HM_DashboardConfigService {
     // Only set iconName if field exists and has value
     String iconName = getFieldValueSafely(component, 'HM_Icon_Name__c');
     mapData.put('iconName', String.isNotBlank(iconName) ? iconName : null);
+    
+    // Only set iconBackgroundColor if field exists and has value
+    String iconBgColor = getFieldValueSafely(component, 'HM_Icon_Background_Color__c');
+    mapData.put('iconBackgroundColor', String.isNotBlank(iconBgColor) ? iconBgColor : null);
     
     // Only set rowIconConfiguration if field exists and has value
     String rowIconConfig = getFieldValueSafely(component, 'HM_Row_Icon_Configuration__c');
@@ -646,6 +660,17 @@ public with sharing class HM_DashboardConfigService {
       // Field doesn't exist or not accessible - skip it
     }
     
+    // Check if HM_Icon_Background_Color__c exists and is accessible
+    try {
+      Schema.DescribeFieldResult iconBgColorField = Schema.sObjectType.HM_Dashboard_Component__c
+        .fields.HM_Icon_Background_Color__c;
+      if (iconBgColorField.isAccessible()) {
+        fields.add('HM_Icon_Background_Color__c');
+      }
+    } catch (Exception ex) {
+      // Field doesn't exist or not accessible - skip it
+    }
+    
     return fields;
   }
 
@@ -665,7 +690,7 @@ public with sharing class HM_DashboardConfigService {
     mapData.put('mapType', detailMap.HM_Map_Type__c);
     mapData.put('displayOrder', detailMap.HM_Display_Order__c);
     mapData.put('formatType', detailMap.HM_Format_Type__c);
-    mapData.put('isMergeField', detailMap.HM_Is_Merge_Field__c);
+    mapData.put('dataSourceName', detailMap.HM_Data_Source_Name__c);
     mapData.put('columnBadgeType', detailMap.HM_Column_Badge_Type__c);
     mapData.put('columnBadgeVariant', detailMap.HM_Column_Badge_Variant__c);
     

@@ -126,6 +126,28 @@ export default class HM_ConfigurableList extends NavigationMixin(
   }
 
   /**
+   * @description Extract error message from error object
+   * Handles different error formats (AuraHandledException, standard errors, strings)
+   * @param {Object|String} error - Error object or string
+   * @return {String} Extracted error message
+   */
+  extractErrorMessage(error) {
+    if (!error) {
+      return "Unknown error";
+    }
+    if (error.body?.message) {
+      return error.body.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return "Unknown error occurred";
+  }
+
+  /**
    * @description Get default list data structure
    * @return {Object} Default list data object
    */
@@ -210,27 +232,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     }
   }
 
-  /**
-   * @description Extract error message from error object
-   * Handles different error formats (AuraHandledException, standard errors, strings)
-   * @param {Object|String} error - Error object or string
-   * @return {String} Extracted error message
-   */
-  extractErrorMessage(error) {
-    if (!error) {
-      return "Unknown error";
-    }
-    if (error.body?.message) {
-      return error.body.message;
-    }
-    if (error.message) {
-      return error.message;
-    }
-    if (typeof error === "string") {
-      return error;
-    }
-    return "Unknown error occurred";
-  }
 
   /**
    * @description Parse number from value
@@ -466,6 +467,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Format raw data into rows with cells
+   * @param {Array} data - Array of record objects to format
+   * @return {Array} Array of row objects with cells, icons, and metadata
    */
   formatRows(data) {
     if (!Array.isArray(data) || data.length === 0) {
@@ -539,7 +542,9 @@ export default class HM_ConfigurableList extends NavigationMixin(
       try {
         badge = this.calculateDaysBadge(value, column.badgeVariant);
       } catch (error) {
-        // If badge calculation fails, silently fail and don't show badge
+        // Graceful degradation: Badge calculation is non-critical UI enhancement.
+        // If calculation fails (invalid date format, etc.), continue without badge
+        // rather than breaking row rendering. Badge will be null and row displays normally.
         badge = null;
       }
     }
@@ -651,6 +656,9 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get object type from record
+   * Attempts multiple strategies: attributes.type, recordType field, objectType field, or Id prefix
+   * @param {Object} record - Record object to extract type from
+   * @return {String} Object type name (Account, Contact, Opportunity, Case, or Unknown)
    */
   getObjectType(record) {
     // Try attributes.type first (from Apex)
@@ -738,6 +746,10 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Check if column applies to object type
+   * Columns with no objectType restriction apply to all object types
+   * @param {Object} column - Column definition with optional objectType array
+   * @param {String} objectType - Object type to check against
+   * @return {Boolean} True if column applies to the object type, false otherwise
    */
   columnAppliesToObject(column, objectType) {
     // If no objectType filter, applies to all
@@ -750,6 +762,9 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get cell for a specific column from a row
+   * @param {Object} row - Row object containing cells array
+   * @param {Object} column - Column definition object
+   * @return {Object|null} Cell object matching the column key, or null if not found
    */
   getCellForColumn(row, column) {
     if (!row || !row.cells || !column) {
@@ -849,6 +864,10 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get field value from record (supports nested fields)
+   * Handles dot notation for parent relationships (e.g., "Account.Name")
+   * @param {Object} record - Record object to get value from
+   * @param {String} fieldApiName - Field API name, supports dot notation for nested fields
+   * @return {*} Field value or null if not found
    */
   getFieldValue(record, fieldApiName) {
     if (!record || !fieldApiName) {
@@ -886,6 +905,10 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Format value based on format type
+   * Delegates to specific formatters (currency, number, percent, date)
+   * @param {*} value - Value to format (can be number, string, date, etc.)
+   * @param {String} formatType - Format type (Currency, Number, Percent, Date, Text)
+   * @return {String} Formatted value string
    */
   formatValue(value, formatType) {
     if (value === null || value === undefined) {
