@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>HM_Map_Type__c</fullName>
-    <inlineHelpText>Select how this field maps to the component display. Tile Value: Main value displayed on tile. Tile Change: Change percentage/indicator. Tile Subtitle: Subtitle text below value. Tile Icon: Icon to display. Tile Badge: Badge indicator in top-right corner (percentage or count). List Column: Column in list/table view, can include column badges (e.g., &apos;3d left&apos;, &apos;SLA Risk&apos;) configured via Column Badge Type field.</inlineHelpText>
+    <inlineHelpText>Select how this field maps to the component display. Tile Value: Main value displayed on tile. Tile Badge: Badge indicator in top-right corner (percentage or count). Subtitle: Value inserted into subtitle text using {value} placeholder (works for both Tile and List components). List Column: Column in list/table view, can include column badges (e.g., &apos;3d left&apos;, &apos;SLA Risk&apos;) configured via Column Badge Type field.</inlineHelpText>
     <label>Map Type</label>
     <required>true</required>
     <trackHistory>false</trackHistory>
@@ -17,19 +17,9 @@
                 <label>Tile Value</label>
             </value>
             <value>
-                <fullName>Tile Change</fullName>
+                <fullName>Tile Badge</fullName>
                 <default>false</default>
-                <label>Tile Change</label>
-            </value>
-            <value>
-                <fullName>Tile Subtitle</fullName>
-                <default>false</default>
-                <label>Tile Subtitle</label>
-            </value>
-            <value>
-                <fullName>Tile Icon</fullName>
-                <default>false</default>
-                <label>Tile Icon</label>
+                <label>Tile Badge</label>
             </value>
             <value>
                 <fullName>List Column</fullName>
@@ -37,9 +27,9 @@
                 <label>List Column</label>
             </value>
             <value>
-                <fullName>Tile Badge</fullName>
+                <fullName>Subtitle</fullName>
                 <default>false</default>
-                <label>Tile Badge</label>
+                <label>Subtitle</label>
             </value>
         </valueSetDefinition>
     </valueSet>

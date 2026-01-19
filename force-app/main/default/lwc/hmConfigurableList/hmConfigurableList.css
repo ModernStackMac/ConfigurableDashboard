@@ -1,4 +1,9 @@
 /* Container */
+:host {
+  display: block;
+  width: 100%;
+}
+
 .cc-container {
   width: 100%;
 }
@@ -10,6 +15,8 @@
   padding: 24px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(0, 0, 0, 0.06);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cc-dark .cc-card {
@@ -141,6 +148,7 @@
 /* Table */
 .cc-table-header {
   display: flex;
+  width: 100%;
   border-bottom: 2px solid #e0e0e0;
   padding: 12px 0;
   font-weight: 600;
@@ -155,10 +163,12 @@
 .cc-table-body {
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .cc-table-row {
   display: flex;
+  width: 100%;
   border-bottom: 1px solid #e0e0e0;
   padding: 12px 0;
   cursor: pointer;
@@ -196,7 +206,7 @@
 }
 
 .cc-col-data {
-  flex: 1;
+  flex: 1 1 0;
   padding: 0 8px;
   min-width: 100px;
   color: #181818;
@@ -291,6 +301,9 @@
   justify-content: space-between;
   gap: 4px;
   transition: background-color 0.2s ease;
+  flex: 1 1 0;
+  padding: 0 8px;
+  min-width: 100px;
 }
 
 .cc-col-sortable:hover {
@@ -311,7 +324,7 @@
 }
 
 .cc-col-label {
-  flex: 1;
+  flex: 1 1 0;
 }
 
 .cc-sort-icon {

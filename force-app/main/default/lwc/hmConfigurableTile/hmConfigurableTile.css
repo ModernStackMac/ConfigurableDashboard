@@ -10,10 +10,15 @@
   --cc-radius-lg: 12px;
   --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: block;
+  width: 100%;
 }
 
 .hm-tile-container {
   /* Container wrapper for dark mode support */
+  height: 100%;
+  width: 100%;
+  display: flex;
 }
 
 /* ==================== KPI CARD ==================== */
@@ -31,6 +36,8 @@
   cursor: pointer;
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .cc-dark .cc-kpi-card {
@@ -52,17 +59,18 @@
 .cc-kpi-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 .cc-kpi-icon {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--cc-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .cc-kpi-icon--brand {
@@ -95,6 +103,47 @@
 
 .cc-dark .cc-kpi-icon--alert lightning-icon {
   --lwc-colorTextIconDefault: #ff5252;
+}
+
+.cc-kpi-icon--success {
+  background: rgba(46, 132, 74, 0.15);
+}
+
+.cc-kpi-icon--success lightning-icon {
+  --lwc-colorTextIconDefault: #2e844a;
+}
+
+.cc-dark .cc-kpi-icon--success {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.cc-dark .cc-kpi-icon--success lightning-icon {
+  --lwc-colorTextIconDefault: #4caf50;
+}
+
+.cc-kpi-icon--warning {
+  background: rgba(255, 183, 93, 0.15);
+}
+
+.cc-kpi-icon--warning lightning-icon {
+  --lwc-colorTextIconDefault: #ffb75d;
+}
+
+.cc-dark .cc-kpi-icon--warning {
+  background: rgba(255, 193, 7, 0.2);
+}
+
+.cc-dark .cc-kpi-icon--warning lightning-icon {
+  --lwc-colorTextIconDefault: #ffc107;
+}
+
+.cc-kpi-icon--no-background {
+  background: transparent;
+  padding: 0;
+  width: auto;
+  height: auto;
+  min-width: 32px;
+  min-height: 32px;
 }
 
 .cc-kpi-change {
@@ -145,56 +194,100 @@
 
 /* ==================== KPI BADGE ==================== */
 .cc-kpi-badge {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 20px;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+  min-height: 28px;
 }
 
 .cc-kpi-badge--up {
-  background: rgba(46, 132, 74, 0.15);
+  background: rgba(46, 132, 74, 0.12);
   color: #2e844a;
+  border: 1px solid rgba(46, 132, 74, 0.2);
 }
 
 .cc-kpi-badge--up lightning-icon {
   --lwc-colorTextIconDefault: #2e844a;
+  --slds-c-icon-color-foreground-default: #2e844a;
 }
 
 .cc-dark .cc-kpi-badge--up {
-  background: rgba(76, 175, 80, 0.2);
+  background: rgba(76, 175, 80, 0.15);
   color: #4caf50;
+  border-color: rgba(76, 175, 80, 0.3);
 }
 
 .cc-dark .cc-kpi-badge--up lightning-icon {
   --lwc-colorTextIconDefault: #4caf50;
+  --slds-c-icon-color-foreground-default: #4caf50;
 }
 
 .cc-kpi-badge--down {
-  background: rgba(234, 0, 30, 0.15);
+  background: rgba(234, 0, 30, 0.12);
   color: #ea001e;
+  border: 1px solid rgba(234, 0, 30, 0.2);
 }
 
 .cc-kpi-badge--down lightning-icon {
   --lwc-colorTextIconDefault: #ea001e;
+  --slds-c-icon-color-foreground-default: #ea001e;
 }
 
 .cc-dark .cc-kpi-badge--down {
-  background: rgba(255, 82, 82, 0.2);
+  background: rgba(255, 82, 82, 0.15);
   color: #ff5252;
+  border-color: rgba(255, 82, 82, 0.3);
 }
 
 .cc-dark .cc-kpi-badge--down lightning-icon {
   --lwc-colorTextIconDefault: #ff5252;
+  --slds-c-icon-color-foreground-default: #ff5252;
+}
+
+.cc-kpi-badge--zero {
+  background: rgba(116, 116, 116, 0.1);
+  color: #747474;
+  border: 1px solid rgba(116, 116, 116, 0.15);
+}
+
+.cc-kpi-badge--zero lightning-icon {
+  --lwc-colorTextIconDefault: #747474;
+  --slds-c-icon-color-foreground-default: #747474;
+}
+
+.cc-dark .cc-kpi-badge--zero {
+  background: rgba(160, 160, 160, 0.12);
+  color: #a0a0a0;
+  border-color: rgba(160, 160, 160, 0.2);
+}
+
+.cc-dark .cc-kpi-badge--zero lightning-icon {
+  --lwc-colorTextIconDefault: #a0a0a0;
+  --slds-c-icon-color-foreground-default: #a0a0a0;
+}
+
+.cc-badge-icon {
+  flex-shrink: 0;
+  margin-top: 1px; /* Slight vertical alignment adjustment */
+}
+
+.cc-badge-text {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .cc-kpi-label {
   font-size: 0.875rem;
   color: #747474;
-  margin: 0 0 4px 0;
+  margin: 0 0 8px 0;
   transition: color 0.3s ease;
+  font-weight: 500;
 }
 
 .cc-dark .cc-kpi-label {
@@ -205,12 +298,17 @@
   font-size: 1.75rem;
   font-weight: 700;
   color: #181818;
-  margin: 0 0 4px 0;
+  margin: 0;
   transition: color 0.3s ease;
 }
 
 .cc-dark .cc-kpi-value {
   color: #ffffff;
+}
+
+.cc-kpi-subtitle-spacer {
+  margin-top: auto;
+  min-height: 1.2em;
 }
 
 .cc-kpi-subtitle {

@@ -7,6 +7,8 @@
   --cc-radius-sm: 6px;
   --cc-radius-md: 8px;
   --cc-radius-lg: 12px;
+  display: block;
+  width: 100%;
 }
 
 /* ==================== LAYOUTS ==================== */
@@ -14,24 +16,30 @@
   display: flex;
   flex-direction: row;
   gap: var(--cc-spacing-md);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .hm-group-layout-vertical {
   display: flex;
   flex-direction: column;
   gap: var(--cc-spacing-md);
+  width: 100%;
 }
 
 .hm-group-layout-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: var(--cc-spacing-md);
+  width: 100%;
 }
 
 .hm-group-item {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
 }
 
 /* ==================== LOADING & ERROR ==================== */
@@ -45,6 +53,7 @@
 
 .hm-group-container {
   /* Container wrapper for dark mode support */
+  width: 100%;
 }
 
 .hm-group-error {
