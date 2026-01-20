@@ -1,15 +1,37 @@
 /* ==================== CSS CUSTOM PROPERTIES ==================== */
 :host {
+  /* Spacing */
   --cc-spacing-xs: 4px;
   --cc-spacing-sm: 8px;
   --cc-spacing-md: 16px;
   --cc-spacing-lg: 24px;
   --cc-spacing-xl: 32px;
+  --cc-spacing-6: 6px;
+  --cc-spacing-12: 12px;
+  --cc-spacing-20: 20px;
+  
+  /* Border Radius */
   --cc-radius-sm: 6px;
   --cc-radius-md: 8px;
   --cc-radius-lg: 12px;
+  --cc-radius-xl: 16px;
+  --cc-radius-xxl: 20px;
+  
+  /* Shadows */
   --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  /* Typography - Font Sizes */
+  --cc-font-size-xs: 0.75rem;
+  --cc-font-size-sm: 0.8125rem;
+  --cc-font-size-base: 0.875rem;
+  --cc-font-size-xl: 2rem;
+  
+  /* Typography - Font Weights */
+  --cc-font-weight-medium: 500;
+  --cc-font-weight-semibold: 600;
+  --cc-font-weight-bold: 700;
+  
   display: block;
   width: 100%;
 }
@@ -25,7 +47,7 @@
 .cc-kpi-card {
   background: #ffffff;
   border-radius: var(--cc-radius-lg);
-  padding: 20px;
+  padding: var(--cc-spacing-20);
   box-shadow: var(--cc-shadow-sm);
   border: 1px solid rgba(0, 0, 0, 0.06);
   transition:
@@ -60,12 +82,22 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 0;
+  gap: var(--cc-spacing-sm);
+  min-height: 40px;
+}
+
+.cc-kpi-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-spacing-sm);
+  flex: 1;
+  min-width: 0;
 }
 
 .cc-kpi-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--cc-radius-md);
   display: flex;
   align-items: center;
@@ -149,11 +181,11 @@
 .cc-kpi-change {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 20px;
+  gap: var(--cc-spacing-xs);
+  font-size: var(--cc-font-size-base);
+  font-weight: var(--cc-font-weight-medium);
+  padding: var(--cc-spacing-xs) var(--cc-spacing-sm);
+  border-radius: var(--cc-radius-xxl);
 }
 
 .cc-kpi-change--up {
@@ -196,11 +228,11 @@
 .cc-kpi-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 16px;
+  gap: var(--cc-spacing-6);
+  font-size: var(--cc-font-size-sm);
+  font-weight: var(--cc-font-weight-semibold);
+  padding: var(--cc-spacing-6) var(--cc-spacing-12);
+  border-radius: var(--cc-radius-xl);
   line-height: 1.2;
   white-space: nowrap;
   min-height: 28px;
@@ -283,11 +315,15 @@
 }
 
 .cc-kpi-label {
-  font-size: 0.875rem;
+  font-size: var(--cc-font-size-base);
   color: #747474;
-  margin: 0 0 8px 0;
+  margin: 0;
   transition: color 0.3s ease;
-  font-weight: 500;
+  font-weight: var(--cc-font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .cc-dark .cc-kpi-label {
@@ -295,11 +331,13 @@
 }
 
 .cc-kpi-value {
-  font-size: 1.75rem;
-  font-weight: 700;
+  font-size: var(--cc-font-size-xl);
+  font-weight: var(--cc-font-weight-bold);
   color: #181818;
-  margin: 0;
+  margin: var(--cc-spacing-sm) 0 var(--cc-spacing-lg) 0;
   transition: color 0.3s ease;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .cc-dark .cc-kpi-value {
@@ -308,14 +346,17 @@
 
 .cc-kpi-subtitle-spacer {
   margin-top: auto;
+  padding-top: var(--cc-spacing-md);
   min-height: 1.2em;
 }
 
 .cc-kpi-subtitle {
-  font-size: 0.75rem;
+  font-size: var(--cc-font-size-xs);
   color: #747474;
   margin: 0;
   transition: color 0.3s ease;
+  line-height: 1.5;
+  max-width: 100%;
 }
 
 .cc-dark .cc-kpi-subtitle {
@@ -325,7 +366,7 @@
 .cc-error-message {
   padding: var(--cc-spacing-md);
   color: #ea001e;
-  font-size: 0.875rem;
+  font-size: var(--cc-font-size-base);
   text-align: center;
 }
 
