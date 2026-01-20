@@ -134,12 +134,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Extract error message from error object
-   * Handles different error formats (AuraHandledException, standard errors, strings)
-   * @param {Object|String} error - Error object or string
-   * @return {String} Extracted error message
-   */
-  /**
-   * @description Extract error message from error object
    * Handles various error formats from Apex and JavaScript
    * @param {Error|Object|String} error - Error object or string
    * @return {String} Extracted error message

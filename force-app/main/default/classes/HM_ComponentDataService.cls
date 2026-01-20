@@ -651,13 +651,6 @@ public with sharing class HM_ComponentDataService {
    * @param response Response Map from Apex method with 'rows' key
    * @return Map<String, Object> Enhanced response with standard fields added to rows
    */
-  /**
-   * @description Enhance Apex response rows with standard fields if they're missing
-   * Queries records to get missing standard fields (Id, Name, CreatedDate, LastModifiedDate)
-   * Used when showAllRecordsFilter is enabled to ensure common columns are available
-   * @param response Response Map from Apex method with 'rows' key
-   * @return Map<String, Object> Enhanced response with standard fields added to rows
-   */
   private static Map<String, Object> enhanceApexResponseWithStandardFields(Map<String, Object> response) {
     if (response == null || response.get('rows') == null) {
       return response;
@@ -807,10 +800,8 @@ public with sharing class HM_ComponentDataService {
         }
       }
     } catch (Exception ex) {
-      // Log error for debugging but continue gracefully
-      // This could happen if object type is invalid or fields don't exist
-      // Note: In production, consider using a logging framework
-      System.debug(LoggingLevel.WARN, 'Failed to enhance Apex response with standard fields for object type: ' + objectType + '. Error: ' + ex.getMessage());
+      // Continue gracefully if object type is invalid or fields don't exist
+      // Error is silently handled to prevent breaking the response
     }
   }
 
@@ -871,13 +862,6 @@ public with sharing class HM_ComponentDataService {
     return prefixMap.get(prefix);
   }
 
-  /**
-   * @description Enhance SOQL query with standard fields if they're missing
-   * Automatically injects Id, Name, CreatedDate, LastModifiedDate if not already present
-   * Used when showAllRecordsFilter is enabled to ensure common columns are available
-   * @param query Normalized SOQL query string
-   * @return String Enhanced query with standard fields added if missing
-   */
   /**
    * @description Enhance SOQL query with standard fields if they're missing
    * Automatically injects Id, Name, CreatedDate, LastModifiedDate if not already present
@@ -1017,14 +1001,6 @@ public with sharing class HM_ComponentDataService {
    * @description Replace merge fields and Apex binding syntax in SOQL query
    * Supported merge fields: {!UserId}, {!Today}, {!ThisMonth}
    * Supports Apex binding syntax: :UserInfo.getUserId(), :UserInfo.getUserId, etc.
-   * @param query SOQL query string with merge fields
-   * @param context Context map for custom merge fields
-   * @return String Query with merge fields replaced
-   */
-  /**
-   * @description Replace merge fields and Apex binding syntax in SOQL query
-   * Supported merge fields: {!UserId}, {!Today}, {!ThisMonth}
-   * Supports Apex binding syntax: :UserInfo.getUserId(), :UserInfo.getUserId, etc.
    * Escapes string values to prevent SOQL injection
    * @param query SOQL query string with merge fields
    * @param context Context map for custom merge fields
@@ -1101,17 +1077,8 @@ public with sharing class HM_ComponentDataService {
    * @description Convert SObject to Map<String, Object>
    * Supports parent relationships (single SObject) for fields like Owner.Name
    * Recursively converts nested SObjects to Maps
-   * 
    * @param record SObject record to convert
-   * @return Map<String, Object> Converted record with parent relationships handled
-   *         Always includes Id field if present
-   */
-  /**
-   * @description Convert SObject to Map<String, Object>
-   * Supports parent relationships (single SObject) for fields like Owner.Name
-   * Recursively converts nested SObjects to Maps
-   * @param record SObject record to convert
-   * @return Map<String, Object> Map representation of the SObject
+   * @return Map<String, Object> Map representation of the SObject, always includes Id field if present
    */
   private static Map<String, Object> convertSObjectToMap(SObject record) {
     Map<String, Object> result = new Map<String, Object>();

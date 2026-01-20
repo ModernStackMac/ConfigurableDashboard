@@ -326,11 +326,6 @@ public with sharing class HM_DashboardConfigService {
   // ==================== HELPER METHODS ====================
 
   /**
-   * @description Find dashboard by ID or Name
-   * @param dashboardIdOrName Dashboard ID (15 or 18 chars) or Name
-   * @return HM_Dashboard__c Dashboard record, or null if not found
-   */
-  /**
    * @description Find dashboard by Id or Name
    * Supports both 15-character and 18-character Salesforce Ids
    * @param dashboardIdOrName Dashboard Id or Name to search for
