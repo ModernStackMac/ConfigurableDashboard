@@ -153,9 +153,10 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
 
   /**
    * @description Get menu button variant for dark mode
+   * SLDS2: Uses "bare" variant to match SLDS icon with dropdown pattern (icon only, no container)
    */
   get menuButtonVariant() {
-    return this.isDarkMode ? "border-inverse" : "border";
+    return this.isDarkMode ? "bare-inverse" : "bare";
   }
 
   /**
