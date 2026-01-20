@@ -97,6 +97,12 @@ export default class HM_ConfigurableList extends NavigationMixin(
   sortDirection = HM_ConfigurableList.SORT_DIRECTIONS.ASC;
   enableColumnSorting = false;
 
+  // Cache for performance optimization
+  _cachedVisibleColumns = null;
+  _cachedVisibleColumnsFilter = null;
+  _cachedObjectTypes = null;
+  _cachedObjectTypesRows = null;
+
   /**
    * @description Wire component configuration
    */
@@ -113,6 +119,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
       // Set sorting configuration
       this.enableColumnSorting = data.enableColumnSorting || false;
       this.buildColumns();
+      // Invalidate caches when config changes
+      this._cachedVisibleColumns = null;
+      this._cachedVisibleColumnsFilter = null;
+      this._cachedObjectTypes = null;
+      this._cachedObjectTypesRows = null;
       // Note: activeFilter will be set in buildFilters() when data loads
       this.loadData();
     } else if (error) {
@@ -125,6 +136,12 @@ export default class HM_ConfigurableList extends NavigationMixin(
    * @description Extract error message from error object
    * Handles different error formats (AuraHandledException, standard errors, strings)
    * @param {Object|String} error - Error object or string
+   * @return {String} Extracted error message
+   */
+  /**
+   * @description Extract error message from error object
+   * Handles various error formats from Apex and JavaScript
+   * @param {Error|Object|String} error - Error object or string
    * @return {String} Extracted error message
    */
   extractErrorMessage(error) {
@@ -165,6 +182,9 @@ export default class HM_ConfigurableList extends NavigationMixin(
   buildColumns() {
     if (!this.componentConfig?.detailMaps) {
       this.columns = [];
+      // Invalidate cache when columns change
+      this._cachedVisibleColumns = null;
+      this._cachedVisibleColumnsFilter = null;
       return;
     }
 
@@ -194,6 +214,10 @@ export default class HM_ConfigurableList extends NavigationMixin(
         
         return column;
       });
+
+    // Invalidate cache when columns change
+    this._cachedVisibleColumns = null;
+    this._cachedVisibleColumnsFilter = null;
   }
 
   /**
@@ -370,6 +394,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
     if (response.shape === 'LIST') {
       this.rows = this.formatRows(response.rows || []);
+      // Invalidate caches when data changes
+      this._cachedVisibleColumns = null;
+      this._cachedVisibleColumnsFilter = null;
+      this._cachedObjectTypes = null;
+      this._cachedObjectTypesRows = null;
       return true;
     }
 
@@ -463,8 +492,19 @@ export default class HM_ConfigurableList extends NavigationMixin(
       };
     }
 
-    // Get field value and format it
-    const value = this.getFieldValue(record, column.fieldApiName);
+    // Get field value - handle smart Name column that shows Name or CaseNumber based on object type
+    let value;
+    if (column.isSmartNameColumn && column.isVirtual) {
+      // For smart Name column: use CaseNumber for Case, Name for others
+      if (objectType === 'Case') {
+        value = this.getFieldValue(record, 'CaseNumber');
+      } else {
+        value = this.getFieldValue(record, 'Name');
+      }
+    } else {
+      value = this.getFieldValue(record, column.fieldApiName);
+    }
+    
     let formattedValue = this.formatValue(value, column.formatType);
     
     // If formatted value is empty but we have a raw value, use the raw value as fallback
@@ -664,14 +704,41 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Find cell for a column in a row using unique detail map ID key
+   * For virtual columns, creates the cell on-the-fly if it doesn't exist
    * @param {Object} row - The row object containing cells
-   * @param {Object} column - The column definition (key is detail map ID)
+   * @param {Object} column - The column definition (key is detail map ID or virtual key)
    * @return {Object} Cell object or placeholder if not found
    */
   findCellForColumn(row, column) {
-    if (!row || !row.cells || !column) {
+    if (!row || !column) {
       return {
         key: column?.key || '',
+        value: null,
+        rawValue: null,
+        applicable: false
+      };
+    }
+
+    // For virtual columns, create cell on-the-fly
+    if (column.isVirtual && row.record) {
+      // For smart Name column, we need to handle it specially
+      if (column.isSmartNameColumn) {
+        // Create a temporary column object that uses the right field
+        const tempColumn = { ...column };
+        if (row.objectType === 'Case') {
+          tempColumn.fieldApiName = 'CaseNumber';
+        } else {
+          tempColumn.fieldApiName = 'Name';
+        }
+        return this.createCellForColumn(row.record, tempColumn, row.objectType);
+      }
+      return this.createCellForColumn(row.record, column, row.objectType);
+    }
+
+    // For regular columns, find in existing cells
+    if (!row.cells) {
+      return {
+        key: column.key,
         value: null,
         rawValue: null,
         applicable: false
@@ -692,31 +759,185 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get visible columns based on active filter
-   * Only shows columns that apply to the currently selected object type
+   * When "All" is selected and showAllRecordsFilter is enabled:
+   *   - Shows columns with no objectType restriction (empty array)
+   *   - Automatically includes Name and CreatedDate if they exist in data
+   * When a specific object type is selected, shows only columns that apply to that type
+   * Results are cached to avoid recalculation on every access
    */
   get visibleColumns() {
-    if (!this.activeFilter) {
-      // If no filter is active, determine object type from configuration or data
-      const inferredObjectType = this.inferObjectType();
-      
-      if (inferredObjectType) {
-        // Filter columns to only show those that apply to the inferred object type
-        return this.columns.filter((column) =>
-          this.columnAppliesToObject(column, inferredObjectType)
+    // Check cache - invalidate if filter, columns, rows, or config changed
+    const cacheKey = `${this.activeFilter}_${this.columns.length}_${this.rows.length}_${this.componentConfig?.showAllRecordsFilter}`;
+    if (this._cachedVisibleColumns && this._cachedVisibleColumnsFilter === cacheKey) {
+      return this._cachedVisibleColumns;
+    }
+
+    let result;
+    // Handle "All" filter
+    if (!this.activeFilter || this.activeFilter === "all") {
+      // Get columns with no objectType restriction (empty array)
+      let visibleCols = this.columns.filter((column) => {
+        return !column.objectType || column.objectType.length === 0;
+      });
+
+      // If showAllRecordsFilter is enabled, automatically add Name/CaseNumber and CreatedDate if they exist in data
+      const showAllRecordsFilter = this.componentConfig?.showAllRecordsFilter === true;
+      if (showAllRecordsFilter && this.rows && this.rows.length > 0) {
+        // Get unique object types in the data
+        const objectTypes = this.getUniqueObjectTypes();
+        const hasCase = objectTypes.includes('Case');
+        const hasAccount = objectTypes.includes('Account');
+        const hasOpportunity = objectTypes.includes('Opportunity');
+        const hasAccountOrOpp = hasAccount || hasOpportunity;
+
+        // Check if these columns already exist in configured columns WITH empty objectType (already visible in "All" tab)
+        const hasNameColumnWithNoRestriction = this.columns.some(
+          col => col.fieldApiName === 'Name' && (!col.objectType || col.objectType.length === 0)
         );
+        const hasCaseNumberColumnWithNoRestriction = this.columns.some(
+          col => col.fieldApiName === 'CaseNumber' && (!col.objectType || col.objectType.length === 0)
+        );
+        const hasCreatedDateColumnWithNoRestriction = this.columns.some(
+          col => col.fieldApiName === 'CreatedDate' && (!col.objectType || col.objectType.length === 0)
+        );
+
+        // Add Name column if we have Account/Opportunity OR Case records
+        // This single column will display Name for Account/Opportunity and CaseNumber for Case
+        if ((hasAccountOrOpp || hasCase) && !hasNameColumnWithNoRestriction) {
+          const nameColumn = this.createVirtualColumn('Name', 'Name', HM_ConfigurableList.FORMAT_TYPES.TEXT);
+          // Mark it as a smart column that handles both Name and CaseNumber
+          nameColumn.isSmartNameColumn = true;
+          visibleCols.unshift(nameColumn); // Add at the beginning
+        }
+
+        // Always add CreatedDate if not already configured with no restriction
+        // (Since we automatically inject CreatedDate into queries when showAllRecordsFilter is enabled)
+        if (!hasCreatedDateColumnWithNoRestriction) {
+          const createdDateColumn = this.createVirtualColumn('CreatedDate', 'Created Date', HM_ConfigurableList.FORMAT_TYPES.DATE);
+          // Insert after Name
+          const nameIndex = visibleCols.findIndex(col => col.fieldApiName === 'Name');
+          if (nameIndex >= 0) {
+            visibleCols.splice(nameIndex + 1, 0, createdDateColumn);
+          } else {
+            visibleCols.unshift(createdDateColumn);
+          }
+        }
       }
-      
-      // If we can't infer object type, show only columns with no objectType restriction
-      // (columns that apply to all object types)
-      return this.columns.filter((column) =>
-        !column.objectType || column.objectType.length === 0
+
+      result = visibleCols;
+    } else {
+      // Filter columns to only show those that apply to the active filter's object type
+      result = this.columns.filter((column) =>
+        this.columnAppliesToObject(column, this.activeFilter)
       );
     }
 
-    // Filter columns to only show those that apply to the active filter's object type
-    return this.columns.filter((column) =>
-      this.columnAppliesToObject(column, this.activeFilter)
-    );
+    // Cache result
+    this._cachedVisibleColumns = result;
+    this._cachedVisibleColumnsFilter = cacheKey;
+    return result;
+  }
+
+  /**
+   * @description Check if a field exists in the data rows
+   * Checks both the record object and the row object itself
+   * @param {String} fieldApiName - Field API name to check
+   * @return {Boolean} True if field exists in at least one row
+   */
+  fieldExistsInData(fieldApiName) {
+    if (!this.rows || this.rows.length === 0) {
+      return false;
+    }
+
+    // Check first few rows to see if field exists
+    // We check multiple rows because some rows might have null values
+    const rowsToCheck = Math.min(10, this.rows.length);
+    for (let i = 0; i < rowsToCheck; i++) {
+      const row = this.rows[i];
+      if (!row) {
+        continue;
+      }
+
+      // Check in row.record first
+      if (row.record) {
+        const value = this.getFieldValue(row.record, fieldApiName);
+        if (value !== null && value !== undefined && value !== '') {
+          return true;
+        }
+      }
+
+      // Also check directly in row object (in case data is stored there)
+      if (row[fieldApiName] !== null && row[fieldApiName] !== undefined && row[fieldApiName] !== '') {
+        return true;
+      }
+
+      // Check in cells if they exist (for already formatted data)
+      if (row.cells && Array.isArray(row.cells)) {
+        const cell = row.cells.find(c => c && c.key && c.key.includes(fieldApiName));
+        if (cell && (cell.value !== null && cell.value !== undefined && cell.value !== '')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * @description Create a virtual column definition
+   * Virtual columns are dynamically added (e.g., Name, CreatedDate) and not in the configured columns
+   * These are created when showAllRecordsFilter is enabled and fields exist in data
+   * @param {String} fieldApiName - Field API name
+   * @param {String} label - Column label
+   * @param {String} formatType - Format type (TEXT, CURRENCY, NUMBER, PERCENT, DATE)
+   * @return {Object} Virtual column definition object
+   */
+  createVirtualColumn(fieldApiName, label, formatType) {
+    const column = {
+      key: `virtual-${fieldApiName}`, // Virtual key to distinguish from configured columns
+      id: null, // No detail map ID for virtual columns
+      label: label,
+      fieldApiName: fieldApiName,
+      formatType: formatType,
+      objectType: [], // Empty array - applies to all object types
+      cssClass: fieldApiName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      sortable: this.enableColumnSorting,
+      sortDirection: null,
+      badgeType: null,
+      badgeVariant: null,
+      isVirtual: true // Flag to identify virtual columns
+    };
+
+    // Compute header class, title, and alternative text
+    column.headerClass = this.computeColumnHeaderClass(column);
+    column.sortIcon = null;
+    column.title = column.sortable ? "Click to sort" : "";
+    column.sortAlternativeText = "";
+
+    return column;
+  }
+
+  /**
+   * @description Get unique object types from rows data
+   * Results are cached to avoid recalculation on every access
+   * @return {Array<String>} Array of unique object type names
+   */
+  getUniqueObjectTypes() {
+    // Check cache - invalidate if rows changed
+    if (this._cachedObjectTypes && this._cachedObjectTypesRows === this.rows) {
+      return this._cachedObjectTypes;
+    }
+
+    if (!this.rows || this.rows.length === 0) {
+      this._cachedObjectTypes = [];
+      this._cachedObjectTypesRows = this.rows;
+      return this._cachedObjectTypes;
+    }
+
+    const result = [...new Set(this.rows.map(row => row.objectType).filter(Boolean))];
+    this._cachedObjectTypes = result;
+    this._cachedObjectTypesRows = this.rows;
+    return result;
   }
 
   /**
@@ -756,6 +977,13 @@ export default class HM_ConfigurableList extends NavigationMixin(
    * Handles dot notation for parent relationships (e.g., "Account.Name")
    * @param {Object} record - Record object to get value from
    * @param {String} fieldApiName - Field API name, supports dot notation for nested fields
+   * @return {*} Field value or null if not found
+   */
+  /**
+   * @description Get field value from record, supporting nested field paths
+   * Handles dot notation for relationship fields (e.g., "Account.Name")
+   * @param {Object} record - Record object containing field values
+   * @param {String} fieldApiName - Field API name or dot-notation path
    * @return {*} Field value or null if not found
    */
   getFieldValue(record, fieldApiName) {
@@ -863,7 +1091,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Build dynamic filters based on object types in data
-   * Only creates filters for object types (no "All" option)
+   * Creates filters for object types and optionally an "All" tab when setting is enabled
    * Only shows filters when there are 2+ different object types
    */
   buildFilters() {
@@ -899,14 +1127,37 @@ export default class HM_ConfigurableList extends NavigationMixin(
       return;
     }
 
-    // Build filter array (no "All" option)
+    // Build filter array
     this.filters = [];
+
+    // Check if "All" tab should be shown
+    const showAllTab = this.componentConfig?.showAllRecordsFilter === true;
+    
+    // Add "All" tab if setting is enabled
+    if (showAllTab) {
+      const totalCount = this.rows.length;
+      const isActive = this.activeFilter === null || this.activeFilter === "all";
+      this.filters.push({
+        value: "all",
+        label: "All",
+        count: totalCount,
+        active: isActive,
+        class: isActive
+          ? HM_ConfigurableList.CSS_CLASSES.FILTER_ACTIVE
+          : HM_ConfigurableList.CSS_CLASSES.FILTER_INACTIVE
+      });
+      
+      // Set "All" as default if no filter is active
+      if (this.activeFilter === null) {
+        this.activeFilter = "all";
+      }
+    }
 
     // Sort object types alphabetically
     const sortedObjectTypes = objectTypes.sort();
     
-    // Set first filter as active if no filter is currently active
-    if (this.activeFilter === null && sortedObjectTypes.length > 0) {
+    // Set first object type filter as active if no filter is currently active and "All" tab is not shown
+    if (!showAllTab && this.activeFilter === null && sortedObjectTypes.length > 0) {
       this.activeFilter = sortedObjectTypes[0];
     }
 
@@ -927,9 +1178,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Apply active filter to rows and update visible cells
+   * Filters rows by object type and updates visible cells based on visibleColumns
+   * Applies sorting if enabled and updates pagination
    */
   applyFilter() {
-    // Filter rows by object type (if filter is active)
+    // Filter rows by object type (if filter is active and not "all")
     if (this.activeFilter && this.activeFilter !== "all") {
       this.filteredRows = this.rows.filter(
         (row) => row.objectType === this.activeFilter
@@ -951,7 +1204,12 @@ export default class HM_ConfigurableList extends NavigationMixin(
     // Apply sorting if enabled and a column is selected
     // IMPORTANT: Sort the FULL filtered dataset before pagination
     if (this.enableColumnSorting && this.sortColumn) {
-      const column = this.columns.find((col) => col.key === this.sortColumn);
+      // Check visibleColumns first (includes virtual columns), then configured columns
+      let column = this.visibleColumns.find((col) => col.key === this.sortColumn);
+      if (!column) {
+        column = this.columns.find((col) => col.key === this.sortColumn);
+      }
+      
       if (column) {
         // Sort the entire filteredRows array (not just current page)
         this.filteredRows = this.sortRows(
@@ -975,6 +1233,10 @@ export default class HM_ConfigurableList extends NavigationMixin(
     // Reset to first page when filter changes
     this.currentPage = 1;
     this.updatePagination();
+
+    // Invalidate cache when filter changes
+    this._cachedVisibleColumns = null;
+    this._cachedVisibleColumnsFilter = null;
   }
 
   /**
@@ -1257,17 +1519,61 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Get cell value from row for sorting
+   * Handles both regular cells and virtual columns (which may need to be created on-the-fly)
    * @param {Object} row - Row object containing cells array
    * @param {String} columnKey - Key of column to get value from
    * @return {*} Raw cell value, or null if not found
    */
   getCellValue(row, columnKey) {
+    // First try to find in existing cells
     const cell = row.cells.find((c) => c && c.key === columnKey);
-    if (!cell) {
-      return null;
+    if (cell) {
+      return cell.rawValue;
     }
-    // Use rawValue for sorting (not formatted value)
-    return cell.rawValue;
+    
+    // If not found, might be a virtual column - try to get from visibleCells
+    if (row.visibleCells) {
+      const visibleCell = row.visibleCells.find((c) => c && c.key === columnKey);
+      if (visibleCell) {
+        return visibleCell.rawValue;
+      }
+    }
+    
+    // If still not found and it's a virtual column, get value directly from record
+    // Check visibleColumns first (what's actually displayed), then configured columns
+    let column = null;
+    try {
+      // Get visible columns (might include virtual columns)
+      const visibleCols = this.visibleColumns;
+      column = visibleCols.find(col => col.key === columnKey);
+    } catch (e) {
+      // If visibleColumns getter has issues, fall back to configured columns
+    }
+    
+    if (!column) {
+      column = this.columns.find(col => col.key === columnKey);
+    }
+    
+    if (column && row.record) {
+      // Handle virtual columns (both smart and regular)
+      if (column.isVirtual) {
+        // Handle smart Name column
+        if (column.isSmartNameColumn) {
+          if (row.objectType === 'Case') {
+            return this.getFieldValue(row.record, 'CaseNumber');
+          } else {
+            return this.getFieldValue(row.record, 'Name');
+          }
+        }
+        // Regular virtual column
+        return this.getFieldValue(row.record, column.fieldApiName);
+      }
+      
+      // For regular columns, try to get from record if cell not found
+      return this.getFieldValue(row.record, column.fieldApiName);
+    }
+    
+    return null;
   }
 
   /**
@@ -1346,8 +1652,13 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Update column sort state and classes
+   * Updates both configured columns and virtual columns (from visibleColumns)
    */
   updateColumnSortState() {
+    // Compute visibleColumns once before loops to avoid multiple getter calls
+    const visibleCols = this.visibleColumns;
+
+    // Update configured columns
     this.columns.forEach((col) => {
       if (col.key === this.sortColumn) {
         col.sortDirection = this.sortDirection;
@@ -1365,6 +1676,27 @@ export default class HM_ConfigurableList extends NavigationMixin(
       col.headerClass = this.computeColumnHeaderClass(col);
       // Title doesn't need to change, but ensure it's set
       col.title = col.sortable ? "Click to sort" : "";
+    });
+    
+    // Update virtual columns (from visibleColumns) - these are not in this.columns
+    visibleCols.forEach((col) => {
+      if (col.isVirtual) {
+        if (col.key === this.sortColumn) {
+          col.sortDirection = this.sortDirection;
+          col.sortIcon = this.sortDirection === HM_ConfigurableList.SORT_DIRECTIONS.ASC 
+            ? HM_ConfigurableList.SORT_ICONS.ASC 
+            : HM_ConfigurableList.SORT_ICONS.DESC;
+          col.sortAlternativeText = this.sortDirection === HM_ConfigurableList.SORT_DIRECTIONS.ASC 
+            ? "Sorted ascending" 
+            : "Sorted descending";
+        } else {
+          col.sortDirection = null;
+          col.sortIcon = null;
+          col.sortAlternativeText = "";
+        }
+        col.headerClass = this.computeColumnHeaderClass(col);
+        col.title = col.sortable ? "Click to sort" : "";
+      }
     });
   }
 

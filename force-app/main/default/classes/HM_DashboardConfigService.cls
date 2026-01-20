@@ -330,6 +330,12 @@ public with sharing class HM_DashboardConfigService {
    * @param dashboardIdOrName Dashboard ID (15 or 18 chars) or Name
    * @return HM_Dashboard__c Dashboard record, or null if not found
    */
+  /**
+   * @description Find dashboard by Id or Name
+   * Supports both 15-character and 18-character Salesforce Ids
+   * @param dashboardIdOrName Dashboard Id or Name to search for
+   * @return HM_Dashboard__c Dashboard record if found, null otherwise
+   */
   private static HM_Dashboard__c findDashboardByIdOrName(String dashboardIdOrName) {
     if (String.isBlank(dashboardIdOrName)) {
       return null;
@@ -432,6 +438,15 @@ public with sharing class HM_DashboardConfigService {
     // Column sorting configuration
     mapData.put('enableColumnSorting', component.HM_Enable_Column_Sorting__c == true);
     
+    // Show All Records Filter configuration
+    try {
+      Boolean showAllRecordsFilter = (Boolean) component.get('HM_Show_All_Records_Filter__c');
+      mapData.put('showAllRecordsFilter', showAllRecordsFilter == true);
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist - default to false
+      mapData.put('showAllRecordsFilter', false);
+    }
+    
     return mapData;
   }
 
@@ -517,6 +532,17 @@ public with sharing class HM_DashboardConfigService {
         .fields.HM_Icon_Background_Color__c;
       if (iconBgColorField.isAccessible()) {
         fields.add('HM_Icon_Background_Color__c');
+      }
+    } catch (SObjectException ex) {
+      // Graceful degradation: field doesn't exist - skip it
+    }
+    
+    // Check if HM_Show_All_Records_Filter__c exists and is accessible
+    try {
+      Schema.DescribeFieldResult showAllRecordsFilterField = Schema.sObjectType.HM_Dashboard_Component__c
+        .fields.HM_Show_All_Records_Filter__c;
+      if (showAllRecordsFilterField.isAccessible()) {
+        fields.add('HM_Show_All_Records_Filter__c');
       }
     } catch (SObjectException ex) {
       // Graceful degradation: field doesn't exist - skip it
