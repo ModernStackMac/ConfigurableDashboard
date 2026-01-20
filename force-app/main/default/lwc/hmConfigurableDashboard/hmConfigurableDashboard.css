@@ -62,6 +62,13 @@
   transition: all 0.2s ease;
 }
 
+/* SLDS2: Additional CSS to ensure icon scales properly when slotted or direct child */
+.cc-actions-menu ::slotted(lightning-icon),
+.cc-actions-menu lightning-icon {
+  --slds-c-icon-sizing-height: 1.75rem;
+  --slds-c-icon-sizing-width: 1.75rem;
+}
+
 .cc-actions-menu--open {
   /* SLDS2: Active state uses brand color for icon and dropdown caret */
   --slds-c-button-text-color: var(--slds-g-color-brand-1, #0176d3);
