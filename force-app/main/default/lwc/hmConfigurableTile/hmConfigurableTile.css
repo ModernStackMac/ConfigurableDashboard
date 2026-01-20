@@ -1,15 +1,6 @@
 /* ==================== CSS CUSTOM PROPERTIES ==================== */
+/* SLDS2 Compliance: Using --slds-g-* global styling hooks for consistency and theming */
 :host {
-  --cc-spacing-xs: 4px;
-  --cc-spacing-sm: 8px;
-  --cc-spacing-md: 16px;
-  --cc-spacing-lg: 24px;
-  --cc-spacing-xl: 32px;
-  --cc-radius-sm: 6px;
-  --cc-radius-md: 8px;
-  --cc-radius-lg: 12px;
-  --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
-  --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
   display: block;
   width: 100%;
 }
@@ -23,10 +14,11 @@
 
 /* ==================== KPI CARD ==================== */
 .cc-kpi-card {
-  background: #ffffff;
-  border-radius: var(--cc-radius-lg);
-  padding: 20px;
-  box-shadow: var(--cc-shadow-sm);
+  background: var(--slds-g-color-neutral-base-100, #ffffff);
+  border-radius: var(--slds-g-radius-border-3, 12px);
+  padding: var(--slds-g-spacing-5, 20px);
+  box-shadow: var(--slds-g-shadow-1, 0 2px 4px rgba(0, 0, 0, 0.1));
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available in all SLDS2 themes */
   border: 1px solid rgba(0, 0, 0, 0.06);
   transition:
     transform 0.2s ease,
@@ -41,100 +33,125 @@
 }
 
 .cc-dark .cc-kpi-card {
-  background: #1e1e1e;
-  border-color: #2a2a2a;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  background: var(--slds-g-color-neutral-base-10, #1e1e1e);
+  border-color: var(--slds-g-color-neutral-base-15, #2a2a2a);
+  box-shadow: var(--slds-g-shadow-1, 0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .cc-kpi-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--cc-shadow-md);
+  box-shadow: var(--slds-g-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.15));
 }
 
 .cc-dark .cc-kpi-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  border-color: #3a3a3a;
+  box-shadow: var(--slds-g-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.4));
+  border-color: var(--slds-g-color-neutral-base-20, #3a3a3a);
 }
 
 .cc-kpi-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--slds-g-spacing-4, 16px);
 }
 
 .cc-kpi-icon {
   width: 48px;
   height: 48px;
-  border-radius: var(--cc-radius-md);
+  border-radius: var(--slds-g-radius-border-2, 8px);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
+/* SLDS2: Using color-mix() for modern browsers with rgba fallback for compatibility */
 .cc-kpi-icon--brand {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-brand-1, #0176d3) 15%, transparent);
+  /* Fallback for older browsers (IE11, older Safari) */
   background: rgba(1, 118, 211, 0.15);
 }
 
 .cc-kpi-icon--brand lightning-icon {
-  --lwc-colorTextIconDefault: #0176d3;
+  --lwc-colorTextIconDefault: var(--slds-g-color-brand-1, #0176d3);
 }
 
 .cc-dark .cc-kpi-icon--brand {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-brand-3, #1b96ff) 20%, transparent);
+  /* Fallback for older browsers */
   background: rgba(27, 150, 255, 0.2);
 }
 
 .cc-dark .cc-kpi-icon--brand lightning-icon {
-  --lwc-colorTextIconDefault: #1b96ff;
+  --lwc-colorTextIconDefault: var(--slds-g-color-brand-3, #1b96ff);
 }
 
 .cc-kpi-icon--alert {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(234, 0, 30, 0.15);
 }
 
 .cc-kpi-icon--alert lightning-icon {
-  --lwc-colorTextIconDefault: #ea001e;
+  --lwc-colorTextIconDefault: var(--slds-g-color-error-1, #ea001e);
 }
 
 .cc-dark .cc-kpi-icon--alert {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent);
+  /* Fallback for older browsers */
   background: rgba(255, 82, 82, 0.2);
 }
 
 .cc-dark .cc-kpi-icon--alert lightning-icon {
-  --lwc-colorTextIconDefault: #ff5252;
+  --lwc-colorTextIconDefault: var(--slds-g-color-error-2, #ff5252);
 }
 
 .cc-kpi-icon--success {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(46, 132, 74, 0.15);
 }
 
 .cc-kpi-icon--success lightning-icon {
-  --lwc-colorTextIconDefault: #2e844a;
+  --lwc-colorTextIconDefault: var(--slds-g-color-success-1, #2e844a);
 }
 
 .cc-dark .cc-kpi-icon--success {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 20%, transparent);
+  /* Fallback for older browsers */
   background: rgba(76, 175, 80, 0.2);
 }
 
 .cc-dark .cc-kpi-icon--success lightning-icon {
-  --lwc-colorTextIconDefault: #4caf50;
+  --lwc-colorTextIconDefault: var(--slds-g-color-success-2, #4caf50);
 }
 
 .cc-kpi-icon--warning {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-warning-1, #ffb75d) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(255, 183, 93, 0.15);
 }
 
 .cc-kpi-icon--warning lightning-icon {
-  --lwc-colorTextIconDefault: #ffb75d;
+  --lwc-colorTextIconDefault: var(--slds-g-color-warning-1, #ffb75d);
 }
 
 .cc-dark .cc-kpi-icon--warning {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-warning-2, #ffc107) 20%, transparent);
+  /* Fallback for older browsers */
   background: rgba(255, 193, 7, 0.2);
 }
 
 .cc-dark .cc-kpi-icon--warning lightning-icon {
-  --lwc-colorTextIconDefault: #ffc107;
+  --lwc-colorTextIconDefault: var(--slds-g-color-warning-2, #ffc107);
 }
 
 .cc-kpi-icon--no-background {
@@ -149,127 +166,183 @@
 .cc-kpi-change {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 4px 8px;
-  border-radius: 20px;
+  gap: var(--slds-g-spacing-1, 4px);
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
+  font-weight: var(--slds-g-font-weight-medium, 500);
+  padding: var(--slds-g-spacing-1, 4px) var(--slds-g-spacing-2, 8px);
+  border-radius: var(--slds-g-radius-border-4, 16px);
 }
 
 .cc-kpi-change--up {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(46, 132, 74, 0.15);
-  color: #2e844a;
+  color: var(--slds-g-color-success-1, #2e844a);
 }
 
 .cc-kpi-change--up lightning-icon {
-  --lwc-colorTextIconDefault: #2e844a;
+  --lwc-colorTextIconDefault: var(--slds-g-color-success-1, #2e844a);
 }
 
 .cc-dark .cc-kpi-change--up {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 20%, transparent);
+  /* Fallback for older browsers */
   background: rgba(76, 175, 80, 0.2);
-  color: #4caf50;
+  color: var(--slds-g-color-success-2, #4caf50);
 }
 
 .cc-dark .cc-kpi-change--up lightning-icon {
-  --lwc-colorTextIconDefault: #4caf50;
+  --lwc-colorTextIconDefault: var(--slds-g-color-success-2, #4caf50);
 }
 
 .cc-kpi-change--down {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(234, 0, 30, 0.15);
-  color: #ea001e;
+  color: var(--slds-g-color-error-1, #ea001e);
 }
 
 .cc-kpi-change--down lightning-icon {
-  --lwc-colorTextIconDefault: #ea001e;
+  --lwc-colorTextIconDefault: var(--slds-g-color-error-1, #ea001e);
 }
 
 .cc-dark .cc-kpi-change--down {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent);
+  /* Fallback for older browsers */
   background: rgba(255, 82, 82, 0.2);
-  color: #ff5252;
+  color: var(--slds-g-color-error-2, #ff5252);
 }
 
 .cc-dark .cc-kpi-change--down lightning-icon {
-  --lwc-colorTextIconDefault: #ff5252;
+  --lwc-colorTextIconDefault: var(--slds-g-color-error-2, #ff5252);
 }
 
 /* ==================== KPI BADGE ==================== */
 .cc-kpi-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 16px;
+  gap: var(--slds-g-spacing-1, 6px);
+  font-size: var(--slds-g-font-scale-2, 0.8125rem);
+  font-weight: var(--slds-g-font-weight-semibold, 600);
+  padding: var(--slds-g-spacing-1, 6px) var(--slds-g-spacing-3, 12px);
+  border-radius: var(--slds-g-radius-border-4, 16px);
   line-height: 1.2;
   white-space: nowrap;
   min-height: 28px;
 }
 
+/* SLDS2: Responsive design - allow wrapping on mobile devices to prevent overflow */
+@media (max-width: 480px) {
+  .cc-kpi-badge {
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+
 .cc-kpi-badge--up {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 12%, transparent);
+  /* Fallback for older browsers */
   background: rgba(46, 132, 74, 0.12);
-  color: #2e844a;
+  color: var(--slds-g-color-success-1, #2e844a);
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
   border: 1px solid rgba(46, 132, 74, 0.2);
+  /* Modern browsers: use color-mix with SLDS2 token for border color */
+  border-color: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 20%, transparent);
 }
 
 .cc-kpi-badge--up lightning-icon {
-  --lwc-colorTextIconDefault: #2e844a;
-  --slds-c-icon-color-foreground-default: #2e844a;
+  --lwc-colorTextIconDefault: var(--slds-g-color-success-1, #2e844a);
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-success-1, #2e844a);
 }
 
 .cc-dark .cc-kpi-badge--up {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(76, 175, 80, 0.15);
-  color: #4caf50;
+  color: var(--slds-g-color-success-2, #4caf50);
+  /* Fallback for older browsers */
   border-color: rgba(76, 175, 80, 0.3);
+  /* Modern browsers: use color-mix with SLDS2 token */
+  border-color: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 30%, transparent);
 }
 
 .cc-dark .cc-kpi-badge--up lightning-icon {
-  --lwc-colorTextIconDefault: #4caf50;
-  --slds-c-icon-color-foreground-default: #4caf50;
+  --lwc-colorTextIconDefault: var(--slds-g-color-success-2, #4caf50);
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-success-2, #4caf50);
 }
 
 .cc-kpi-badge--down {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 12%, transparent);
+  /* Fallback for older browsers */
   background: rgba(234, 0, 30, 0.12);
-  color: #ea001e;
+  color: var(--slds-g-color-error-1, #ea001e);
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
   border: 1px solid rgba(234, 0, 30, 0.2);
+  /* Modern browsers: use color-mix with SLDS2 token for border color */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent);
 }
 
 .cc-kpi-badge--down lightning-icon {
-  --lwc-colorTextIconDefault: #ea001e;
-  --slds-c-icon-color-foreground-default: #ea001e;
+  --lwc-colorTextIconDefault: var(--slds-g-color-error-1, #ea001e);
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-error-1, #ea001e);
 }
 
 .cc-dark .cc-kpi-badge--down {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 15%, transparent);
+  /* Fallback for older browsers */
   background: rgba(255, 82, 82, 0.15);
-  color: #ff5252;
+  color: var(--slds-g-color-error-2, #ff5252);
+  /* Fallback for older browsers */
   border-color: rgba(255, 82, 82, 0.3);
+  /* Modern browsers: use color-mix with SLDS2 token */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 30%, transparent);
 }
 
 .cc-dark .cc-kpi-badge--down lightning-icon {
-  --lwc-colorTextIconDefault: #ff5252;
-  --slds-c-icon-color-foreground-default: #ff5252;
+  --lwc-colorTextIconDefault: var(--slds-g-color-error-2, #ff5252);
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-error-2, #ff5252);
 }
 
 .cc-kpi-badge--zero {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-neutral-base-50, #747474) 10%, transparent);
+  /* Fallback for older browsers */
   background: rgba(116, 116, 116, 0.1);
-  color: #747474;
+  color: var(--slds-g-color-neutral-base-50, #747474);
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
   border: 1px solid rgba(116, 116, 116, 0.15);
+  /* Modern browsers: use color-mix with SLDS2 token for border color */
+  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-50, #747474) 15%, transparent);
 }
 
 .cc-kpi-badge--zero lightning-icon {
-  --lwc-colorTextIconDefault: #747474;
-  --slds-c-icon-color-foreground-default: #747474;
+  --lwc-colorTextIconDefault: var(--slds-g-color-neutral-base-50, #747474);
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-neutral-base-50, #747474);
 }
 
 .cc-dark .cc-kpi-badge--zero {
+  /* Modern browsers: use color-mix with SLDS2 token */
+  background: color-mix(in srgb, var(--slds-g-color-neutral-base-40, #a0a0a0) 12%, transparent);
+  /* Fallback for older browsers */
   background: rgba(160, 160, 160, 0.12);
-  color: #a0a0a0;
+  color: var(--slds-g-color-neutral-base-40, #a0a0a0);
+  /* Fallback for older browsers */
   border-color: rgba(160, 160, 160, 0.2);
+  /* Modern browsers: use color-mix with SLDS2 token */
+  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-40, #a0a0a0) 20%, transparent);
 }
 
 .cc-dark .cc-kpi-badge--zero lightning-icon {
-  --lwc-colorTextIconDefault: #a0a0a0;
-  --slds-c-icon-color-foreground-default: #a0a0a0;
+  --lwc-colorTextIconDefault: var(--slds-g-color-neutral-base-40, #a0a0a0);
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }
 
 .cc-badge-icon {
@@ -283,27 +356,27 @@
 }
 
 .cc-kpi-label {
-  font-size: 0.875rem;
-  color: #747474;
-  margin: 0 0 8px 0;
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
+  color: var(--slds-g-color-neutral-base-50, #747474);
+  margin: 0 0 var(--slds-g-spacing-2, 8px) 0;
   transition: color 0.3s ease;
-  font-weight: 500;
+  font-weight: var(--slds-g-font-weight-medium, 500);
 }
 
 .cc-dark .cc-kpi-label {
-  color: #a0a0a0;
+  color: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }
 
 .cc-kpi-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #181818;
+  font-size: var(--slds-g-font-scale-7, 1.75rem);
+  font-weight: var(--slds-g-font-weight-bold, 700);
+  color: var(--slds-g-color-neutral-base-10, #181818);
   margin: 0;
   transition: color 0.3s ease;
 }
 
 .cc-dark .cc-kpi-value {
-  color: #ffffff;
+  color: var(--slds-g-color-neutral-base-100, #ffffff);
 }
 
 .cc-kpi-subtitle-spacer {
@@ -312,23 +385,23 @@
 }
 
 .cc-kpi-subtitle {
-  font-size: 0.75rem;
-  color: #747474;
+  font-size: var(--slds-g-font-scale-1, 0.75rem);
+  color: var(--slds-g-color-neutral-base-50, #747474);
   margin: 0;
   transition: color 0.3s ease;
 }
 
 .cc-dark .cc-kpi-subtitle {
-  color: #808080;
+  color: var(--slds-g-color-neutral-base-45, #808080);
 }
 
 .cc-error-message {
-  padding: var(--cc-spacing-md);
-  color: #ea001e;
-  font-size: 0.875rem;
+  padding: var(--slds-g-spacing-4, 16px);
+  color: var(--slds-g-color-error-1, #ea001e);
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
   text-align: center;
 }
 
 .cc-dark .cc-error-message {
-  color: #ff5252;
+  color: var(--slds-g-color-error-2, #ff5252);
 }
