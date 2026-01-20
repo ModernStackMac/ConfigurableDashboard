@@ -109,13 +109,27 @@ public with sharing class HM_ComponentDataService {
         throw new AuraHandledException(ERROR_INSUFFICIENT_PERMISSIONS_COMPONENT);
       }
 
-      // Verify component exists and is active, get component type
-      HM_Dashboard_Component__c component = [
-        SELECT Id, HM_Active__c, HM_Type__c
-        FROM HM_Dashboard_Component__c
-        WHERE Id = :componentId AND HM_Active__c = TRUE
-        LIMIT 1
-      ];
+      // Verify component exists and is active, get component type and showAllRecordsFilter setting
+      List<String> componentFields = new List<String>{ 'Id', 'HM_Active__c', 'HM_Type__c' };
+      
+      // Check if HM_Show_All_Records_Filter__c exists and is accessible
+      try {
+        Schema.DescribeFieldResult showAllRecordsFilterField = Schema.sObjectType.HM_Dashboard_Component__c
+          .fields.HM_Show_All_Records_Filter__c;
+        if (showAllRecordsFilterField.isAccessible()) {
+          componentFields.add('HM_Show_All_Records_Filter__c');
+        }
+      } catch (SObjectException ex) {
+        // Graceful degradation: field doesn't exist - skip it
+      }
+      
+      String componentQuery = 'SELECT ' + String.join(componentFields, ', ') + 
+        ' FROM HM_Dashboard_Component__c' +
+        ' WHERE Id = :componentId AND HM_Active__c = TRUE' +
+        ' LIMIT 1';
+      
+      List<HM_Dashboard_Component__c> components = Database.query(componentQuery);
+      HM_Dashboard_Component__c component = components.isEmpty() ? null : components[0];
 
       if (component == null) {
         return buildEmptyResponse();
@@ -190,6 +204,25 @@ public with sharing class HM_ComponentDataService {
         }
       }
 
+      // Check if showAllRecordsFilter is enabled (for automatic standard field injection)
+      Boolean showAllRecordsFilter = false;
+      try {
+        showAllRecordsFilter = (Boolean) component.get('HM_Show_All_Records_Filter__c');
+        if (showAllRecordsFilter == null) {
+          showAllRecordsFilter = false;
+        }
+      } catch (SObjectException ex) {
+        // Graceful degradation: field doesn't exist - default to false
+        showAllRecordsFilter = false;
+      }
+      
+      // Add component setting to context for use in query enhancement
+      if (context == null) {
+        context = new Map<String, Object>();
+      }
+      context.put('showAllRecordsFilter', showAllRecordsFilter);
+      context.put('componentId', componentId);
+
       // Process all data sources and combine results
       // For List components: combine all LIST sources
       // For Tile components: use first AGGREGATE or first LIST source
@@ -198,6 +231,9 @@ public with sharing class HM_ComponentDataService {
         mainResponse = processMultipleDataSourcesForList(dataSources, context, component.HM_Type__c);
       } else {
         // Tile component - process first data source only
+        if (dataSources.isEmpty()) {
+          return buildEmptyResponse();
+        }
         mainResponse = processDataSource(dataSources[0], context, component.HM_Type__c);
         
         // Process subtitle data source if different from main data source
@@ -319,6 +355,14 @@ public with sharing class HM_ComponentDataService {
       dataSource.HM_Return_Type__c
     );
     
+    // Enhance response with standard fields if showAllRecordsFilter is enabled
+    if (context != null && context.containsKey('showAllRecordsFilter')) {
+      Boolean showAllRecordsFilter = (Boolean) context.get('showAllRecordsFilter');
+      if (showAllRecordsFilter == true && response != null && response.get('shape') == SHAPE_LIST) {
+        response = enhanceApexResponseWithStandardFields(response);
+      }
+    }
+    
     // Add data source icon to rows if present
     addDataSourceIconToRows(response, dataSource);
     
@@ -367,8 +411,17 @@ public with sharing class HM_ComponentDataService {
     // Validate basic SOQL syntax
     validateSOQLSyntax(normalizedQuery);
 
+    // Enhance query with standard fields if showAllRecordsFilter is enabled
+    String enhancedQuery = normalizedQuery;
+    if (context != null && context.containsKey('showAllRecordsFilter')) {
+      Boolean showAllRecordsFilter = (Boolean) context.get('showAllRecordsFilter');
+      if (showAllRecordsFilter == true) {
+        enhancedQuery = enhanceSOQLWithStandardFields(normalizedQuery);
+      }
+    }
+
     // Execute SOQL query (don't normalize again - already normalized)
-    Map<String, Object> response = executeSOQLQuery(normalizedQuery, context, false, dataSource.HM_Return_Type__c);
+    Map<String, Object> response = executeSOQLQuery(enhancedQuery, context, false, dataSource.HM_Return_Type__c);
     
     // Add data source icon to rows if present
     addDataSourceIconToRows(response, dataSource);
@@ -592,6 +645,321 @@ public with sharing class HM_ComponentDataService {
   }
 
   /**
+   * @description Enhance Apex response rows with standard fields if they're missing
+   * Queries records to get missing standard fields (Id, Name, CreatedDate, LastModifiedDate)
+   * Used when showAllRecordsFilter is enabled to ensure common columns are available
+   * @param response Response Map from Apex method with 'rows' key
+   * @return Map<String, Object> Enhanced response with standard fields added to rows
+   */
+  /**
+   * @description Enhance Apex response rows with standard fields if they're missing
+   * Queries records to get missing standard fields (Id, Name, CreatedDate, LastModifiedDate)
+   * Used when showAllRecordsFilter is enabled to ensure common columns are available
+   * @param response Response Map from Apex method with 'rows' key
+   * @return Map<String, Object> Enhanced response with standard fields added to rows
+   */
+  private static Map<String, Object> enhanceApexResponseWithStandardFields(Map<String, Object> response) {
+    if (response == null || response.get('rows') == null) {
+      return response;
+    }
+
+    List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
+    if (rows == null || rows.isEmpty()) {
+      return response;
+    }
+
+    // Standard fields to ensure are present
+    Set<String> standardFields = new Set<String>{ 'Id', 'Name', 'CreatedDate', 'LastModifiedDate' };
+    
+    // Group rows by object type for efficient querying
+    Map<String, List<Map<String, Object>>> rowsByObjectType = new Map<String, List<Map<String, Object>>>();
+    Map<String, Set<String>> missingFieldsByType = new Map<String, Set<String>>();
+    
+    for (Map<String, Object> row : rows) {
+      String objectType = extractObjectTypeFromRow(row);
+      if (String.isBlank(objectType)) {
+        continue; // Skip rows where we can't determine object type
+      }
+      
+      Set<String> missingFields = findMissingStandardFields(row, standardFields);
+      if (missingFields.isEmpty()) {
+        continue; // Skip rows that already have all standard fields
+      }
+      
+      // Initialize maps for this object type if needed
+      if (!rowsByObjectType.containsKey(objectType)) {
+        rowsByObjectType.put(objectType, new List<Map<String, Object>>());
+        missingFieldsByType.put(objectType, new Set<String>());
+      }
+      rowsByObjectType.get(objectType).add(row);
+      missingFieldsByType.get(objectType).addAll(missingFields);
+    }
+    
+    // Query missing fields for each object type
+    for (String objectType : rowsByObjectType.keySet()) {
+      enhanceRowsForObjectType(
+        objectType,
+        rowsByObjectType.get(objectType),
+        missingFieldsByType.get(objectType)
+      );
+    }
+    
+    return response;
+  }
+
+  /**
+   * @description Extract object type from row data
+   * @param row Row map containing attributes, recordType, or Id
+   * @return String Object type name or null if cannot be determined
+   */
+  private static String extractObjectTypeFromRow(Map<String, Object> row) {
+    // Try attributes.type first (from Apex)
+    if (row.containsKey('attributes') && row.get('attributes') instanceof Map<String, Object>) {
+      Map<String, Object> attrs = (Map<String, Object>) row.get('attributes');
+      String objectType = (String) attrs.get('type');
+      if (String.isNotBlank(objectType)) {
+        return objectType;
+      }
+    }
+    
+    // Try recordType field
+    if (row.containsKey('recordType')) {
+      String objectType = (String) row.get('recordType');
+      if (String.isNotBlank(objectType)) {
+        return objectType;
+      }
+    }
+    
+    // Try to infer from Id prefix
+    if (row.containsKey('Id')) {
+      String recordId = (String) row.get('Id');
+      if (String.isNotBlank(recordId) && recordId.length() >= 3) {
+        String prefix = recordId.substring(0, 3);
+        return inferObjectTypeFromPrefix(prefix);
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * @description Find missing standard fields in a row
+   * @param row Row map to check
+   * @param standardFields Set of standard field names to check for
+   * @return Set<String> Set of missing field names
+   */
+  private static Set<String> findMissingStandardFields(Map<String, Object> row, Set<String> standardFields) {
+    Set<String> missingFields = new Set<String>();
+    for (String field : standardFields) {
+      if (!row.containsKey(field) || row.get(field) == null) {
+        missingFields.add(field);
+      }
+    }
+    return missingFields;
+  }
+
+  /**
+   * @description Enhance rows for a specific object type by querying missing standard fields
+   * @param objectType Object API name
+   * @param rowsToEnhance List of row maps to enhance
+   * @param missingFields Set of field names to query
+   */
+  private static void enhanceRowsForObjectType(
+    String objectType,
+    List<Map<String, Object>> rowsToEnhance,
+    Set<String> missingFields
+  ) {
+    if (rowsToEnhance.isEmpty() || missingFields.isEmpty()) {
+      return;
+    }
+    
+    // Collect Ids
+    Set<Id> recordIds = collectRecordIds(rowsToEnhance);
+    if (recordIds.isEmpty()) {
+      return;
+    }
+    
+    // Validate objectType against Schema to prevent SOQL injection
+    if (!isValidObjectType(objectType)) {
+      return; // Skip invalid object types
+    }
+    
+    // Build and execute query
+    List<String> fieldsToQuery = new List<String>(missingFields);
+    String soqlQuery = 'SELECT ' + String.join(fieldsToQuery, ', ') + 
+      ' FROM ' + objectType + 
+      ' WHERE Id IN :recordIds';
+    
+    try {
+      List<SObject> records = Database.query(soqlQuery);
+      Map<Id, SObject> recordMap = new Map<Id, SObject>(records);
+      
+      // Enhance rows with queried fields
+      for (Map<String, Object> row : rowsToEnhance) {
+        Id rowId = (Id) row.get('Id');
+        if (recordMap.containsKey(rowId)) {
+          SObject record = recordMap.get(rowId);
+          for (String field : missingFields) {
+            if (record.get(field) != null) {
+              row.put(field, record.get(field));
+            }
+          }
+        }
+      }
+    } catch (Exception ex) {
+      // Log error for debugging but continue gracefully
+      // This could happen if object type is invalid or fields don't exist
+      // Note: In production, consider using a logging framework
+      System.debug(LoggingLevel.WARN, 'Failed to enhance Apex response with standard fields for object type: ' + objectType + '. Error: ' + ex.getMessage());
+    }
+  }
+
+  /**
+   * @description Collect valid record Ids from rows
+   * @param rows List of row maps
+   * @return Set<Id> Set of valid record Ids
+   */
+  private static Set<Id> collectRecordIds(List<Map<String, Object>> rows) {
+    Set<Id> recordIds = new Set<Id>();
+    for (Map<String, Object> row : rows) {
+      if (row.containsKey('Id') && row.get('Id') != null) {
+        try {
+          recordIds.add((Id) row.get('Id'));
+        } catch (Exception ex) {
+          // Skip invalid Ids
+        }
+      }
+    }
+    return recordIds;
+  }
+
+  /**
+   * @description Validate object type against Schema to prevent SOQL injection
+   * @param objectType Object API name to validate
+   * @return Boolean True if object type exists in Schema, false otherwise
+   */
+  private static Boolean isValidObjectType(String objectType) {
+    if (String.isBlank(objectType)) {
+      return false;
+    }
+    
+    try {
+      Schema.SObjectType sObjType = Schema.getGlobalDescribe().get(objectType);
+      return sObjType != null;
+    } catch (Exception ex) {
+      return false;
+    }
+  }
+
+  /**
+   * @description Infer object type from Id prefix (simplified)
+   * @param prefix First 3 characters of Salesforce Id
+   * @return String Object type name or null if unknown
+   */
+  private static String inferObjectTypeFromPrefix(String prefix) {
+    // Common standard object prefixes
+    Map<String, String> prefixMap = new Map<String, String>{
+      '001' => 'Account',
+      '003' => 'Contact',
+      '006' => 'Opportunity',
+      '00Q' => 'Lead',
+      '500' => 'Case',
+      '00T' => 'Task',
+      '00U' => 'Event'
+    };
+    
+    return prefixMap.get(prefix);
+  }
+
+  /**
+   * @description Enhance SOQL query with standard fields if they're missing
+   * Automatically injects Id, Name, CreatedDate, LastModifiedDate if not already present
+   * Used when showAllRecordsFilter is enabled to ensure common columns are available
+   * @param query Normalized SOQL query string
+   * @return String Enhanced query with standard fields added if missing
+   */
+  /**
+   * @description Enhance SOQL query with standard fields if they're missing
+   * Automatically injects Id, Name, CreatedDate, LastModifiedDate if not already present
+   * Used when showAllRecordsFilter is enabled to ensure common columns are available
+   * @param query Normalized SOQL query string
+   * @return String Enhanced query with standard fields added if missing
+   */
+  private static String enhanceSOQLWithStandardFields(String query) {
+    if (String.isBlank(query)) {
+      return query;
+    }
+
+    // Standard fields to ensure are present (exist on all standard objects)
+    // Note: Id is almost always present, but we check for all to be safe
+    Set<String> standardFields = new Set<String>{ 'Id', 'Name', 'CreatedDate', 'LastModifiedDate' };
+    
+    // Parse SELECT clause (everything between SELECT and FROM)
+    String queryUpper = query.toUpperCase();
+    Integer selectIndex = queryUpper.indexOf('SELECT');
+    Integer fromIndex = queryUpper.indexOf(' FROM');
+    
+    if (selectIndex < 0 || fromIndex < 0 || fromIndex <= selectIndex) {
+      // Invalid query structure - return as-is to avoid breaking query
+      return query;
+    }
+    
+    // Check for complex queries (subqueries, aggregate functions) - skip enhancement to be safe
+    // Simple check: if SELECT contains parentheses (likely subquery or function), skip
+    String selectClauseOriginal = query.substring(selectIndex + 6, fromIndex).trim();
+    if (selectClauseOriginal.contains('(') || selectClauseOriginal.contains(')')) {
+      // Likely contains functions or subqueries - return as-is to avoid breaking
+      return query;
+    }
+    
+    // Extract SELECT clause and rest of query
+    String selectClause = selectClauseOriginal;
+    String restOfQuery = query.substring(fromIndex);
+    
+    // Parse fields from SELECT clause (handle commas, whitespace, case-insensitive)
+    Set<String> existingFields = new Set<String>();
+    List<String> fieldList = new List<String>();
+    
+    // Split by comma and process each field
+    List<String> parts = selectClause.split(',');
+    for (String part : parts) {
+      String field = part.trim();
+      if (String.isNotBlank(field)) {
+        // Remove any alias (AS keyword) for comparison
+        String fieldName = field;
+        Integer asIndex = field.toUpperCase().indexOf(' AS ');
+        if (asIndex > 0) {
+          fieldName = field.substring(0, asIndex).trim();
+        }
+        
+        // Handle relationship fields (Account.Name) - extract just the field name
+        // For standard fields, we check the base name (e.g., "Name" from "Account.Name")
+        String baseFieldName = fieldName;
+        if (fieldName.contains('.')) {
+          List<String> fieldParts = fieldName.split('\\.');
+          baseFieldName = fieldParts[fieldParts.size() - 1]; // Get last part
+        }
+        
+        // Store original field (with alias if present)
+        fieldList.add(field);
+        // Store base field name for comparison (case-insensitive)
+        existingFields.add(baseFieldName.toUpperCase());
+      }
+    }
+    
+    // Add missing standard fields (only if not already present)
+    for (String standardField : standardFields) {
+      if (!existingFields.contains(standardField.toUpperCase())) {
+        fieldList.add(standardField);
+      }
+    }
+    
+    // Rebuild query with enhanced SELECT clause
+    String enhancedSelectClause = String.join(fieldList, ', ');
+    return 'SELECT ' + enhancedSelectClause + restOfQuery;
+  }
+
+  /**
    * @description Normalize SOQL query by removing line breaks and excessive whitespace
    * Handles queries with \r\n, \n, and multiple spaces to prevent syntax errors
    * @param query Raw SOQL query string
@@ -649,6 +1017,15 @@ public with sharing class HM_ComponentDataService {
    * @description Replace merge fields and Apex binding syntax in SOQL query
    * Supported merge fields: {!UserId}, {!Today}, {!ThisMonth}
    * Supports Apex binding syntax: :UserInfo.getUserId(), :UserInfo.getUserId, etc.
+   * @param query SOQL query string with merge fields
+   * @param context Context map for custom merge fields
+   * @return String Query with merge fields replaced
+   */
+  /**
+   * @description Replace merge fields and Apex binding syntax in SOQL query
+   * Supported merge fields: {!UserId}, {!Today}, {!ThisMonth}
+   * Supports Apex binding syntax: :UserInfo.getUserId(), :UserInfo.getUserId, etc.
+   * Escapes string values to prevent SOQL injection
    * @param query SOQL query string with merge fields
    * @param context Context map for custom merge fields
    * @return String Query with merge fields replaced
@@ -728,6 +1105,13 @@ public with sharing class HM_ComponentDataService {
    * @param record SObject record to convert
    * @return Map<String, Object> Converted record with parent relationships handled
    *         Always includes Id field if present
+   */
+  /**
+   * @description Convert SObject to Map<String, Object>
+   * Supports parent relationships (single SObject) for fields like Owner.Name
+   * Recursively converts nested SObjects to Maps
+   * @param record SObject record to convert
+   * @return Map<String, Object> Map representation of the SObject
    */
   private static Map<String, Object> convertSObjectToMap(SObject record) {
     Map<String, Object> result = new Map<String, Object>();

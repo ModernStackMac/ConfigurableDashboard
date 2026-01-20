@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Show_All_Records_Filter__c</fullName>
+    <defaultValue>false</defaultValue>
+    <inlineHelpText>When enabled and multiple data sources exist, shows an 'All' tab that displays combined rows from all data sources.</inlineHelpText>
+    <label>Show All Records Filter</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>
