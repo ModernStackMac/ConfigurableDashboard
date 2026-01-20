@@ -16,7 +16,7 @@
   border-radius: var(--slds-g-radius-border-3, 12px);
   padding: var(--slds-g-spacing-6, 24px);
   box-shadow: var(--slds-g-shadow-1, 0 2px 4px rgba(0, 0, 0, 0.1));
-  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available in all SLDS2 themes */
   border: 1px solid rgba(0, 0, 0, 0.06);
   width: 100%;
   box-sizing: border-box;
@@ -74,6 +74,7 @@
 }
 
 /* Filter Group */
+/* SLDS2: Segmented button group with rounded outer corners, matching SLDS button group pattern */
 .cc-filter-group {
   display: flex;
   /* SLDS2: Using 1px as fallback - border width tokens may not be available */
@@ -94,13 +95,14 @@
   font-size: var(--slds-g-font-scale-2, 0.875rem);
   background: transparent;
   color: var(--slds-g-color-neutral-base-30, #444444);
-  border: none;
   /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  border: none;
   border-right: 1px solid var(--slds-g-color-neutral-base-60, #aeaeae);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   flex: 1;
+  /* Ensure buttons are evenly distributed */
 }
 
 /* SLDS2: Responsive design - allow wrapping on mobile devices to prevent overflow */
@@ -409,7 +411,8 @@
   align-items: center;
   margin-top: var(--slds-g-spacing-5, 20px);
   padding-top: var(--slds-g-spacing-4, 16px);
-  /*border-top: 1px solid #e0e0e0;*/
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  border-top: 1px solid var(--slds-g-color-neutral-base-80, #e0e0e0);
   gap: var(--slds-g-spacing-4, 16px);
 }
 

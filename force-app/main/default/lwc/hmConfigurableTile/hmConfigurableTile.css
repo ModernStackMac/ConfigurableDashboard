@@ -1,4 +1,4 @@
-/* ==================== KPI CARD ==================== */
+/* ==================== CSS CUSTOM PROPERTIES ==================== */
 /* SLDS2 Compliance: Using --slds-g-* global styling hooks for consistency and theming */
 :host {
   display: block;
@@ -18,7 +18,7 @@
   border-radius: var(--slds-g-radius-border-3, 12px);
   padding: var(--slds-g-spacing-5, 20px);
   box-shadow: var(--slds-g-shadow-1, 0 2px 4px rgba(0, 0, 0, 0.1));
-  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available in all SLDS2 themes */
   border: 1px solid rgba(0, 0, 0, 0.06);
   transition:
     transform 0.2s ease,
@@ -52,22 +52,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0;
-  gap: var(--slds-g-spacing-2, 8px);
-  min-height: 40px;
-}
-
-.cc-kpi-header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--slds-g-spacing-2, 8px);
-  flex: 1;
-  min-width: 0;
+  margin-bottom: var(--slds-g-spacing-4, 16px);
 }
 
 .cc-kpi-icon {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--slds-g-radius-border-2, 8px);
   display: flex;
   align-items: center;
@@ -75,11 +65,11 @@
   flex-shrink: 0;
 }
 
-/* SLDS2: Using color-mix() for icon backgrounds with rgba fallback for browser compatibility */
+/* SLDS2: Using color-mix() for modern browsers with rgba fallback for compatibility */
 .cc-kpi-icon--brand {
   /* Modern browsers: use color-mix with SLDS2 token */
   background: color-mix(in srgb, var(--slds-g-color-brand-1, #0176d3) 15%, transparent);
-  /* Fallback for older browsers */
+  /* Fallback for older browsers (IE11, older Safari) */
   background: rgba(1, 118, 211, 0.15);
 }
 
@@ -89,13 +79,13 @@
 
 .cc-dark .cc-kpi-icon--brand {
   /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-brand-2, #1b96ff) 20%, transparent);
+  background: color-mix(in srgb, var(--slds-g-color-brand-3, #1b96ff) 20%, transparent);
   /* Fallback for older browsers */
   background: rgba(27, 150, 255, 0.2);
 }
 
 .cc-dark .cc-kpi-icon--brand lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-brand-2, #1b96ff);
+  --lwc-colorTextIconDefault: var(--slds-g-color-brand-3, #1b96ff);
 }
 
 .cc-kpi-icon--alert {
@@ -180,10 +170,9 @@
   font-size: var(--slds-g-font-scale-2, 0.875rem);
   font-weight: var(--slds-g-font-weight-medium, 500);
   padding: var(--slds-g-spacing-1, 4px) var(--slds-g-spacing-2, 8px);
-  border-radius: var(--slds-g-radius-border-4, 20px);
+  border-radius: var(--slds-g-radius-border-4, 16px);
 }
 
-/* SLDS2: Using color-mix() for change indicator backgrounds with rgba fallback */
 .cc-kpi-change--up {
   /* Modern browsers: use color-mix with SLDS2 token */
   background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 15%, transparent);
@@ -246,7 +235,14 @@
   min-height: 28px;
 }
 
-/* SLDS2: Using color-mix() for badge backgrounds and borders with rgba fallback */
+/* SLDS2: Responsive design - allow wrapping on mobile devices to prevent overflow */
+@media (max-width: 480px) {
+  .cc-kpi-badge {
+    white-space: normal;
+    word-break: break-word;
+  }
+}
+
 .cc-kpi-badge--up {
   /* Modern browsers: use color-mix with SLDS2 token */
   background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 12%, transparent);
@@ -254,8 +250,9 @@
   background: rgba(46, 132, 74, 0.12);
   color: var(--slds-g-color-success-1, #2e844a);
   /* SLDS2: Using 1px as fallback - border width tokens may not be available */
-  border: 1px solid rgba(46, 132, 74, 0.2); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 20%, transparent); /* Modern */
+  border: 1px solid rgba(46, 132, 74, 0.2);
+  /* Modern browsers: use color-mix with SLDS2 token for border color */
+  border-color: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 20%, transparent);
 }
 
 .cc-kpi-badge--up lightning-icon {
@@ -269,8 +266,10 @@
   /* Fallback for older browsers */
   background: rgba(76, 175, 80, 0.15);
   color: var(--slds-g-color-success-2, #4caf50);
-  border: 1px solid rgba(76, 175, 80, 0.3); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 30%, transparent); /* Modern */
+  /* Fallback for older browsers */
+  border-color: rgba(76, 175, 80, 0.3);
+  /* Modern browsers: use color-mix with SLDS2 token */
+  border-color: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 30%, transparent);
 }
 
 .cc-dark .cc-kpi-badge--up lightning-icon {
@@ -284,8 +283,10 @@
   /* Fallback for older browsers */
   background: rgba(234, 0, 30, 0.12);
   color: var(--slds-g-color-error-1, #ea001e);
-  border: 1px solid rgba(234, 0, 30, 0.2); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent); /* Modern */
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  border: 1px solid rgba(234, 0, 30, 0.2);
+  /* Modern browsers: use color-mix with SLDS2 token for border color */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent);
 }
 
 .cc-kpi-badge--down lightning-icon {
@@ -299,8 +300,10 @@
   /* Fallback for older browsers */
   background: rgba(255, 82, 82, 0.15);
   color: var(--slds-g-color-error-2, #ff5252);
-  border: 1px solid rgba(255, 82, 82, 0.3); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 30%, transparent); /* Modern */
+  /* Fallback for older browsers */
+  border-color: rgba(255, 82, 82, 0.3);
+  /* Modern browsers: use color-mix with SLDS2 token */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 30%, transparent);
 }
 
 .cc-dark .cc-kpi-badge--down lightning-icon {
@@ -314,8 +317,10 @@
   /* Fallback for older browsers */
   background: rgba(116, 116, 116, 0.1);
   color: var(--slds-g-color-neutral-base-50, #747474);
-  border: 1px solid rgba(116, 116, 116, 0.15); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-50, #747474) 15%, transparent); /* Modern */
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  border: 1px solid rgba(116, 116, 116, 0.15);
+  /* Modern browsers: use color-mix with SLDS2 token for border color */
+  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-50, #747474) 15%, transparent);
 }
 
 .cc-kpi-badge--zero lightning-icon {
@@ -329,8 +334,10 @@
   /* Fallback for older browsers */
   background: rgba(160, 160, 160, 0.12);
   color: var(--slds-g-color-neutral-base-40, #a0a0a0);
-  border: 1px solid rgba(160, 160, 160, 0.2); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-40, #a0a0a0) 20%, transparent); /* Modern */
+  /* Fallback for older browsers */
+  border-color: rgba(160, 160, 160, 0.2);
+  /* Modern browsers: use color-mix with SLDS2 token */
+  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-40, #a0a0a0) 20%, transparent);
 }
 
 .cc-dark .cc-kpi-badge--zero lightning-icon {
@@ -351,13 +358,9 @@
 .cc-kpi-label {
   font-size: var(--slds-g-font-scale-2, 0.875rem);
   color: var(--slds-g-color-neutral-base-50, #747474);
-  margin: 0;
+  margin: 0 0 var(--slds-g-spacing-2, 8px) 0;
   transition: color 0.3s ease;
   font-weight: var(--slds-g-font-weight-medium, 500);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 1;
 }
 
 .cc-dark .cc-kpi-label {
@@ -365,13 +368,11 @@
 }
 
 .cc-kpi-value {
-  font-size: var(--slds-g-font-scale-6, 2rem);
+  font-size: var(--slds-g-font-scale-7, 1.75rem);
   font-weight: var(--slds-g-font-weight-bold, 700);
   color: var(--slds-g-color-neutral-base-10, #181818);
-  margin: var(--slds-g-spacing-2, 8px) 0 var(--slds-g-spacing-3, 12px) 0;
+  margin: 0;
   transition: color 0.3s ease;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
 }
 
 .cc-dark .cc-kpi-value {
@@ -379,7 +380,7 @@
 }
 
 .cc-kpi-subtitle-spacer {
-  padding-top: var(--slds-g-spacing-2, 8px);
+  margin-top: auto;
   min-height: 1.2em;
 }
 
@@ -388,8 +389,6 @@
   color: var(--slds-g-color-neutral-base-50, #747474);
   margin: 0;
   transition: color 0.3s ease;
-  line-height: 1.5;
-  max-width: 100%;
 }
 
 .cc-dark .cc-kpi-subtitle {

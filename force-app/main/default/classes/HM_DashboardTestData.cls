@@ -309,8 +309,7 @@ public with sharing class HM_DashboardTestData implements Callable {
     Decimal lastMonth = (Decimal) (lastMonthResults.isEmpty() || lastMonthResults[0].get('oppCount') == null 
       ? 0 : lastMonthResults[0].get('oppCount'));
 
-    //return calculatePercentageChange(thisMonth, lastMonth);
-    return -24.5;
+    return calculatePercentageChange(thisMonth, lastMonth);
   }
 
   /**
