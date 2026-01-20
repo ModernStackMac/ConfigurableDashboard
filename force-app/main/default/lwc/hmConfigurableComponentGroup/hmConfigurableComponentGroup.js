@@ -60,10 +60,26 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
     if (data) {
       this.groupConfig = data;
       this.error = null;
+      // Apply dynamic CSS custom property for components per row
+      this.applyComponentsPerRowStyle();
     } else if (error) {
       this.error = error;
     }
     this.isLoading = false;
+  }
+
+  /**
+   * @description Apply CSS custom property for components per row
+   * Sets --components-per-row CSS variable on the layout container
+   */
+  applyComponentsPerRowStyle() {
+    // Use setTimeout to ensure DOM is ready
+    setTimeout(() => {
+      const layoutElement = this.template.querySelector(`.${this.layoutClass}`);
+      if (layoutElement && this.componentsPerRow) {
+        layoutElement.style.setProperty('--components-per-row', this.componentsPerRow);
+      }
+    }, 0);
   }
 
 
@@ -75,6 +91,17 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
     return this.isDarkMode
       ? HM_ConfigurableComponentGroup.CSS_CLASSES.CONTAINER_DARK
       : HM_ConfigurableComponentGroup.CSS_CLASSES.CONTAINER;
+  }
+
+  /**
+   * @description Get components per row value from configuration
+   * @return {Number|null} Number of components per row, or null if not set
+   */
+  get componentsPerRow() {
+    if (!this.groupConfig || this.groupConfig.componentsPerRow == null) {
+      return null;
+    }
+    return this.groupConfig.componentsPerRow;
   }
 
   /**
@@ -99,6 +126,17 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
     
     // Default to horizontal
     return HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_HORIZONTAL;
+  }
+
+  /**
+   * @description Get dynamic style string for layout based on components per row
+   * @return {String} CSS style string with --components-per-row custom property
+   */
+  get layoutStyle() {
+    if (this.componentsPerRow) {
+      return `--components-per-row: ${this.componentsPerRow};`;
+    }
+    return '';
   }
 
   /**
@@ -176,5 +214,15 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
    */
   get errorMessage() {
     return this.extractErrorMessage(this.error);
+  }
+
+  /**
+   * @description Lifecycle hook called after component renders
+   * Applies components per row styling after render
+   */
+  renderedCallback() {
+    if (this.groupConfig && this.componentsPerRow) {
+      this.applyComponentsPerRowStyle();
+    }
   }
 }
