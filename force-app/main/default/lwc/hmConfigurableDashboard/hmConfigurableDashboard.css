@@ -62,7 +62,7 @@
   transition: all 0.2s ease;
 }
 
-/* SLDS2: Additional CSS to ensure icon scales properly */
+/* SLDS2: Additional CSS to ensure icon scales properly when slotted or direct child */
 .cc-actions-menu ::slotted(lightning-icon),
 .cc-actions-menu lightning-icon {
   --slds-c-icon-sizing-height: 1.75rem;

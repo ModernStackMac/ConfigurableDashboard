@@ -14,12 +14,16 @@
         </template>
 
         <template if:false={error}>
+          <!-- Header: Icon + Title inline, Badge on right -->
           <div class="cc-kpi-header">
-            <div class={tileData.iconClass}>
-              <lightning-icon
-                icon-name={tileData.iconName}
-                size="small"
-              ></lightning-icon>
+            <div class="cc-kpi-header-left">
+              <div class={tileData.iconClass}>
+                <lightning-icon
+                  icon-name={tileData.iconName}
+                  size="small"
+                ></lightning-icon>
+              </div>
+              <p class="cc-kpi-label">{title}</p>
             </div>
             <template if:true={tileData.badge}>
               <div class={tileData.badge.class}>
@@ -34,8 +38,9 @@
               </div>
             </template>
           </div>
-          <p class="cc-kpi-label">{title}</p>
+          <!-- Value: Most prominent, left-aligned -->
           <p class="cc-kpi-value">{tileData.value}</p>
+          <!-- Subtitle: Additional context at bottom with proper spacing -->
           <div class="cc-kpi-subtitle-spacer">
             <template if:true={subtitle}>
               <p class="cc-kpi-subtitle">{subtitle}</p>
