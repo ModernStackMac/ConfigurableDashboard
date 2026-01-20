@@ -1,23 +1,14 @@
-/* ==================== CSS CUSTOM PROPERTIES ==================== */
+/* ==================== CONTAINER ==================== */
+/* SLDS2 Compliance: Using --slds-g-* global styling hooks for consistency and theming */
 :host {
-  --cc-spacing-xs: 4px;
-  --cc-spacing-sm: 8px;
-  --cc-spacing-md: 16px;
-  --cc-spacing-lg: 24px;
-  --cc-spacing-xl: 32px;
-  --cc-radius-sm: 6px;
-  --cc-radius-md: 8px;
-  --cc-radius-lg: 12px;
-  --cc-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
-  --cc-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
   display: block;
   width: 100%;
 }
 
 /* ==================== CONTAINER ==================== */
 .cc-container {
-  padding: var(--cc-spacing-lg);
-  background: #f3f3f3;
+  padding: var(--slds-g-spacing-6, 24px);
+  background: var(--slds-g-color-neutral-base-95, #f3f3f3);
   min-height: 100%;
   transition: background 0.3s ease;
   width: 100%;
@@ -25,7 +16,7 @@
 }
 
 .cc-container.cc-dark {
-  background: #121212;
+  background: var(--slds-g-color-neutral-base-10, #121212);
 }
 
 /* ==================== WELCOME BANNER ==================== */
@@ -33,91 +24,78 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--cc-spacing-lg);
+  margin-bottom: var(--slds-g-spacing-6, 24px);
 }
 
 .cc-welcome-heading {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #181818;
-  margin: 0 0 4px 0;
+  font-size: var(--slds-g-font-scale-5, 1.5rem);
+  font-weight: var(--slds-g-font-weight-semibold, 600);
+  color: var(--slds-g-color-neutral-base-10, #181818);
+  margin: 0 0 var(--slds-g-spacing-1, 4px) 0;
   transition: color 0.3s ease;
 }
 
 .cc-dark .cc-welcome-heading {
-  color: #ffffff;
+  color: var(--slds-g-color-neutral-base-100, #ffffff);
 }
 
 .cc-welcome-subtext {
-  font-size: 0.875rem;
-  color: #747474;
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
+  color: var(--slds-g-color-neutral-base-50, #747474);
   margin: 0;
   transition: color 0.3s ease;
 }
 
 .cc-dark .cc-welcome-subtext {
-  color: #a0a0a0;
+  color: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }
 
 /* Actions Menu Button - Light Mode */
-/* Square button with rounded corners (modern look) */
+/* SLDS2: Component-specific SLDS tokens (--slds-c-button-*) use SLDS2 global tokens in values */
+/* SLDS2: Uses "bare" variant to match SLDS icon with dropdown pattern (icon only, no container) */
 .cc-actions-menu {
-  --slds-c-button-color-background: #ffffff;
-  --slds-c-button-color-border: #aeaeae;
-  --slds-c-button-text-color: #444444;
-  --slds-c-button-radius-border: 0.25rem;
-  --slds-c-button-sizing-height: 44px;
-  --slds-c-button-sizing-width: 44px;
-  --slds-c-button-icon-sizing-height: 44px;
-  --slds-c-button-icon-sizing-width: 44px;
+  --slds-c-button-text-color: var(--slds-g-color-neutral-base-30, #444444);
+  /* SLDS2: Increase icon size beyond "large" by overriding icon sizing tokens */
+  /* Adjust these values to make icon bigger: 1.5rem = 24px, 1.75rem = 28px, 2rem = 32px */
+  --slds-c-button-icon-sizing-height: 1.75rem;
+  --slds-c-button-icon-sizing-width: 1.75rem;
   transition: all 0.2s ease;
-  display: inline-block;
-  min-width: 44px;
-  min-height: 44px;
-  width: 44px;
-  height: 44px;
 }
 
 .cc-actions-menu--open {
-  --slds-c-button-color-background: #0176d3;
-  --slds-c-button-color-border: #0176d3;
-  --slds-c-button-text-color: #ffffff;
+  /* SLDS2: Active state uses brand color for icon and dropdown caret */
+  --slds-c-button-text-color: var(--slds-g-color-brand-1, #0176d3);
 }
 
 /* Actions Menu Button - Dark Mode */
+/* SLDS2: Dark mode uses bare-inverse variant styling */
 :host(.cc-dark) .cc-actions-menu,
 .cc-dark .cc-actions-menu {
-  --slds-c-button-color-background: #1e1e1e;
-  --slds-c-button-color-border: #333;
-  --slds-c-button-text-color: #a0a0a0;
+  --slds-c-button-text-color: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }
 
 :host(.cc-dark) .cc-actions-menu--open,
 .cc-dark .cc-actions-menu--open {
-  --slds-c-button-color-background: #1b96ff;
-  --slds-c-button-color-border: #1b96ff;
-  --slds-c-button-text-color: #ffffff;
+  /* SLDS2: Active state in dark mode uses brand color */
+  --slds-c-button-text-color: var(--slds-g-color-brand-2, #1b96ff);
 }
 
 /* Menu Dropdown Styling - Global styles for popover (rendered outside shadow DOM) */
-:host {
-  /* Light mode menu defaults */
-}
-
+/* SLDS2: Component-specific SLDS tokens (--slds-c-menu-*) use SLDS2 global tokens in values */
 :host(.cc-dark) {
   /* Dark mode - these CSS variables may be picked up by menu items */
-  --slds-c-menu-color-background: #1e1e1e;
-  --slds-c-menu-color-border: #333;
-  --slds-c-menu-text-color: #ffffff;
+  --slds-c-menu-color-background: var(--slds-g-color-neutral-base-10, #1e1e1e);
+  --slds-c-menu-color-border: var(--slds-g-color-neutral-base-20, #333333);
+  --slds-c-menu-text-color: var(--slds-g-color-neutral-base-100, #ffffff);
 }
 
 /* Note: Menu dropdown styling is limited due to shadow DOM.
-   The variant="border-inverse" should handle dark mode button styling.
+   The variant="bare-inverse" should handle dark mode button styling.
    Menu dropdown items may need to be styled via global CSS or theme settings. */
 
 /* ==================== DASHBOARD GROUPS ==================== */
 .cc-dashboard-group {
-  margin-bottom: var(--cc-spacing-lg);
+  margin-bottom: var(--slds-g-spacing-6, 24px);
   width: 100%;
   box-sizing: border-box;
 }
@@ -131,33 +109,38 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: var(--cc-spacing-xl);
+  padding: var(--slds-g-spacing-8, 32px);
   min-height: 400px;
 }
 
+/* SLDS2: Error message uses color-mix() for border color with rgba fallback for browser compatibility */
 .cc-error-message {
-  padding: var(--cc-spacing-lg);
-  color: #ea001e;
-  font-size: 0.875rem;
+  padding: var(--slds-g-spacing-6, 24px);
+  color: var(--slds-g-color-error-1, #ea001e);
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
   text-align: center;
-  background: #ffffff;
-  border-radius: var(--cc-radius-md);
-  border: 1px solid rgba(234, 0, 30, 0.2);
+  background: var(--slds-g-color-neutral-base-100, #ffffff);
+  border-radius: var(--slds-g-radius-border-2, 8px);
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  border: 1px solid rgba(234, 0, 30, 0.2); /* Fallback */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent); /* Modern */
 }
 
 .cc-dark .cc-error-message {
-  color: #ff5252;
-  background: #1e1e1e;
-  border-color: rgba(255, 82, 82, 0.2);
+  color: var(--slds-g-color-error-2, #ff5252);
+  background: var(--slds-g-color-neutral-base-10, #1e1e1e);
+  /* SLDS2: Using color-mix() for dark mode error border */
+  border: 1px solid rgba(255, 82, 82, 0.2); /* Fallback */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent); /* Modern */
 }
 
 .cc-empty-dashboard {
-  padding: var(--cc-spacing-xl);
+  padding: var(--slds-g-spacing-8, 32px);
   text-align: center;
-  color: #747474;
-  font-size: 0.875rem;
+  color: var(--slds-g-color-neutral-base-50, #747474);
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
 }
 
 .cc-dark .cc-empty-dashboard {
-  color: #a0a0a0;
+  color: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }

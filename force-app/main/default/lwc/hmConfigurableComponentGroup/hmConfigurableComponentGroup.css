@@ -1,12 +1,6 @@
-/* ==================== CSS CUSTOM PROPERTIES ==================== */
+/* ==================== LAYOUTS ==================== */
+/* SLDS2 Compliance: Using --slds-g-* global styling hooks for consistency and theming */
 :host {
-  --cc-spacing-xs: 4px;
-  --cc-spacing-sm: 8px;
-  --cc-spacing-md: 16px;
-  --cc-spacing-lg: 24px;
-  --cc-radius-sm: 6px;
-  --cc-radius-md: 8px;
-  --cc-radius-lg: 12px;
   display: block;
   width: 100%;
 }
@@ -15,7 +9,7 @@
 .hm-group-layout-horizontal {
   display: flex;
   flex-direction: row;
-  gap: var(--cc-spacing-md);
+  gap: var(--slds-g-spacing-4, 16px);
   flex-wrap: wrap;
   width: 100%;
   box-sizing: border-box;
@@ -31,7 +25,7 @@
 .hm-group-layout-vertical {
   display: flex;
   flex-direction: column;
-  gap: var(--cc-spacing-md);
+  gap: var(--slds-g-spacing-4, 16px);
   width: 100%;
 }
 
@@ -39,7 +33,7 @@
   display: grid;
   /* Use minmax to allow natural wrapping - if screen is too small, items wrap to fewer columns */
   grid-template-columns: repeat(var(--components-per-row, auto-fit), minmax(250px, 1fr));
-  gap: var(--cc-spacing-md);
+  gap: var(--slds-g-spacing-4, 16px);
   width: 100%;
 }
 
@@ -81,7 +75,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: var(--cc-spacing-xl);
+  padding: var(--slds-g-spacing-8, 32px);
   min-height: 100px;
 }
 
@@ -91,29 +85,34 @@
   box-sizing: border-box;
 }
 
+/* SLDS2: Error message uses color-mix() for border color with rgba fallback for browser compatibility */
 .hm-group-error {
-  padding: var(--cc-spacing-md);
-  color: #ea001e;
-  font-size: 0.875rem;
+  padding: var(--slds-g-spacing-4, 16px);
+  color: var(--slds-g-color-error-1, #ea001e);
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
   text-align: center;
-  background: #ffffff;
-  border-radius: var(--cc-radius-md);
-  border: 1px solid rgba(234, 0, 30, 0.2);
+  background: var(--slds-g-color-neutral-base-100, #ffffff);
+  border-radius: var(--slds-g-radius-border-2, 8px);
+  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
+  border: 1px solid rgba(234, 0, 30, 0.2); /* Fallback */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent); /* Modern */
 }
 
 .cc-dark .hm-group-error {
-  color: #ff5252;
-  background: #1e1e1e;
-  border-color: rgba(255, 82, 82, 0.2);
+  color: var(--slds-g-color-error-2, #ff5252);
+  background: var(--slds-g-color-neutral-base-10, #1e1e1e);
+  /* SLDS2: Using color-mix() for dark mode error border */
+  border: 1px solid rgba(255, 82, 82, 0.2); /* Fallback */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent); /* Modern */
 }
 
 .hm-group-empty {
-  padding: var(--cc-spacing-lg);
+  padding: var(--slds-g-spacing-6, 24px);
   text-align: center;
-  color: #747474;
-  font-size: 0.875rem;
+  color: var(--slds-g-color-neutral-base-50, #747474);
+  font-size: var(--slds-g-font-scale-2, 0.875rem);
 }
 
 .cc-dark .hm-group-empty {
-  color: #a0a0a0;
+  color: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }
