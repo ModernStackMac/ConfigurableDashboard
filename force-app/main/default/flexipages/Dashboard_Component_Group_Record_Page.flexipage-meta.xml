@@ -113,8 +113,8 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Max_Components__c</fieldItem>
-                <identifier>RecordHM_Max_Components_cField</identifier>
+                <fieldItem>Record.HM_Components_Per_Row__c</fieldItem>
+                <identifier>RecordHM_Components_Per_Row_cField</identifier>
             </fieldInstance>
         </itemInstances>
         <itemInstances>

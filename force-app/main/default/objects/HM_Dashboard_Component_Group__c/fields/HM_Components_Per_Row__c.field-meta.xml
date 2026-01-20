@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>HM_Max_Components__c</fullName>
+    <fullName>HM_Components_Per_Row__c</fullName>
     <externalId>false</externalId>
-    <inlineHelpText>Maximum number of components allowed in this group. Useful for enforcing layout constraints. Leave blank for unlimited components.</inlineHelpText>
-    <label>Max Components</label>
+    <inlineHelpText>Number of components to display per row. Only applicable for Horizontal and Grid layout types.</inlineHelpText>
+    <label>Components Per Row</label>
     <precision>18</precision>
     <required>false</required>
     <scale>0</scale>

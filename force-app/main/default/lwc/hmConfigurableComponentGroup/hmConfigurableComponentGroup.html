@@ -18,7 +18,7 @@
 
       <template if:false={error}>
         <template if:true={hasComponents}>
-          <div class={layoutClass}>
+          <div class={layoutClass} style={layoutStyle}>
             <template for:each={components} for:item="component">
               <div key={component.id} class="hm-group-item">
                 <template if:true={component.isTile}>

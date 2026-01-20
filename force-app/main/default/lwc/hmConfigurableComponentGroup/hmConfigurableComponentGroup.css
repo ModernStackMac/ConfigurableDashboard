@@ -21,6 +21,13 @@
   box-sizing: border-box;
 }
 
+/* Horizontal layout with components per row specified - use grid for better control */
+.hm-group-layout-horizontal[style*="--components-per-row"] {
+  display: grid;
+  /* Use minmax to allow natural wrapping when screen is too small */
+  grid-template-columns: repeat(var(--components-per-row, auto-fit), minmax(250px, 1fr));
+}
+
 .hm-group-layout-vertical {
   display: flex;
   flex-direction: column;
@@ -30,9 +37,28 @@
 
 .hm-group-layout-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  /* Use minmax to allow natural wrapping - if screen is too small, items wrap to fewer columns */
+  grid-template-columns: repeat(var(--components-per-row, auto-fit), minmax(250px, 1fr));
   gap: var(--cc-spacing-md);
   width: 100%;
+}
+
+/* Responsive: On smaller screens (mobile/tablet), reduce to single column */
+@media (max-width: 768px) {
+  .hm-group-layout-grid[style*="--components-per-row"],
+  .hm-group-layout-horizontal[style*="--components-per-row"] {
+    /* Force single column on mobile/tablet for better readability */
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+/* Responsive: On medium screens, limit to 2 columns max */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .hm-group-layout-grid[style*="--components-per-row"],
+  .hm-group-layout-horizontal[style*="--components-per-row"] {
+    /* Limit to 2 columns max on medium screens */
+    grid-template-columns: repeat(2, minmax(250px, 1fr));
+  }
 }
 
 .hm-group-item {

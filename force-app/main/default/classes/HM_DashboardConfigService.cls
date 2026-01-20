@@ -85,7 +85,7 @@ public with sharing class HM_DashboardConfigService {
           HM_Display_Order__c,
           HM_Component_Type__c,
           HM_Layout_Type__c,
-          HM_Max_Components__c
+          HM_Components_Per_Row__c
         FROM HM_Dashboard_Component_Group__c
         WHERE HM_Dashboard__c = :dashboard.Id
         ORDER BY HM_Display_Order__c ASC NULLS LAST
@@ -172,7 +172,7 @@ public with sharing class HM_DashboardConfigService {
           HM_Display_Order__c,
           HM_Component_Type__c,
           HM_Layout_Type__c,
-          HM_Max_Components__c
+          HM_Components_Per_Row__c
         FROM HM_Dashboard_Component_Group__c
         WHERE Id = :groupId
         LIMIT 1
@@ -399,7 +399,7 @@ public with sharing class HM_DashboardConfigService {
     mapData.put('displayOrder', componentGroup.HM_Display_Order__c);
     mapData.put('componentType', componentGroup.HM_Component_Type__c);
     mapData.put('layoutType', componentGroup.HM_Layout_Type__c);
-    mapData.put('maxComponents', componentGroup.HM_Max_Components__c);
+    mapData.put('componentsPerRow', componentGroup.HM_Components_Per_Row__c);
     return mapData;
   }
 

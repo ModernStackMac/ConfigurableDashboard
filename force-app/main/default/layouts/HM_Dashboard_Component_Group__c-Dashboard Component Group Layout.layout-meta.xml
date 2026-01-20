@@ -39,7 +39,7 @@
         <layoutColumns>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>HM_Max_Components__c</field>
+                <field>HM_Components_Per_Row__c</field>
             </layoutItems>
             <layoutItems>
                 <behavior>Required</behavior>
