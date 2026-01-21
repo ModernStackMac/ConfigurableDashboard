@@ -6,6 +6,15 @@
   padding-bottom: 1rem;
 }
 
+/* ==================== Loading Container ==================== */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 2rem;
+}
+
 /* ==================== Form Container (Page 1) ==================== */
 .form-container {
   max-width: 600px;
@@ -76,15 +85,34 @@
 }
 
 .icon-preview-container {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0.5rem;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
   background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
   border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
   border-radius: 0.25rem;
   min-height: 40px;
-  width: fit-content;
+}
+
+/* Icon Placeholder (when no valid icon) */
+.icon-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.icon-placeholder .placeholder-icon {
+  --slds-c-icon-color-foreground-default: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+.icon-placeholder .placeholder-text {
+  font-size: 0.6875rem;
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+  text-align: center;
 }
 
 /* ==================== Combobox Dropdown ==================== */
@@ -190,7 +218,76 @@
 /* ==================== Page 3 Layout (Filters Only) ==================== */
 .page3-container {
   max-width: 100%;
-  overflow: visible;
+}
+
+/* Filters Card (Page 3) */
+.filters-card {
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: 0.25rem;
+}
+
+/* Collapsible Section (reusable) */
+.collapsible-section {
+  position: relative;
+}
+
+.collapsible-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.collapsible-section-header:first-child {
+  border-radius: 0.25rem 0.25rem 0 0;
+}
+
+.collapsible-toggle-btn {
+  display: flex;
+  align-items: center;
+  color: var(--slds-g-color-neutral-base-10, #181818);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.collapsible-toggle-btn:hover {
+  color: var(--slds-g-color-brand-base-50, #0176d3);
+}
+
+.collapsible-section-content {
+  padding: 1rem;
+}
+
+.conditions-content {
+  padding: 0.75rem 1rem;
+}
+
+/* Quick Filters Inner */
+.quick-filters-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Query Limit Inner */
+.query-limit-inner {
+  padding: 1rem;
+}
+
+.query-limit-inner .slds-form-element__label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+/* Add Condition Button in header */
+.add-condition-btn {
+  flex-shrink: 0;
 }
 
 /* ==================== Page 4 Layout (Review & Save) ==================== */
@@ -239,13 +336,22 @@
   background-color: var(--slds-g-color-border-base-1, #e5e5e5);
 }
 
-/* Results Section Inner */
-.results-section-inner {
-  padding: 1rem;
+/* Results Section Header (Collapsible) */
+.results-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
 }
 
-.results-header {
-  margin-bottom: 0.75rem;
+.results-section-header .refresh-btn {
+  flex-shrink: 0;
+}
+
+/* Results Section Content */
+.results-section-content {
+  padding: 1rem;
 }
 
 .results-count {
@@ -265,13 +371,6 @@
 }
 
 /* Query Limit Section (Page 3) */
-.query-limit-section {
-  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
-  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
-  border-radius: 0.25rem;
-  padding: 1rem;
-}
-
 /* SOQL Preview Section */
 .soql-preview-section {
   width: 100%;
@@ -286,19 +385,7 @@
   overflow-y: auto;
 }
 
-/* ==================== Quick Filters ==================== */
-.quick-filters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
-  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
-  border-radius: 0.25rem;
-  padding: 0.5rem 1rem;
-}
-
-/* Owner Filter Toggle Buttons */
+/* ==================== Owner Filter Toggle Buttons ==================== */
 .owner-filter-btn {
   display: inline-flex;
   align-items: center;
@@ -326,23 +413,7 @@
   background-color: var(--slds-g-color-brand-base-40, #014486);
 }
 
-/* ==================== Conditions Section ==================== */
-.conditions-section {
-  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
-  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
-  border-radius: 0.25rem;
-  padding: 1rem;
-  max-height: 400px;
-  overflow-y: auto;
-  overflow-x: visible;
-}
-
-.conditions-header {
-  border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
+/* ==================== Conditions Container ==================== */
 .conditions-container {
   min-height: 60px;
   overflow: visible;

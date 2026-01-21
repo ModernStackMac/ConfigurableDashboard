@@ -123,6 +123,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   };
 
   componentType = null;
+  isIconNameConfirmed = false; // True after user blurs the icon name input
 
   // ==================== PAGE 2 STATE ====================
   @track page2Data = {
@@ -157,6 +158,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   
   // Query limit (null means no limit)
   queryLimit = null;
+  
+  // Collapsible section states for Page 3
+  isQuickFiltersExpanded = true;
+  isConditionsExpanded = true;
 
   // CodeMirror state
   codeMirrorInitialized = false;
@@ -169,6 +174,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   isQueryLoading = false;
   queryError = null;
   isSoqlSectionExpanded = true;
+  isResultsSectionExpanded = true;
 
   // ==================== COMMON STATE ====================
   isLoading = false;
@@ -245,6 +251,15 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    */
   handleRowIconNameChange(event) {
     this.formData.rowIconName = event.target.value || "";
+    // Reset confirmation when user types
+    this.isIconNameConfirmed = false;
+  }
+
+  /**
+   * @description Handle Row Icon Name input blur - confirms the icon preview
+   */
+  handleRowIconNameBlur() {
+    this.isIconNameConfirmed = true;
   }
 
   // ==================== ACTION HANDLERS ====================
@@ -561,6 +576,27 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    */
   toggleSoqlSection() {
     this.isSoqlSectionExpanded = !this.isSoqlSectionExpanded;
+  }
+
+  /**
+   * @description Toggle Results section expanded/collapsed
+   */
+  toggleResultsSection() {
+    this.isResultsSectionExpanded = !this.isResultsSectionExpanded;
+  }
+
+  /**
+   * @description Toggle Quick Filters section expanded/collapsed
+   */
+  toggleQuickFiltersSection() {
+    this.isQuickFiltersExpanded = !this.isQuickFiltersExpanded;
+  }
+
+  /**
+   * @description Toggle Conditions section expanded/collapsed
+   */
+  toggleConditionsSection() {
+    this.isConditionsExpanded = !this.isConditionsExpanded;
   }
 
   /**
@@ -1271,6 +1307,30 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
+   * @description Get icon for Results section toggle
+   * @returns {string} Icon name
+   */
+  get resultsSectionIcon() {
+    return this.isResultsSectionExpanded ? "utility:chevrondown" : "utility:chevronright";
+  }
+
+  /**
+   * @description Get icon for Quick Filters section toggle
+   * @returns {string} Icon name
+   */
+  get quickFiltersSectionIcon() {
+    return this.isQuickFiltersExpanded ? "utility:chevrondown" : "utility:chevronright";
+  }
+
+  /**
+   * @description Get icon for Conditions section toggle
+   * @returns {string} Icon name
+   */
+  get conditionsSectionIcon() {
+    return this.isConditionsExpanded ? "utility:chevrondown" : "utility:chevronright";
+  }
+
+  /**
    * @description Check if there are query results
    * @returns {boolean} True if results exist
    */
@@ -1451,7 +1511,15 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    * @returns {boolean} True if row icon name is valid
    */
   get showIconPreview() {
-    return this.showRowIconInput && this.isValidIconName;
+    return this.showRowIconInput && this.isValidIconName && this.isIconNameConfirmed;
+  }
+
+  /**
+   * @description Check if icon preview should show placeholder
+   * @returns {boolean} True if showing placeholder
+   */
+  get showIconPlaceholder() {
+    return this.showRowIconInput && !this.showIconPreview;
   }
 
   /**

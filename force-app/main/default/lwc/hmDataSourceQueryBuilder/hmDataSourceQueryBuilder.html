@@ -12,8 +12,8 @@
 
     <!-- Loading State -->
     <template if:true={isLoading}>
-      <div class="slds-align_absolute-center slds-m-vertical_large">
-        <lightning-spinner alternative-text="Loading..."></lightning-spinner>
+      <div class="loading-container">
+        <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
       </div>
     </template>
 
@@ -86,6 +86,7 @@
                   field-level-help="Icon displayed on each row in the list. Use format: utility:iconName, standard:iconName, action:iconName, custom:iconName, or doctype:iconName"
                   value={formData.rowIconName}
                   onchange={handleRowIconNameChange}
+                  onblur={handleRowIconNameBlur}
                   placeholder="utility:icon_name or standard:icon_name"
                   message-when-pattern-mismatch={iconNameError}>
                 </lightning-input>
@@ -94,15 +95,21 @@
                 </template>
               </div>
               <div class="slds-col slds-size_1-of-2 form-field-container icon-preview-col">
-                <template if:true={showIconPreview}>
-                  <label class="slds-form-element__label">Preview</label>
-                  <div class="icon-preview-container">
+                <label class="slds-form-element__label">Preview</label>
+                <div class="icon-preview-container">
+                  <template if:true={showIconPreview}>
                     <lightning-icon
                       icon-name={formData.rowIconName}
                       size="medium">
                     </lightning-icon>
-                  </div>
-                </template>
+                  </template>
+                  <template if:true={showIconPlaceholder}>
+                    <div class="icon-placeholder">
+                      <lightning-icon icon-name="utility:image" size="small" class="placeholder-icon"></lightning-icon>
+                      <span class="placeholder-text">Enter valid icon name</span>
+                    </div>
+                  </template>
+                </div>
               </div>
             </template>
           </div>
@@ -297,54 +304,70 @@
       <template if:true={isPage3}>
         <div class="slds-p-around_medium page3-container">
           
-          <!-- Quick Filters Section -->
-          <template if:true={hasOwnerField}>
-            <div class="quick-filters slds-m-bottom_medium">
-              <span class="slds-text-title_caps slds-m-right_small">Quick Filters:</span>
-              <button
-                class={ownedByMeButtonClass}
-                data-filter="me"
-                onclick={handleOwnerFilterToggle}
-                title="Filter by records owned by current user"
-                type="button">
-                <lightning-icon icon-name="utility:user" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
-                Owned By Me
-              </button>
-              <button
-                class={ownedByQueueButtonClass}
-                data-filter="queue"
-                onclick={handleOwnerFilterToggle}
-                title="Filter by records owned by queues"
-                type="button">
-                <lightning-icon icon-name="utility:groups" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
-                Owned By Queue
-              </button>
-            </div>
-          </template>
-
-          <!-- WHERE Conditions Section -->
-          <div class="conditions-section">
-            <div class="conditions-header slds-grid slds-grid_align-spread slds-m-bottom_small">
-              <div class="slds-col">
-                <h3 class="slds-text-heading_small">
-                  Conditions
-                  <template if:true={hasConditions}>
-                    <span class="slds-badge slds-badge_inverse slds-m-left_x-small">{conditionCount}</span>
-                  </template>
-                </h3>
+          <!-- Single Card containing all filter sections -->
+          <div class="filters-card">
+            
+            <!-- Quick Filters Section (Collapsible) -->
+            <template if:true={hasOwnerField}>
+              <div class="collapsible-section">
+                <div class="collapsible-section-header" onclick={toggleQuickFiltersSection}>
+                  <button type="button" class="slds-button collapsible-toggle-btn" aria-expanded={isQuickFiltersExpanded}>
+                    <lightning-icon icon-name={quickFiltersSectionIcon} size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                    <span class="slds-text-title_caps">Quick Filters</span>
+                  </button>
+                </div>
+                <template if:true={isQuickFiltersExpanded}>
+                  <div class="collapsible-section-content">
+                    <div class="quick-filters-inner">
+                      <button
+                        class={ownedByMeButtonClass}
+                        data-filter="me"
+                        onclick={handleOwnerFilterToggle}
+                        title="Filter by records owned by current user"
+                        type="button">
+                        <lightning-icon icon-name="utility:user" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                        Owned By Me
+                      </button>
+                      <button
+                        class={ownedByQueueButtonClass}
+                        data-filter="queue"
+                        onclick={handleOwnerFilterToggle}
+                        title="Filter by records owned by queues"
+                        type="button">
+                        <lightning-icon icon-name="utility:groups" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                        Owned By Queue
+                      </button>
+                    </div>
+                  </div>
+                </template>
               </div>
-              <div class="slds-col slds-no-flex">
+              <div class="section-divider"></div>
+            </template>
+
+            <!-- WHERE Conditions Section (Collapsible) -->
+            <div class="collapsible-section">
+              <div class="collapsible-section-header">
+                <button type="button" class="slds-button collapsible-toggle-btn" onclick={toggleConditionsSection} aria-expanded={isConditionsExpanded}>
+                  <lightning-icon icon-name={conditionsSectionIcon} size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                  <span class="slds-text-title_caps">
+                    Conditions
+                    <template if:true={hasConditions}>
+                      <span class="slds-badge slds-badge_inverse slds-m-left_x-small">{conditionCount}</span>
+                    </template>
+                  </span>
+                </button>
                 <lightning-button
                   label="Add Condition"
                   icon-name="utility:add"
                   onclick={handleAddCondition}
-                  variant="neutral">
+                  variant="neutral"
+                  class="add-condition-btn">
                 </lightning-button>
               </div>
-            </div>
-
-            <!-- Conditions List -->
-            <div class="conditions-container">
+              <template if:true={isConditionsExpanded}>
+                <div class="collapsible-section-content conditions-content">
+                  <!-- Conditions List -->
+                  <div class="conditions-container">
               <template if:true={hasConditions}>
                 <template for:each={conditionsWithMeta} for:item="cond">
                   <div key={cond.id} class="condition-row slds-grid slds-gutters_x-small">
@@ -517,40 +540,47 @@
                 </template>
               </template>
 
-              <!-- Empty State -->
-              <template if:false={hasConditions}>
-                <div class="empty-state slds-p-around_medium slds-text-align_center">
-                  <lightning-icon
-                    icon-name="utility:filterList"
-                    size="large"
-                    alternative-text="No conditions"
-                    class="slds-m-bottom_small empty-icon">
-                  </lightning-icon>
-                  <p class="slds-text-body_regular slds-text-color_weak">
-                    No conditions added yet
-                  </p>
-                  <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
-                    Click "Add Condition" to filter your query results
-                  </p>
+                  <!-- Empty State -->
+                  <template if:false={hasConditions}>
+                    <div class="empty-state slds-p-around_medium slds-text-align_center">
+                      <lightning-icon
+                        icon-name="utility:filterList"
+                        size="large"
+                        alternative-text="No conditions"
+                        class="slds-m-bottom_small empty-icon">
+                      </lightning-icon>
+                      <p class="slds-text-body_regular slds-text-color_weak">
+                        No conditions added yet
+                      </p>
+                      <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                        Click "Add Condition" to filter your query results
+                      </p>
+                    </div>
+                  </template>
+                  </div>
                 </div>
               </template>
             </div>
-          </div>
 
-          <!-- Query Limit Section -->
-          <div class="query-limit-section slds-m-top_medium">
-            <div class="slds-grid slds-gutters">
-              <div class="slds-col slds-size_1-of-3">
-                <lightning-input
-                  type="number"
-                  label="Query Limit"
-                  field-level-help="Maximum number of records to return. Leave empty for no limit."
-                  value={queryLimit}
-                  onchange={handleQueryLimitChange}
-                  min="1"
-                  max="50000"
-                  placeholder="No limit">
-                </lightning-input>
+            <!-- Section Divider -->
+            <div class="section-divider"></div>
+
+            <!-- Query Limit Section -->
+            <div class="query-limit-inner">
+              <label class="slds-form-element__label slds-text-title_caps slds-m-bottom_x-small">Query Limit</label>
+              <div class="slds-grid slds-gutters">
+                <div class="slds-col slds-size_1-of-3">
+                  <lightning-input
+                    type="number"
+                    label="Limit"
+                    value={queryLimit}
+                    onchange={handleQueryLimitChange}
+                    min="1"
+                    max="50000"
+                    placeholder="No limit"
+                    variant="label-hidden">
+                  </lightning-input>
+                </div>
               </div>
             </div>
           </div>
@@ -600,79 +630,88 @@
             <!-- Divider -->
             <div class="section-divider"></div>
 
-            <!-- Query Results Section -->
-            <div class="results-section-inner">
-              <div class="results-header slds-grid slds-grid_align-spread slds-m-bottom_small">
-                <div class="slds-col">
-                  <h3 class="slds-text-title_caps">
-                    Query Results Preview
-                    <template if:true={hasQueryResults}>
-                      <span class="slds-text-body_small slds-text-color_weak slds-m-left_small results-count">
-                        Showing {queryResultsCount} of {queryTotalCount} records
-                      </span>
-                    </template>
-                  </h3>
-                </div>
-                <div class="slds-col slds-no-flex">
-                  <lightning-button
-                    label="Refresh Preview"
-                    icon-name="utility:refresh"
-                    onclick={handleRefreshPreview}
-                    variant="neutral"
-                    disabled={isQueryLoading}>
-                  </lightning-button>
-                </div>
-              </div>
-
-              <!-- Loading State -->
-              <template if:true={isQueryLoading}>
-                <div class="slds-align_absolute-center slds-p-around_large results-loading">
-                  <lightning-spinner alternative-text="Loading preview..." size="medium"></lightning-spinner>
-                </div>
-              </template>
-
-              <!-- Query Error -->
-              <template if:true={queryError}>
-                <div class="slds-box slds-box_x-small slds-theme_error slds-m-bottom_medium">
-                  <div class="slds-text-color_error">
-                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-                    {queryError}
-                  </div>
-                </div>
-              </template>
-
-              <!-- Results Table -->
-              <template if:false={isQueryLoading}>
-                <template if:true={hasQueryResults}>
-                  <div class="results-table-container">
-                    <lightning-datatable
-                      key-field="Id"
-                    data={queryResults}
-                    columns={queryColumns}
-                    hide-checkbox-column
-                    show-row-number-column>
-                  </lightning-datatable>
-                </div>
-              </template>
-
-              <!-- Empty State -->
-              <template if:false={hasQueryResults}>
-                <template if:false={queryError}>
-                  <div class="empty-state slds-p-around_medium slds-text-align_center">
-                    <lightning-icon
-                      icon-name="utility:preview"
-                      size="large"
-                      alternative-text="No results"
-                      class="slds-m-bottom_small empty-icon">
-                    </lightning-icon>
-                    <p class="slds-text-body_regular slds-text-color_weak">
-                      No records found matching your criteria
-                    </p>
+            <!-- Query Results Section (Collapsible) -->
+            <div class="results-section-header">
+              <button
+                type="button"
+                class="slds-button collapsible-toggle-btn"
+                onclick={toggleResultsSection}
+                aria-expanded={isResultsSectionExpanded}>
+                <lightning-icon
+                  icon-name={resultsSectionIcon}
+                  size="x-small"
+                  class="slds-m-right_x-small">
+                </lightning-icon>
+                <span class="slds-text-title_caps">
+                  Query Results Preview
+                  <template if:true={hasQueryResults}>
+                    <span class="slds-text-body_small slds-text-color_weak slds-m-left_small results-count">
+                      Showing {queryResultsCount} of {queryTotalCount} records
+                    </span>
+                  </template>
+                </span>
+              </button>
+              <lightning-button
+                label="Refresh Preview"
+                icon-name="utility:refresh"
+                onclick={handleRefreshPreview}
+                variant="neutral"
+                disabled={isQueryLoading}
+                class="refresh-btn">
+              </lightning-button>
+            </div>
+            <template if:true={isResultsSectionExpanded}>
+              <div class="results-section-content">
+                <!-- Loading State -->
+                <template if:true={isQueryLoading}>
+                  <div class="slds-align_absolute-center slds-p-around_large results-loading">
+                    <lightning-spinner alternative-text="Loading preview..." size="medium"></lightning-spinner>
                   </div>
                 </template>
-              </template>
+
+                <!-- Query Error -->
+                <template if:true={queryError}>
+                  <div class="slds-box slds-box_x-small slds-theme_error slds-m-bottom_medium">
+                    <div class="slds-text-color_error">
+                      <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                      {queryError}
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Results Table -->
+                <template if:false={isQueryLoading}>
+                  <template if:true={hasQueryResults}>
+                    <div class="results-table-container">
+                      <lightning-datatable
+                        key-field="Id"
+                        data={queryResults}
+                        columns={queryColumns}
+                        hide-checkbox-column
+                        show-row-number-column>
+                      </lightning-datatable>
+                    </div>
+                  </template>
+
+                  <!-- Empty State -->
+                  <template if:false={hasQueryResults}>
+                    <template if:false={queryError}>
+                      <div class="empty-state slds-p-around_medium slds-text-align_center">
+                        <lightning-icon
+                          icon-name="utility:preview"
+                          size="large"
+                          alternative-text="No results"
+                          class="slds-m-bottom_small empty-icon">
+                        </lightning-icon>
+                        <p class="slds-text-body_regular slds-text-color_weak">
+                          No records found matching your criteria
+                        </p>
+                      </div>
+                    </template>
+                  </template>
+                </template>
+              </div>
             </template>
-            </div>
           </div>
 
           <!-- Error Display -->
