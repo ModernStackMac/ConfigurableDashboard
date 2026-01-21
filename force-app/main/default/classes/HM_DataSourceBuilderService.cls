@@ -221,12 +221,176 @@ public with sharing class HM_DataSourceBuilderService {
         fi.label = fieldDesc.getLabel();
         fi.type = String.valueOf(fieldDesc.getType());
         fi.isRequired = !fieldDesc.isNillable() && fieldDesc.isCreateable();
+        fi.isFilterable = fieldDesc.isFilterable();
+        
+        // Populate picklist values for picklist fields
+        Schema.DisplayType fieldType = fieldDesc.getType();
+        if (fieldType == Schema.DisplayType.PICKLIST || fieldType == Schema.DisplayType.MULTIPICKLIST) {
+          fi.picklistValues = new List<PicklistValue>();
+          for (Schema.PicklistEntry pe : fieldDesc.getPicklistValues()) {
+            if (pe.isActive()) {
+              PicklistValue pv = new PicklistValue();
+              pv.label = pe.getLabel();
+              pv.value = pe.getValue();
+              fi.picklistValues.add(pv);
+            }
+          }
+        }
+        
         fields.add(fi);
       }
     }
     
     fields.sort();
     return fields;
+  }
+  
+  /**
+   * @description Execute a preview query and return limited results
+   * @param objectApiName API name of the object to query
+   * @param fieldApiNames List of field API names to select
+   * @param whereClause WHERE clause conditions (without 'WHERE' keyword)
+   * @param queryLimit User-specified limit (used for count, preview always limited to 5)
+   * @return QueryResult Query results with columns, rows, and total count
+   */
+  @AuraEnabled(cacheable=false)
+  public static QueryResult executePreviewQuery(
+    String objectApiName,
+    List<String> fieldApiNames,
+    String whereClause,
+    Integer queryLimit
+  ) {
+    QueryResult result = new QueryResult();
+    result.columns = new List<ColumnInfo>();
+    result.rows = new List<Map<String, Object>>();
+    result.totalCount = 0;
+    
+    if (String.isBlank(objectApiName)) {
+      throw new AuraHandledException('Object API name is required');
+    }
+    if (fieldApiNames == null || fieldApiNames.isEmpty()) {
+      throw new AuraHandledException('At least one field is required');
+    }
+    
+    try {
+      // Validate object access
+      Schema.SObjectType objType = Schema.getGlobalDescribe().get(objectApiName);
+      if (objType == null || !objType.getDescribe().isAccessible() || !objType.getDescribe().isQueryable()) {
+        throw new AuraHandledException('Object not accessible: ' + objectApiName);
+      }
+      
+      // Build field list - ensure Id is always first
+      Set<String> fieldSet = new Set<String>();
+      List<String> orderedFields = new List<String>();
+      
+      // Add Id first if not already in list
+      if (!fieldApiNames.contains('Id')) {
+        orderedFields.add('Id');
+        fieldSet.add('Id');
+      }
+      
+      // Add remaining fields
+      Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
+      for (String fieldName : fieldApiNames) {
+        String lowerFieldName = fieldName.toLowerCase();
+        if (fieldMap.containsKey(lowerFieldName) && !fieldSet.contains(fieldName)) {
+          Schema.DescribeFieldResult fieldDesc = fieldMap.get(lowerFieldName).getDescribe();
+          if (fieldDesc.isAccessible()) {
+            orderedFields.add(fieldName);
+            fieldSet.add(fieldName);
+          }
+        }
+      }
+      
+      if (orderedFields.isEmpty()) {
+        throw new AuraHandledException('No accessible fields found');
+      }
+      
+      // Build column info
+      for (String fieldName : orderedFields) {
+        Schema.DescribeFieldResult fieldDesc = fieldMap.get(fieldName.toLowerCase()).getDescribe();
+        ColumnInfo col = new ColumnInfo();
+        col.apiName = fieldDesc.getName();
+        col.label = fieldDesc.getLabel();
+        col.type = String.valueOf(fieldDesc.getType());
+        result.columns.add(col);
+      }
+      
+      // Build SOQL query
+      String fieldList = String.join(orderedFields, ', ');
+      String soql = 'SELECT ' + fieldList + ' FROM ' + String.escapeSingleQuotes(objectApiName);
+      
+      // Add WHERE clause if provided
+      if (String.isNotBlank(whereClause)) {
+        // Replace merge fields
+        String processedWhere = whereClause;
+        if (processedWhere.contains(':UserInfo.getUserId()')) {
+          processedWhere = processedWhere.replace(':UserInfo.getUserId()', '\'' + String.escapeSingleQuotes(UserInfo.getUserId()) + '\'');
+        }
+        soql += ' WHERE ' + processedWhere;
+      }
+      
+      // Get total count (respecting user's limit if set)
+      String countSoql = 'SELECT COUNT() FROM ' + String.escapeSingleQuotes(objectApiName);
+      if (String.isNotBlank(whereClause)) {
+        String processedWhere = whereClause;
+        if (processedWhere.contains(':UserInfo.getUserId()')) {
+          processedWhere = processedWhere.replace(':UserInfo.getUserId()', '\'' + String.escapeSingleQuotes(UserInfo.getUserId()) + '\'');
+        }
+        countSoql += ' WHERE ' + processedWhere;
+      }
+      
+      Integer totalCount = Database.countQuery(countSoql);
+      
+      // Apply user limit to total count if specified
+      if (queryLimit != null && queryLimit > 0 && totalCount > queryLimit) {
+        result.totalCount = queryLimit;
+      } else {
+        result.totalCount = totalCount;
+      }
+      
+      // Always limit preview to 5 rows
+      soql += ' LIMIT 5';
+      
+      // Execute query
+      List<SObject> records = Database.query(soql);
+      
+      // Apply FLS stripping
+      SObjectAccessDecision decision = Security.stripInaccessible(AccessType.READABLE, records);
+      List<SObject> strippedRecords = decision.getRecords();
+      
+      // Convert to maps
+      for (SObject record : strippedRecords) {
+        Map<String, Object> recordMap = new Map<String, Object>();
+        for (String fieldName : orderedFields) {
+          try {
+            Object value = record.get(fieldName);
+            // Format the value for display
+            if (value instanceof Date) {
+              recordMap.put(fieldName, ((Date)value).format());
+            } else if (value instanceof Datetime) {
+              recordMap.put(fieldName, ((Datetime)value).format());
+            } else if (value instanceof Decimal) {
+              recordMap.put(fieldName, value);
+            } else if (value != null) {
+              recordMap.put(fieldName, String.valueOf(value));
+            } else {
+              recordMap.put(fieldName, null);
+            }
+          } catch (Exception e) {
+            recordMap.put(fieldName, null);
+          }
+        }
+        result.rows.add(recordMap);
+      }
+      
+    } catch (QueryException ex) {
+      throw new AuraHandledException('Query error: ' + ex.getMessage());
+    } catch (Exception ex) {
+      throw new AuraHandledException('Error executing preview: ' + ex.getMessage());
+    }
+    
+    return result;
   }
   
   // ==================== INNER CLASSES ====================
@@ -280,6 +444,8 @@ public with sharing class HM_DataSourceBuilderService {
     @AuraEnabled public String label;
     @AuraEnabled public String type;
     @AuraEnabled public Boolean isRequired;
+    @AuraEnabled public Boolean isFilterable;
+    @AuraEnabled public List<PicklistValue> picklistValues;
     
     public Integer compareTo(Object other) {
       FieldInfo otherField = (FieldInfo) other;
@@ -294,6 +460,32 @@ public with sharing class HM_DataSourceBuilderService {
       }
       return this.label.compareTo(otherField.label);
     }
+  }
+  
+  /**
+   * @description Picklist value wrapper for picklist fields
+   */
+  public class PicklistValue {
+    @AuraEnabled public String label;
+    @AuraEnabled public String value;
+  }
+  
+  /**
+   * @description Query result wrapper for preview execution
+   */
+  public class QueryResult {
+    @AuraEnabled public List<ColumnInfo> columns;
+    @AuraEnabled public List<Map<String, Object>> rows;
+    @AuraEnabled public Integer totalCount;
+  }
+  
+  /**
+   * @description Column information wrapper for datatable
+   */
+  public class ColumnInfo {
+    @AuraEnabled public String apiName;
+    @AuraEnabled public String label;
+    @AuraEnabled public String type;
   }
   
   // ============================================================================

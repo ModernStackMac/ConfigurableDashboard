@@ -4,7 +4,9 @@
     <div class="slds-p-horizontal_medium slds-p-top_medium progress-container">
       <lightning-progress-indicator current-step={currentStepValue} type="base" variant="base">
         <lightning-progress-step label="Basic Info" value="1"></lightning-progress-step>
-        <lightning-progress-step label="Select Object" value="2"></lightning-progress-step>
+        <lightning-progress-step label="Object & Fields" value="2"></lightning-progress-step>
+        <lightning-progress-step label="Filters" value="3"></lightning-progress-step>
+        <lightning-progress-step label="Review" value="4"></lightning-progress-step>
       </lightning-progress-indicator>
     </div>
 
@@ -79,28 +81,28 @@
             <!-- Row 3: Row Icon Name (only for List type) -->
             <template if:true={showRowIconInput}>
               <div class="slds-col slds-size_1-of-2 form-field-container">
-                <div class="slds-form-element">
-                  <label class="slds-form-element__label">Row Icon Name</label>
-                  <div class="slds-form-element__control icon-input-container">
-                    <lightning-input
-                      value={formData.rowIconName}
-                      onchange={handleRowIconNameChange}
-                      placeholder="utility:icon_name or standard:icon_name"
-                      message-when-pattern-mismatch={iconNameError}
-                      variant="label-hidden">
-                    </lightning-input>
-                    <template if:true={showIconPreview}>
-                      <lightning-icon
-                        icon-name={formData.rowIconName}
-                        size="small"
-                        class="slds-m-left_small">
-                      </lightning-icon>
-                    </template>
+                <lightning-input
+                  label="Row Icon Name"
+                  field-level-help="Icon displayed on each row in the list. Use format: utility:iconName, standard:iconName, action:iconName, custom:iconName, or doctype:iconName"
+                  value={formData.rowIconName}
+                  onchange={handleRowIconNameChange}
+                  placeholder="utility:icon_name or standard:icon_name"
+                  message-when-pattern-mismatch={iconNameError}>
+                </lightning-input>
+                <template if:true={iconNameError}>
+                  <div class="slds-form-element__help slds-text-color_error">{iconNameError}</div>
+                </template>
+              </div>
+              <div class="slds-col slds-size_1-of-2 form-field-container icon-preview-col">
+                <template if:true={showIconPreview}>
+                  <label class="slds-form-element__label">Preview</label>
+                  <div class="icon-preview-container">
+                    <lightning-icon
+                      icon-name={formData.rowIconName}
+                      size="medium">
+                    </lightning-icon>
                   </div>
-                  <template if:true={iconNameError}>
-                    <div class="slds-form-element__help slds-text-color_error">{iconNameError}</div>
-                  </template>
-                </div>
+                </template>
               </div>
             </template>
           </div>
@@ -290,11 +292,404 @@
           </template>
         </div>
       </template>
+
+      <!-- ==================== PAGE 3: Filters ==================== -->
+      <template if:true={isPage3}>
+        <div class="slds-p-around_medium page3-container">
+          
+          <!-- Quick Filters Section -->
+          <template if:true={hasOwnerField}>
+            <div class="quick-filters slds-m-bottom_medium">
+              <span class="slds-text-title_caps slds-m-right_small">Quick Filters:</span>
+              <button
+                class={ownedByMeButtonClass}
+                data-filter="me"
+                onclick={handleOwnerFilterToggle}
+                title="Filter by records owned by current user"
+                type="button">
+                <lightning-icon icon-name="utility:user" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                Owned By Me
+              </button>
+              <button
+                class={ownedByQueueButtonClass}
+                data-filter="queue"
+                onclick={handleOwnerFilterToggle}
+                title="Filter by records owned by queues"
+                type="button">
+                <lightning-icon icon-name="utility:groups" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                Owned By Queue
+              </button>
+            </div>
+          </template>
+
+          <!-- WHERE Conditions Section -->
+          <div class="conditions-section">
+            <div class="conditions-header slds-grid slds-grid_align-spread slds-m-bottom_small">
+              <div class="slds-col">
+                <h3 class="slds-text-heading_small">
+                  Conditions
+                  <template if:true={hasConditions}>
+                    <span class="slds-badge slds-badge_inverse slds-m-left_x-small">{conditionCount}</span>
+                  </template>
+                </h3>
+              </div>
+              <div class="slds-col slds-no-flex">
+                <lightning-button
+                  label="Add Condition"
+                  icon-name="utility:add"
+                  onclick={handleAddCondition}
+                  variant="neutral">
+                </lightning-button>
+              </div>
+            </div>
+
+            <!-- Conditions List -->
+            <div class="conditions-container">
+              <template if:true={hasConditions}>
+                <template for:each={conditionsWithMeta} for:item="cond">
+                  <div key={cond.id} class="condition-row slds-grid slds-gutters_x-small">
+                    <!-- Conjunction (AND/OR) or WHERE label -->
+                    <div class="slds-col conjunction-col">
+                      <template if:true={cond.showConjunction}>
+                        <lightning-combobox
+                          label="Logic"
+                          value={cond.conjunction}
+                          options={conjunctionOptions}
+                          data-id={cond.id}
+                          onchange={handleConditionConjunctionChange}
+                          variant="label-hidden">
+                        </lightning-combobox>
+                      </template>
+                      <template if:false={cond.showConjunction}>
+                        <span class="where-label">WHERE</span>
+                      </template>
+                    </div>
+
+                    <!-- Field Selector - Searchable Input -->
+                    <div class="slds-col slds-grow field-combobox-wrapper">
+                      <div class="slds-combobox_container">
+                        <div class="slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click" role="combobox">
+                          <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                            <input
+                              type="text"
+                              class="slds-input slds-combobox__input"
+                              role="textbox"
+                              placeholder="Search fields..."
+                              value={cond.fieldSearchTerm}
+                              data-id={cond.id}
+                              oninput={handleConditionFieldSearchInput}
+                              onfocus={handleConditionFieldFocus}
+                              onblur={handleConditionFieldBlur}
+                              autocomplete="off" />
+                            <span class="slds-icon_container slds-input__icon slds-input__icon_right">
+                              <lightning-icon icon-name="utility:search" size="x-small" alternative-text="Search"></lightning-icon>
+                            </span>
+                          </div>
+                          <template if:true={cond.isFieldListOpen}>
+                            <div class="field-dropdown" role="listbox">
+                              <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                <template for:each={cond.filteredFieldOptions} for:item="field">
+                                  <li key={field.apiName} role="presentation" class="slds-listbox__item">
+                                    <div
+                                      class="slds-media slds-listbox__option slds-listbox__option_entity"
+                                      data-id={cond.id}
+                                      data-field={field.apiName}
+                                      onmousedown={handleConditionFieldSelect}
+                                      role="option">
+                                      <span class="slds-media__body">
+                                        <span class="slds-truncate field-label">{field.label}</span>
+                                        <span class="slds-truncate field-api-name">{field.apiName}</span>
+                                      </span>
+                                    </div>
+                                  </li>
+                                </template>
+                                <template if:true={cond.noFieldsMatch}>
+                                  <li class="slds-p-around_small slds-text-align_center slds-text-color_weak">
+                                    No fields match
+                                  </li>
+                                </template>
+                              </ul>
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Operator Selector -->
+                    <div class="slds-col operator-col">
+                      <lightning-combobox
+                        label="Operator"
+                        placeholder="Operator..."
+                        value={cond.operator}
+                        options={cond.operatorOptions}
+                        data-id={cond.id}
+                        onchange={handleConditionOperatorChange}
+                        variant="label-hidden"
+                        disabled={cond.isOperatorDisabled}
+                        required>
+                      </lightning-combobox>
+                    </div>
+
+                    <!-- Value Input - Type-aware -->
+                    <div class="slds-col slds-grow value-col">
+                      <template if:true={cond.showValueInput}>
+                        <!-- Picklist Value -->
+                        <template if:true={cond.isPicklistField}>
+                          <lightning-combobox
+                            label="Value"
+                            placeholder="Select value..."
+                            value={cond.value}
+                            options={cond.picklistOptions}
+                            data-id={cond.id}
+                            onchange={handleConditionValueChange}
+                            variant="label-hidden"
+                            disabled={cond.isValueDisabled}>
+                          </lightning-combobox>
+                        </template>
+
+                        <!-- Boolean Value -->
+                        <template if:true={cond.isBooleanField}>
+                          <lightning-combobox
+                            label="Value"
+                            placeholder="Select..."
+                            value={cond.value}
+                            options={booleanOptions}
+                            data-id={cond.id}
+                            onchange={handleConditionValueChange}
+                            variant="label-hidden"
+                            disabled={cond.isValueDisabled}>
+                          </lightning-combobox>
+                        </template>
+
+                        <!-- N Days Input -->
+                        <template if:true={cond.showNDaysInput}>
+                          <lightning-input
+                            type="number"
+                            label="Number of Days"
+                            value={cond.value}
+                            data-id={cond.id}
+                            onchange={handleConditionValueChange}
+                            variant="label-hidden"
+                            min="1"
+                            placeholder="Days..."
+                            disabled={cond.isValueDisabled}>
+                          </lightning-input>
+                        </template>
+
+                        <!-- Default Input (text, number, date) -->
+                        <template if:true={cond.showDefaultInput}>
+                          <lightning-input
+                            type={cond.valueInputType}
+                            label="Value"
+                            value={cond.value}
+                            data-id={cond.id}
+                            onchange={handleConditionValueChange}
+                            variant="label-hidden"
+                            placeholder="Value..."
+                            disabled={cond.isValueDisabled}>
+                          </lightning-input>
+                        </template>
+                      </template>
+
+                      <!-- No value needed for null operators -->
+                      <template if:false={cond.showValueInput}>
+                        <template if:false={cond.showNDaysInput}>
+                          <div class="null-placeholder">
+                            <span class="slds-text-color_weak">No value needed</span>
+                          </div>
+                        </template>
+                      </template>
+                    </div>
+
+                    <!-- Remove Button -->
+                    <div class="slds-col slds-no-flex remove-col">
+                      <lightning-button-icon
+                        icon-name="utility:delete"
+                        variant="bare"
+                        alternative-text="Remove condition"
+                        title="Remove condition"
+                        data-id={cond.id}
+                        onclick={handleRemoveCondition}
+                        class="remove-button">
+                      </lightning-button-icon>
+                    </div>
+                  </div>
+                </template>
+              </template>
+
+              <!-- Empty State -->
+              <template if:false={hasConditions}>
+                <div class="empty-state slds-p-around_medium slds-text-align_center">
+                  <lightning-icon
+                    icon-name="utility:filterList"
+                    size="large"
+                    alternative-text="No conditions"
+                    class="slds-m-bottom_small empty-icon">
+                  </lightning-icon>
+                  <p class="slds-text-body_regular slds-text-color_weak">
+                    No conditions added yet
+                  </p>
+                  <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
+                    Click "Add Condition" to filter your query results
+                  </p>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Query Limit Section -->
+          <div class="query-limit-section slds-m-top_medium">
+            <div class="slds-grid slds-gutters">
+              <div class="slds-col slds-size_1-of-3">
+                <lightning-input
+                  type="number"
+                  label="Query Limit"
+                  field-level-help="Maximum number of records to return. Leave empty for no limit."
+                  value={queryLimit}
+                  onchange={handleQueryLimitChange}
+                  min="1"
+                  max="50000"
+                  placeholder="No limit">
+                </lightning-input>
+              </div>
+            </div>
+          </div>
+
+          <!-- Error Display -->
+          <template if:true={error}>
+            <div class="slds-m-top_medium">
+              <div class="slds-box slds-box_x-small slds-theme_error">
+                <div class="slds-text-color_error">{error}</div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ==================== PAGE 4: Review & Save ==================== -->
+      <template if:true={isPage4}>
+        <div class="slds-p-around_medium page4-container">
+          
+          <!-- Single Card containing SOQL Preview and Results -->
+          <div class="preview-card">
+            
+            <!-- SOQL Preview Section (Collapsible) -->
+            <div class="soql-section-header">
+              <button
+                type="button"
+                class="slds-button soql-toggle-btn"
+                onclick={toggleSoqlSection}
+                aria-expanded={isSoqlSectionExpanded}>
+                <lightning-icon
+                  icon-name={soqlSectionIcon}
+                  size="x-small"
+                  class="slds-m-right_x-small">
+                </lightning-icon>
+                <span class="slds-text-title_caps">Generated SOQL Query</span>
+              </button>
+            </div>
+            <template if:true={isSoqlSectionExpanded}>
+              <div class="soql-preview-wrapper">
+                <div class="soql-preview-box">
+
+<pre class="soql-preview">{generatedSoql}</pre>
+                </div>
+              </div>
+            </template>
+
+            <!-- Divider -->
+            <div class="section-divider"></div>
+
+            <!-- Query Results Section -->
+            <div class="results-section-inner">
+              <div class="results-header slds-grid slds-grid_align-spread slds-m-bottom_small">
+                <div class="slds-col">
+                  <h3 class="slds-text-title_caps">
+                    Query Results Preview
+                    <template if:true={hasQueryResults}>
+                      <span class="slds-text-body_small slds-text-color_weak slds-m-left_small results-count">
+                        Showing {queryResultsCount} of {queryTotalCount} records
+                      </span>
+                    </template>
+                  </h3>
+                </div>
+                <div class="slds-col slds-no-flex">
+                  <lightning-button
+                    label="Refresh Preview"
+                    icon-name="utility:refresh"
+                    onclick={handleRefreshPreview}
+                    variant="neutral"
+                    disabled={isQueryLoading}>
+                  </lightning-button>
+                </div>
+              </div>
+
+              <!-- Loading State -->
+              <template if:true={isQueryLoading}>
+                <div class="slds-align_absolute-center slds-p-around_large results-loading">
+                  <lightning-spinner alternative-text="Loading preview..." size="medium"></lightning-spinner>
+                </div>
+              </template>
+
+              <!-- Query Error -->
+              <template if:true={queryError}>
+                <div class="slds-box slds-box_x-small slds-theme_error slds-m-bottom_medium">
+                  <div class="slds-text-color_error">
+                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                    {queryError}
+                  </div>
+                </div>
+              </template>
+
+              <!-- Results Table -->
+              <template if:false={isQueryLoading}>
+                <template if:true={hasQueryResults}>
+                  <div class="results-table-container">
+                    <lightning-datatable
+                      key-field="Id"
+                    data={queryResults}
+                    columns={queryColumns}
+                    hide-checkbox-column
+                    show-row-number-column>
+                  </lightning-datatable>
+                </div>
+              </template>
+
+              <!-- Empty State -->
+              <template if:false={hasQueryResults}>
+                <template if:false={queryError}>
+                  <div class="empty-state slds-p-around_medium slds-text-align_center">
+                    <lightning-icon
+                      icon-name="utility:preview"
+                      size="large"
+                      alternative-text="No results"
+                      class="slds-m-bottom_small empty-icon">
+                    </lightning-icon>
+                    <p class="slds-text-body_regular slds-text-color_weak">
+                      No records found matching your criteria
+                    </p>
+                  </div>
+                </template>
+              </template>
+            </template>
+            </div>
+          </div>
+
+          <!-- Error Display -->
+          <template if:true={error}>
+            <div class="slds-m-top_medium">
+              <div class="slds-box slds-box_x-small slds-theme_error">
+                <div class="slds-text-color_error">{error}</div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
     </template>
 
     <!-- Footer Actions -->
     <div slot="footer">
-      <!-- Page 1 Footer -->
+      <!-- Cancel button (Page 1 only) -->
       <template if:true={isPage1}>
         <lightning-button
           label="Cancel"
@@ -302,6 +697,20 @@
           variant="neutral"
           disabled={isSaving}>
         </lightning-button>
+      </template>
+
+      <!-- Back button (Pages 2, 3, and 4) -->
+      <template if:true={showBackButton}>
+        <lightning-button
+          label="Back"
+          onclick={handleBack}
+          variant="neutral"
+          disabled={isSaving}>
+        </lightning-button>
+      </template>
+
+      <!-- Next button (Pages 1, 2, and 3) -->
+      <template if:true={showNextButton}>
         <lightning-button
           class="slds-m-left_small"
           label="Next"
@@ -311,14 +720,8 @@
         </lightning-button>
       </template>
 
-      <!-- Page 2 Footer -->
-      <template if:true={isPage2}>
-        <lightning-button
-          label="Back"
-          onclick={handleBack}
-          variant="neutral"
-          disabled={isSaving}>
-        </lightning-button>
+      <!-- Save button (Page 4 only) -->
+      <template if:true={showSaveButton}>
         <lightning-button
           class="slds-m-left_small"
           label="Save"

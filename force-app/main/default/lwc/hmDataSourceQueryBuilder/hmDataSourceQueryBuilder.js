@@ -9,6 +9,7 @@ import loadDataSource from "@salesforce/apex/HM_DataSourceBuilderService.loadDat
 import saveDataSourceBasicInfo from "@salesforce/apex/HM_DataSourceBuilderService.saveDataSourceBasicInfo";
 import getAccessibleObjects from "@salesforce/apex/HM_DataSourceBuilderService.getAccessibleObjects";
 import getObjectFields from "@salesforce/apex/HM_DataSourceBuilderService.getObjectFields";
+import executePreviewQuery from "@salesforce/apex/HM_DataSourceBuilderService.executePreviewQuery";
 
 /**
  * @description Data Source Query Builder - Multi-step wizard for creating/editing Data Sources
@@ -16,6 +17,96 @@ import getObjectFields from "@salesforce/apex/HM_DataSourceBuilderService.getObj
  * @date 2024
  */
 export default class HM_DataSourceQueryBuilder extends LightningElement {
+  // ==================== STATIC DEFINITIONS ====================
+
+  static OPERATORS = {
+    STRING: [
+      { label: "equals", value: "equals" },
+      { label: "not equals", value: "not_equals" },
+      { label: "contains", value: "contains" },
+      { label: "starts with", value: "starts_with" },
+      { label: "ends with", value: "ends_with" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ],
+    TEXTAREA: [
+      { label: "equals", value: "equals" },
+      { label: "not equals", value: "not_equals" },
+      { label: "contains", value: "contains" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ],
+    PICKLIST: [
+      { label: "equals", value: "equals" },
+      { label: "not equals", value: "not_equals" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ],
+    MULTIPICKLIST: [
+      { label: "includes", value: "includes" },
+      { label: "excludes", value: "excludes" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ],
+    NUMBER: [
+      { label: "equals", value: "equals" },
+      { label: "not equals", value: "not_equals" },
+      { label: "less than", value: "less_than" },
+      { label: "greater than", value: "greater_than" },
+      { label: "less or equal", value: "less_or_equal" },
+      { label: "greater or equal", value: "greater_or_equal" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ],
+    DATE: [
+      { label: "equals", value: "equals" },
+      { label: "not equals", value: "not_equals" },
+      { label: "less than", value: "less_than" },
+      { label: "greater than", value: "greater_than" },
+      { label: "less or equal", value: "less_or_equal" },
+      { label: "greater or equal", value: "greater_or_equal" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" },
+      { label: "= TODAY", value: "date_today" },
+      { label: "= THIS_WEEK", value: "date_this_week" },
+      { label: "= THIS_MONTH", value: "date_this_month" },
+      { label: "= THIS_YEAR", value: "date_this_year" },
+      { label: "= LAST_N_DAYS:n", value: "date_last_n_days" },
+      { label: "= NEXT_N_DAYS:n", value: "date_next_n_days" }
+    ],
+    BOOLEAN: [
+      { label: "equals", value: "equals" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ],
+    ID: [
+      { label: "equals", value: "equals" },
+      { label: "not equals", value: "not_equals" },
+      { label: "is null", value: "is_null" },
+      { label: "is not null", value: "is_not_null" }
+    ]
+  };
+
+  static FIELD_TYPE_MAP = {
+    STRING: "STRING",
+    TEXTAREA: "TEXTAREA",
+    EMAIL: "STRING",
+    PHONE: "STRING",
+    URL: "STRING",
+    PICKLIST: "PICKLIST",
+    MULTIPICKLIST: "MULTIPICKLIST",
+    INTEGER: "NUMBER",
+    DOUBLE: "NUMBER",
+    CURRENCY: "NUMBER",
+    PERCENT: "NUMBER",
+    DATE: "DATE",
+    DATETIME: "DATE",
+    TIME: "STRING",
+    BOOLEAN: "BOOLEAN",
+    ID: "ID",
+    REFERENCE: "ID"
+  };
+
   // ==================== PUBLIC PROPERTIES ====================
   @api recordId; // Record ID from Quick Action context (for editing existing records)
 
@@ -54,9 +145,30 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   fieldCache = {};
   fieldSearchTerm = "";
 
+  // ==================== PAGE 3 STATE ====================
+  @track whereConditions = [];
+  conditionIdCounter = 0;
+  
+  // Owner filter state (mutually exclusive: 'me' | 'queue' | null)
+  activeOwnerFilter = null;
+  
+  // Field search state per condition
+  @track openFieldListConditionId = null;
+  
+  // Query limit (null means no limit)
+  queryLimit = null;
+
   // CodeMirror state
   codeMirrorInitialized = false;
   codeMirrorEditor = null;
+
+  // ==================== PAGE 4 STATE ====================
+  @track queryResults = [];
+  @track queryColumns = [];
+  queryTotalCount = 0;
+  isQueryLoading = false;
+  queryError = null;
+  isSoqlSectionExpanded = true;
 
   // ==================== COMMON STATE ====================
   isLoading = false;
@@ -145,41 +257,61 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Handle Next button click - navigates to Page 2 (no save until final step)
+   * @description Handle Next button click - navigates to next page
    */
   handleNext() {
-    if (!this.isPage1Valid) {
-      return;
-    }
-
     this.clearError();
-    
-    // Navigate to Page 2
-    this.currentStep = 2;
 
-    // Load objects for Page 2
-    this.loadObjects();
-
-    // Initialize CodeMirror (deferred to allow DOM to render)
-    // eslint-disable-next-line @lwc/lwc/no-async-operation
-    setTimeout(() => {
-      this.initializeCodeMirror();
-    }, 100);
+    if (this.currentStep === 1) {
+      if (!this.isPage1Valid) {
+        return;
+      }
+      // Navigate to Page 2
+      this.currentStep = 2;
+      // Load objects for Page 2
+      this.loadObjects();
+      // Initialize CodeMirror (deferred to allow DOM to render)
+      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      setTimeout(() => {
+        this.initializeCodeMirror();
+      }, 100);
+    } else if (this.currentStep === 2) {
+      if (!this.isPage2Valid) {
+        return;
+      }
+      // Navigate to Page 3 (Filters)
+      this.currentStep = 3;
+    } else if (this.currentStep === 3) {
+      if (!this.isPage3Valid) {
+        return;
+      }
+      // Navigate to Page 4 (Preview)
+      this.currentStep = 4;
+      // Execute preview query
+      this.executeQueryPreview();
+    }
   }
 
   /**
-   * @description Handle Back button click - returns to Page 1
+   * @description Handle Back button click - returns to previous page
    */
   handleBack() {
-    this.currentStep = 1;
     this.clearError();
+    if (this.currentStep === 2) {
+      this.currentStep = 1;
+    } else if (this.currentStep === 3) {
+      this.currentStep = 2;
+    } else if (this.currentStep === 4) {
+      this.currentStep = 3;
+    }
   }
 
   /**
    * @description Handle Save button click on final page - saves all wizard data
    */
   async handleSave() {
-    if (!this.isPage2Valid) {
+    // Page 4 is preview - validation already done on Page 3
+    if (!this.isPage3Valid) {
       return;
     }
 
@@ -187,7 +319,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.clearError();
 
     try {
-      // Save all wizard data (Page 1 + Page 2)
+      // Save all wizard data (Page 1 + Page 2 + Page 3)
       await saveDataSourceBasicInfo({
         recordId: this.recordId,
         name: this.formData.name.trim(),
@@ -197,7 +329,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
         rowIconName: this.formData.rowIconName?.trim() || null
       });
 
-      // TODO: Save Page 2 data (selected object) when field is added to Data Source
+      // TODO: Save Page 2 data (selected object, fields) when fields are added to Data Source
+      // TODO: Save Page 3 data (WHERE conditions) when fields are added to Data Source
 
       this.showToast("Success", "Data Source saved successfully", "success");
       this.closePanel();
@@ -409,6 +542,516 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
   }
 
+  // ==================== QUERY LIMIT HANDLER ====================
+
+  /**
+   * @description Handle Query Limit input change
+   * @param {Event} event - Input change event
+   */
+  handleQueryLimitChange(event) {
+    const value = event.target.value;
+    this.queryLimit = value ? parseInt(value, 10) : null;
+    this.updateSoqlPreview();
+  }
+
+  // ==================== PAGE 4 HANDLERS ====================
+
+  /**
+   * @description Toggle SOQL section expanded/collapsed
+   */
+  toggleSoqlSection() {
+    this.isSoqlSectionExpanded = !this.isSoqlSectionExpanded;
+  }
+
+  /**
+   * @description Handle refresh preview button click
+   */
+  handleRefreshPreview() {
+    this.executeQueryPreview();
+  }
+
+  /**
+   * @description Execute the preview query and display results
+   */
+  async executeQueryPreview() {
+    if (!this.page2Data.selectedObjectApiName || this.selectedFieldApiNames.length === 0) {
+      this.queryError = "Object and fields are required";
+      return;
+    }
+
+    this.isQueryLoading = true;
+    this.queryError = null;
+    this.queryResults = [];
+    this.queryColumns = [];
+    this.queryTotalCount = 0;
+
+    try {
+      // Build WHERE clause for Apex
+      const whereClause = this.buildWhereClause();
+      
+      const result = await executePreviewQuery({
+        objectApiName: this.page2Data.selectedObjectApiName,
+        fieldApiNames: this.selectedFieldApiNames,
+        whereClause: whereClause || null,
+        queryLimit: this.queryLimit
+      });
+
+      // Transform columns for lightning-datatable
+      this.queryColumns = result.columns.map((col) => ({
+        label: col.label,
+        fieldName: col.apiName,
+        type: this.mapFieldTypeToDataTableType(col.type)
+      }));
+
+      // Set results
+      this.queryResults = result.rows;
+      this.queryTotalCount = result.totalCount;
+
+    } catch (error) {
+      this.queryError = error.body?.message || error.message || "Error executing preview query";
+    } finally {
+      this.isQueryLoading = false;
+    }
+  }
+
+  /**
+   * @description Map Salesforce field type to lightning-datatable type
+   * @param {string} fieldType - Salesforce field type
+   * @returns {string} Datatable column type
+   */
+  mapFieldTypeToDataTableType(fieldType) {
+    const typeMap = {
+      ID: "text",
+      STRING: "text",
+      TEXTAREA: "text",
+      PICKLIST: "text",
+      MULTIPICKLIST: "text",
+      EMAIL: "email",
+      PHONE: "phone",
+      URL: "url",
+      INTEGER: "number",
+      DOUBLE: "number",
+      CURRENCY: "currency",
+      PERCENT: "percent",
+      DATE: "date",
+      DATETIME: "date",
+      BOOLEAN: "boolean",
+      REFERENCE: "text"
+    };
+    return typeMap[fieldType] || "text";
+  }
+
+  // ==================== WHERE CLAUSE HANDLERS ====================
+
+  /**
+   * @description Add a new condition row
+   */
+  handleAddCondition() {
+    this.conditionIdCounter++;
+    const newCondition = {
+      id: `cond_${this.conditionIdCounter}`,
+      fieldApiName: "",
+      fieldLabel: "",
+      fieldType: "",
+      operator: "",
+      value: "",
+      conjunction: "AND"
+    };
+    this.whereConditions = [...this.whereConditions, newCondition];
+  }
+
+  /**
+   * @description Remove a condition row
+   * @param {Event} event - Click event with data-id attribute
+   */
+  handleRemoveCondition(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    this.whereConditions = this.whereConditions.filter((condition) => condition.id !== conditionId);
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Handle condition field change
+   * @param {Event} event - Combobox change event
+   */
+  handleConditionFieldChange(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    const fieldApiName = event.detail.value;
+    const field = this.filterableFields.find((f) => f.apiName === fieldApiName);
+    
+    this.whereConditions = this.whereConditions.map((condition) => {
+      if (condition.id === conditionId) {
+        return {
+          ...condition,
+          fieldApiName: fieldApiName,
+          fieldLabel: field?.label || "",
+          fieldType: field?.type || "STRING",
+          operator: "", // Reset operator when field changes
+          value: "" // Reset value when field changes
+        };
+      }
+      return condition;
+    });
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Handle condition operator change
+   * @param {Event} event - Combobox change event
+   */
+  handleConditionOperatorChange(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    const operator = event.detail.value;
+    
+    this.whereConditions = this.whereConditions.map((condition) => {
+      if (condition.id === conditionId) {
+        return {
+          ...condition,
+          operator: operator,
+          value: "" // Reset value when operator changes
+        };
+      }
+      return condition;
+    });
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Handle condition value change
+   * @param {Event} event - Input/Combobox change event
+   */
+  handleConditionValueChange(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    const value = event.detail?.value ?? event.target.value;
+    
+    this.whereConditions = this.whereConditions.map((condition) => {
+      if (condition.id === conditionId) {
+        return { ...condition, value: value };
+      }
+      return condition;
+    });
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Handle condition conjunction change (AND/OR)
+   * @param {Event} event - Combobox change event
+   */
+  handleConditionConjunctionChange(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    const conjunction = event.detail.value;
+    
+    this.whereConditions = this.whereConditions.map((condition) => {
+      if (condition.id === conditionId) {
+        return { ...condition, conjunction: conjunction };
+      }
+      return condition;
+    });
+    this.updateSoqlPreview();
+  }
+
+  // ==================== QUICK FILTER HANDLERS ====================
+
+  /**
+   * @description Handle owner filter toggle (mutually exclusive)
+   * @param {Event} event - Click event with data-filter attribute
+   */
+  handleOwnerFilterToggle(event) {
+    const filterType = event.currentTarget.dataset.filter; // 'me' or 'queue'
+    
+    if (this.activeOwnerFilter === filterType) {
+      // Clicking active filter removes it
+      this.removeOwnerCondition();
+      this.activeOwnerFilter = null;
+    } else {
+      // Switch to new filter (remove old first if exists)
+      if (this.activeOwnerFilter) {
+        this.removeOwnerCondition();
+      }
+      this.activeOwnerFilter = filterType;
+      this.addOwnerCondition(filterType);
+    }
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Add owner condition based on filter type
+   * @param {string} filterType - 'me' or 'queue'
+   */
+  addOwnerCondition(filterType) {
+    this.conditionIdCounter++;
+    let newCondition;
+    
+    if (filterType === "me") {
+      newCondition = {
+        id: `owner_${this.conditionIdCounter}`,
+        fieldApiName: "OwnerId",
+        fieldLabel: "Owner ID",
+        fieldType: "REFERENCE",
+        operator: "equals",
+        value: "{!UserId}",
+        conjunction: "AND",
+        isOwnerFilter: true
+      };
+    } else {
+      newCondition = {
+        id: `owner_${this.conditionIdCounter}`,
+        fieldApiName: "Owner.Type",
+        fieldLabel: "Owner Type",
+        fieldType: "STRING",
+        operator: "equals",
+        value: "Queue",
+        conjunction: "AND",
+        isOwnerFilter: true
+      };
+    }
+    
+    this.whereConditions = [...this.whereConditions, newCondition];
+  }
+
+  /**
+   * @description Remove owner condition from conditions list
+   */
+  removeOwnerCondition() {
+    this.whereConditions = this.whereConditions.filter((c) => !c.isOwnerFilter);
+  }
+
+  /**
+   * @description Get CSS class for "Owned By Me" button
+   * @returns {string} CSS classes
+   */
+  get ownedByMeButtonClass() {
+    const base = "owner-filter-btn";
+    return this.activeOwnerFilter === "me" ? `${base} active` : base;
+  }
+
+  /**
+   * @description Get CSS class for "Owned By Queue" button
+   * @returns {string} CSS classes
+   */
+  get ownedByQueueButtonClass() {
+    const base = "owner-filter-btn";
+    return this.activeOwnerFilter === "queue" ? `${base} active` : base;
+  }
+
+  // ==================== FIELD SEARCH HANDLERS ====================
+
+  /**
+   * @description Handle field search input for condition row
+   * @param {Event} event - Input event
+   */
+  handleConditionFieldSearchInput(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    const searchTerm = event.target.value;
+    
+    this.whereConditions = this.whereConditions.map((condition) => {
+      if (condition.id === conditionId) {
+        return { ...condition, fieldSearchTerm: searchTerm };
+      }
+      return condition;
+    });
+    this.openFieldListConditionId = conditionId;
+  }
+
+  /**
+   * @description Handle field focus for condition row
+   * @param {Event} event - Focus event
+   */
+  handleConditionFieldFocus(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    this.openFieldListConditionId = conditionId;
+  }
+
+  /**
+   * @description Handle field blur for condition row
+   * @param {Event} event - Blur event
+   */
+  handleConditionFieldBlur() {
+    // Delay to allow click events on dropdown items
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    setTimeout(() => {
+      this.openFieldListConditionId = null;
+    }, 200);
+  }
+
+  /**
+   * @description Handle field selection from dropdown
+   * @param {Event} event - Click event
+   */
+  handleConditionFieldSelect(event) {
+    const conditionId = event.currentTarget.dataset.id;
+    const fieldApiName = event.currentTarget.dataset.field;
+    const field = this.filterableFields.find((f) => f.apiName === fieldApiName);
+    
+    this.whereConditions = this.whereConditions.map((condition) => {
+      if (condition.id === conditionId) {
+        return {
+          ...condition,
+          fieldApiName: fieldApiName,
+          fieldLabel: field?.label || "",
+          fieldType: field?.type || "STRING",
+          fieldSearchTerm: field?.label || fieldApiName,
+          operator: "",
+          value: ""
+        };
+      }
+      return condition;
+    });
+    this.openFieldListConditionId = null;
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Helper to add a quick filter condition (kept for extensibility)
+   * @param {Object} filterData - Filter condition data
+   */
+  addQuickFilterCondition(filterData) {
+    this.conditionIdCounter++;
+    const newCondition = {
+      id: `cond_${this.conditionIdCounter}`,
+      fieldApiName: filterData.fieldApiName,
+      fieldLabel: filterData.fieldLabel,
+      fieldType: filterData.fieldType,
+      operator: filterData.operator,
+      value: filterData.value,
+      conjunction: "AND",
+      isDateLiteral: filterData.isDateLiteral || false
+    };
+    this.whereConditions = [...this.whereConditions, newCondition];
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Get filterable fields for WHERE clause
+   * @returns {Array} Fields that can be used in WHERE clause
+   */
+  get filterableFields() {
+    return this.allFields.filter((f) => f.isFilterable);
+  }
+
+  // ==================== PAGE 3 GETTERS ====================
+
+  /**
+   * @description Get conditions with metadata for rendering
+   * @returns {Array} Conditions with isFirst flag and computed properties
+   */
+  get conditionsWithMeta() {
+    return this.whereConditions.map((condition, index) => {
+      const field = this.filterableFields.find((f) => f.apiName === condition.fieldApiName);
+      const mappedType = HM_DataSourceQueryBuilder.FIELD_TYPE_MAP[condition.fieldType] || "STRING";
+      const operators = HM_DataSourceQueryBuilder.OPERATORS[mappedType] || HM_DataSourceQueryBuilder.OPERATORS.STRING;
+      
+      // Determine value input type and visibility
+      const nullOperators = ["is_null", "is_not_null"];
+      const dateLiteralOperators = ["date_today", "date_this_week", "date_this_month", "date_this_year"];
+      const showValueInput = !nullOperators.includes(condition.operator) && !dateLiteralOperators.includes(condition.operator);
+      const showNDaysInput = condition.operator === "date_last_n_days" || condition.operator === "date_next_n_days";
+      const isPicklistField = condition.fieldType === "PICKLIST" || condition.fieldType === "MULTIPICKLIST";
+      const isBooleanField = condition.fieldType === "BOOLEAN";
+      const isNumberField = ["INTEGER", "DOUBLE", "CURRENCY", "PERCENT"].includes(condition.fieldType);
+      const isDateField = condition.fieldType === "DATE" || condition.fieldType === "DATETIME";
+      
+      let valueInputType = "text";
+      if (isNumberField) valueInputType = "number";
+      if (isDateField && !showNDaysInput) valueInputType = "date";
+      
+      // Field search properties
+      const fieldSearchTerm = condition.fieldSearchTerm || (field ? field.label : "");
+      const isFieldListOpen = this.openFieldListConditionId === condition.id;
+      const searchTermLower = (condition.fieldSearchTerm || "").toLowerCase();
+      const filteredFieldOptions = this.filterableFields
+        .filter((f) => {
+          if (!searchTermLower) return true;
+          return f.label.toLowerCase().includes(searchTermLower) || 
+                 f.apiName.toLowerCase().includes(searchTermLower);
+        })
+        .slice(0, 50)
+        .map((f) => ({ ...f }));
+      const noFieldsMatch = isFieldListOpen && filteredFieldOptions.length === 0 && searchTermLower;
+      
+      return {
+        ...condition,
+        index,
+        isFirst: index === 0,
+        showConjunction: index > 0,
+        operatorOptions: operators,
+        picklistOptions: field?.picklistValues?.map((pv) => ({ label: pv.label, value: pv.value })) || [],
+        isOperatorDisabled: !condition.fieldApiName,
+        isValueDisabled: !condition.operator,
+        showValueInput,
+        showNDaysInput,
+        isPicklistField,
+        isBooleanField,
+        isNumberField,
+        isDateField,
+        valueInputType,
+        showDefaultInput: showValueInput && !isPicklistField && !isBooleanField && !showNDaysInput,
+        // Field search
+        fieldSearchTerm,
+        isFieldListOpen,
+        filteredFieldOptions,
+        noFieldsMatch
+      };
+    });
+  }
+
+  /**
+   * @description Check if there are conditions
+   * @returns {boolean} True if conditions exist
+   */
+  get hasConditions() {
+    return this.whereConditions.length > 0;
+  }
+
+  /**
+   * @description Get condition count for display
+   * @returns {number} Number of conditions
+   */
+  get conditionCount() {
+    return this.whereConditions.length;
+  }
+
+  /**
+   * @description Get field options for condition dropdowns
+   * @returns {Array} Filterable fields formatted for combobox
+   */
+  get conditionFieldOptions() {
+    return this.filterableFields.map((f) => ({
+      label: `${f.label} (${f.apiName})`,
+      value: f.apiName
+    }));
+  }
+
+  /**
+   * @description Get conjunction options (AND/OR)
+   * @returns {Array} Conjunction options
+   */
+  get conjunctionOptions() {
+    return [
+      { label: "AND", value: "AND" },
+      { label: "OR", value: "OR" }
+    ];
+  }
+
+  /**
+   * @description Get boolean options for boolean fields
+   * @returns {Array} Boolean options
+   */
+  get booleanOptions() {
+    return [
+      { label: "True", value: "true" },
+      { label: "False", value: "false" }
+    ];
+  }
+
+  /**
+   * @description Check if object has OwnerId field
+   * @returns {boolean} True if OwnerId field exists and is filterable
+   */
+  get hasOwnerField() {
+    return this.filterableFields.some((f) => f.apiName === "OwnerId");
+  }
+
   /**
    * @description Filter objects based on search term
    */
@@ -567,10 +1210,16 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    */
   get modalTitle() {
     const prefix = this.recordId ? "Edit" : "Create";
-    if (this.currentStep === 1) {
-      return `${prefix} Data Source - Basic Info`;
+    switch (this.currentStep) {
+      case 1:
+        return `${prefix} Data Source - Basic Info`;
+      case 2:
+        return `${prefix} Data Source - Select Object & Fields`;
+      case 3:
+        return `${prefix} Data Source - Filters`;
+      default:
+        return `${prefix} Data Source`;
     }
-    return `${prefix} Data Source - Select Object`;
   }
 
   /**
@@ -598,19 +1247,95 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
+   * @description Check if currently on Page 3
+   * @returns {boolean} True if on Page 3
+   */
+  get isPage3() {
+    return this.currentStep === 3;
+  }
+
+  /**
+   * @description Check if currently on Page 4 (Preview)
+   * @returns {boolean} True if on Page 4
+   */
+  get isPage4() {
+    return this.currentStep === 4;
+  }
+
+  /**
+   * @description Check if SOQL section is expanded (for collapsible)
+   * @returns {string} Icon name for SOQL section toggle
+   */
+  get soqlSectionIcon() {
+    return this.isSoqlSectionExpanded ? "utility:chevrondown" : "utility:chevronright";
+  }
+
+  /**
+   * @description Check if there are query results
+   * @returns {boolean} True if results exist
+   */
+  get hasQueryResults() {
+    return this.queryResults && this.queryResults.length > 0;
+  }
+
+  /**
+   * @description Get query results count for display
+   * @returns {number} Number of preview rows
+   */
+  get queryResultsCount() {
+    return this.queryResults ? this.queryResults.length : 0;
+  }
+
+  /**
    * @description Check if Next button should be disabled
    * @returns {boolean} True if Next should be disabled
    */
   get isNextDisabled() {
-    return this.isSaving || this.isLoading || !this.isPage1Valid;
+    if (this.isSaving || this.isLoading) {
+      return true;
+    }
+    if (this.currentStep === 1) {
+      return !this.isPage1Valid;
+    }
+    if (this.currentStep === 2) {
+      return !this.isPage2Valid;
+    }
+    if (this.currentStep === 3) {
+      return !this.isPage3Valid;
+    }
+    return true;
   }
 
   /**
-   * @description Check if Save button should be disabled (Page 2)
+   * @description Check if Save button should be disabled (Page 4)
    * @returns {boolean} True if save should be disabled
    */
   get isSaveDisabled() {
-    return this.isSaving || this.isLoading || !this.isPage2Valid;
+    return this.isSaving || this.isLoading;
+  }
+
+  /**
+   * @description Check if Next button should be shown
+   * @returns {boolean} True if on Page 1, 2, or 3
+   */
+  get showNextButton() {
+    return this.currentStep === 1 || this.currentStep === 2 || this.currentStep === 3;
+  }
+
+  /**
+   * @description Check if Save button should be shown
+   * @returns {boolean} True if on Page 4
+   */
+  get showSaveButton() {
+    return this.currentStep === 4;
+  }
+
+  /**
+   * @description Check if Back button should be shown
+   * @returns {boolean} True if on Page 2, 3, or 4
+   */
+  get showBackButton() {
+    return this.currentStep === 2 || this.currentStep === 3 || this.currentStep === 4;
   }
 
   /**
@@ -630,6 +1355,39 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       this.page2Data.selectedObjectApiName !== null &&
       this.selectedFieldApiNames.length > 0
     );
+  }
+
+  /**
+   * @description Check if Page 3 is valid (WHERE conditions are optional but must be complete if present)
+   * @returns {boolean} True if Page 3 is valid (conditions optional, but if present must be valid)
+   */
+  get isPage3Valid() {
+    // WHERE conditions are optional
+    if (this.whereConditions.length === 0) {
+      return true;
+    }
+    // If conditions exist, validate each one
+    const nullOperators = ["is_null", "is_not_null"];
+    const dateLiteralOperators = [
+      "date_today",
+      "date_this_week",
+      "date_this_month",
+      "date_this_year"
+    ];
+    return this.whereConditions.every((condition) => {
+      // Must have field and operator
+      if (!condition.fieldApiName || !condition.operator) {
+        return false;
+      }
+      // Value is required unless operator doesn't need one
+      if (
+        !nullOperators.includes(condition.operator) &&
+        !dateLiteralOperators.includes(condition.operator)
+      ) {
+        return condition.value !== "" && condition.value !== null && condition.value !== undefined;
+      }
+      return true;
+    });
   }
 
   /**
@@ -711,6 +1469,31 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   // ==================== SOQL PREVIEW ====================
 
   /**
+   * @description Map operator to SOQL syntax
+   */
+  static OPERATOR_MAP = {
+    equals: "=",
+    not_equals: "!=",
+    contains: "LIKE",
+    starts_with: "LIKE",
+    ends_with: "LIKE",
+    less_than: "<",
+    greater_than: ">",
+    less_or_equal: "<=",
+    greater_or_equal: ">=",
+    is_null: "=",
+    is_not_null: "!=",
+    includes: "INCLUDES",
+    excludes: "EXCLUDES",
+    date_today: "=",
+    date_this_week: "=",
+    date_this_month: "=",
+    date_this_year: "=",
+    date_last_n_days: "=",
+    date_next_n_days: "="
+  };
+
+  /**
    * @description Generate formatted SOQL query string
    * @returns {string} Formatted SOQL query or empty string
    */
@@ -720,7 +1503,165 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
 
     const fields = this.selectedFieldApiNames.join(",\n       ");
-    return `SELECT ${fields}\n  FROM ${this.page2Data.selectedObjectApiName}`;
+    let query = `SELECT ${fields}\n  FROM ${this.page2Data.selectedObjectApiName}`;
+
+    // Add WHERE clause if conditions exist
+    const whereClause = this.buildWhereClause();
+    if (whereClause) {
+      query += `\n WHERE ${whereClause}`;
+    }
+
+    // Add LIMIT clause if set
+    if (this.queryLimit) {
+      query += `\n LIMIT ${this.queryLimit}`;
+    }
+
+    return query;
+  }
+
+  /**
+   * @description Build WHERE clause from conditions with proper OR grouping
+   * @returns {string} WHERE clause or empty string
+   */
+  buildWhereClause() {
+    const validConditions = this.whereConditions.filter(
+      (c) => c.fieldApiName && c.operator
+    );
+
+    if (validConditions.length === 0) {
+      return "";
+    }
+
+    // Check if we have mixed conjunctions (need parentheses for OR groups)
+    const hasOr = validConditions.some((c, i) => i > 0 && c.conjunction === "OR");
+    const hasAnd = validConditions.some((c, i) => i > 0 && c.conjunction === "AND");
+    const hasMixedConjunctions = hasOr && hasAnd;
+
+    if (!hasMixedConjunctions) {
+      // Simple case: all same conjunction, no grouping needed
+      return validConditions
+        .map((condition, index) => {
+          const clause = this.buildConditionClause(condition);
+          if (index === 0) {
+            return clause;
+          }
+          return `\n    ${condition.conjunction} ${clause}`;
+        })
+        .join("");
+    }
+
+    // Complex case: mixed AND/OR - group consecutive OR conditions
+    let result = "";
+    let inOrGroup = false;
+
+    validConditions.forEach((condition, index) => {
+      const clause = this.buildConditionClause(condition);
+      const isOr = condition.conjunction === "OR";
+      const nextIsOr = index < validConditions.length - 1 && 
+                       validConditions[index + 1].conjunction === "OR";
+
+      if (index === 0) {
+        result = clause;
+      } else if (isOr) {
+        // Starting or continuing OR group
+        if (!inOrGroup) {
+          // Starting new OR group - wrap previous clause and this one
+          result += `\n    AND (${clause}`;
+          inOrGroup = true;
+        } else {
+          result += `\n         OR ${clause}`;
+        }
+        
+        // Close OR group if next is not OR
+        if (!nextIsOr && inOrGroup) {
+          result += ")";
+          inOrGroup = false;
+        }
+      } else {
+        // AND conjunction
+        result += `\n    AND ${clause}`;
+      }
+    });
+
+    // Close any unclosed OR group
+    if (inOrGroup) {
+      result += ")";
+    }
+
+    return result;
+  }
+
+  /**
+   * @description Build a single condition clause
+   * @param {Object} condition - Condition object
+   * @returns {string} Formatted condition clause
+   */
+  buildConditionClause(condition) {
+    const operator = HM_DataSourceQueryBuilder.OPERATOR_MAP[condition.operator] || "=";
+    const field = condition.fieldApiName;
+
+    // Handle null operators
+    if (condition.operator === "is_null") {
+      return `${field} = null`;
+    }
+    if (condition.operator === "is_not_null") {
+      return `${field} != null`;
+    }
+
+    // Handle date literals
+    if (condition.operator === "date_today") {
+      return `${field} = TODAY`;
+    }
+    if (condition.operator === "date_this_week") {
+      return `${field} = THIS_WEEK`;
+    }
+    if (condition.operator === "date_this_month") {
+      return `${field} = THIS_MONTH`;
+    }
+    if (condition.operator === "date_this_year") {
+      return `${field} = THIS_YEAR`;
+    }
+    if (condition.operator === "date_last_n_days") {
+      return `${field} = LAST_N_DAYS:${condition.value}`;
+    }
+    if (condition.operator === "date_next_n_days") {
+      return `${field} = NEXT_N_DAYS:${condition.value}`;
+    }
+
+    // Handle LIKE operators
+    if (condition.operator === "contains") {
+      return `${field} LIKE '%${condition.value}%'`;
+    }
+    if (condition.operator === "starts_with") {
+      return `${field} LIKE '${condition.value}%'`;
+    }
+    if (condition.operator === "ends_with") {
+      return `${field} LIKE '%${condition.value}'`;
+    }
+
+    // Handle special values
+    if (condition.value === "{!UserId}") {
+      return `${field} ${operator} :UserInfo.getUserId()`;
+    }
+
+    // Handle boolean values
+    if (condition.fieldType === "BOOLEAN") {
+      return `${field} ${operator} ${condition.value}`;
+    }
+
+    // Handle numeric types (no quotes)
+    const numericTypes = ["INTEGER", "DOUBLE", "CURRENCY", "PERCENT"];
+    if (numericTypes.includes(condition.fieldType)) {
+      return `${field} ${operator} ${condition.value}`;
+    }
+
+    // Handle INCLUDES/EXCLUDES for multipicklist
+    if (condition.operator === "includes" || condition.operator === "excludes") {
+      return `${field} ${operator} ('${condition.value}')`;
+    }
+
+    // Default: string value with quotes
+    return `${field} ${operator} '${condition.value}'`;
   }
 
   /**
