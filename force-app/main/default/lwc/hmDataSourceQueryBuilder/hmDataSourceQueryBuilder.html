@@ -221,8 +221,34 @@
                 </div>
               </div>
 
-              <!-- Field Selection - Searchable Checkbox List (shown after object selected) -->
+              <!-- Query Type Toggle (shown after object selected) -->
               <template if:true={page2Data.selectedObjectApiName}>
+                <div class="query-type-toggle slds-m-top_medium">
+                  <label class="slds-form-element__label">
+                    <abbr class="slds-required" title="required">*</abbr>
+                    Query Type
+                  </label>
+                  <div class="slds-button-group" role="group">
+                    <button
+                      type="button"
+                      class={listButtonClass}
+                      data-value="List"
+                      onclick={handleQueryTypeChange}>
+                      List
+                    </button>
+                    <button
+                      type="button"
+                      class={aggregateButtonClass}
+                      data-value="Aggregate"
+                      onclick={handleQueryTypeChange}>
+                      Aggregate
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Field Selection - Searchable Checkbox List (List mode only) -->
+              <template if:true={showFieldSelection}>
                 <div class="slds-form-element slds-m-top_medium">
                   <template if:true={isLoadingFields}>
                     <div class="slds-p-around_medium slds-align_absolute-center">
@@ -265,6 +291,124 @@
                       <template if:false={hasFilteredFields}>
                         <div class="slds-p-around_medium slds-text-align_center slds-text-color_weak">
                           No fields match "{fieldSearchTerm}"
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Aggregate Section (Aggregate mode only) -->
+              <template if:true={showAggregateSection}>
+                <div class="aggregate-section slds-m-top_medium">
+                  <!-- Aggregate Function Selector -->
+                  <div class="slds-form-element">
+                    <lightning-combobox
+                      label="Aggregate Function"
+                      placeholder="Select function..."
+                      options={aggregateFunctionOptions}
+                      value={aggregateFunction}
+                      onchange={handleAggregateFunctionChange}
+                      required>
+                    </lightning-combobox>
+                  </div>
+
+                  <!-- Aggregate Field Selector - Searchable (shown after function selected) -->
+                  <template if:true={showAggregateFieldSelector}>
+                    <div class="slds-form-element slds-m-top_small aggregate-field-wrapper">
+                      <label class="slds-form-element__label">
+                        <template if:true={selectedFunctionRequiresField}>
+                          <abbr class="slds-required" title="required">*</abbr>
+                        </template>
+                        {aggregateFieldLabel}
+                      </label>
+                      <div class="slds-form-element__control">
+                        <div class="slds-combobox_container">
+                          <div class={aggregateFieldComboboxClasses} role="combobox" aria-expanded={isAggregateFieldListOpen} aria-haspopup="listbox">
+                            <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                              <input
+                                type="text"
+                                class="slds-input slds-combobox__input"
+                                role="textbox"
+                                placeholder="Search fields..."
+                                value={aggregateFieldSearchTerm}
+                                oninput={handleAggregateFieldSearchInput}
+                                onfocus={handleAggregateFieldFocus}
+                                onblur={handleAggregateFieldBlur}
+                                onkeydown={handleAggregateFieldKeydown}
+                                aria-controls="aggregate-field-listbox"
+                                aria-autocomplete="list"
+                                autocomplete="off" />
+                              <!-- Clear button when value selected -->
+                              <template if:true={aggregateFieldApiName}>
+                                <button
+                                  class="slds-button slds-button_icon slds-input__icon slds-input__icon_right"
+                                  onclick={handleAggregateFieldClear}
+                                  type="button"
+                                  title="Clear selection">
+                                  <lightning-icon icon-name="utility:close" size="x-small" alternative-text="Clear"></lightning-icon>
+                                </button>
+                              </template>
+                              <!-- Search icon when no value -->
+                              <template if:false={aggregateFieldApiName}>
+                                <span class="slds-icon_container slds-input__icon slds-input__icon_right">
+                                  <lightning-icon icon-name="utility:search" size="x-small" alternative-text="Search"></lightning-icon>
+                                </span>
+                              </template>
+                            </div>
+
+                            <!-- Dropdown listbox -->
+                            <template if:true={isAggregateFieldListOpen}>
+                              <div id="aggregate-field-listbox" class="aggregate-field-dropdown" role="listbox">
+                                <!-- Loading state -->
+                                <template if:true={isLoadingFields}>
+                                  <div class="slds-p-around_medium slds-align_absolute-center">
+                                    <lightning-spinner size="small" alternative-text="Loading fields..."></lightning-spinner>
+                                  </div>
+                                </template>
+
+                                <!-- Results -->
+                                <template if:false={isLoadingFields}>
+                                  <template if:true={hasFilteredAggregateFields}>
+                                    <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                      <template for:each={filteredAggregateFields} for:item="field">
+                                        <li key={field.apiName} role="presentation" class="slds-listbox__item">
+                                          <div
+                                            class={field.itemClass}
+                                            data-value={field.apiName}
+                                            onclick={handleAggregateFieldSelect}
+                                            onmousedown={handleAggregateFieldSelect}
+                                            role="option">
+                                            <span class="slds-media__body">
+                                              <span class="slds-truncate field-label">{field.label}</span>
+                                              <span class="slds-truncate field-api-name">{field.apiName}</span>
+                                            </span>
+                                          </div>
+                                        </li>
+                                      </template>
+                                    </ul>
+                                  </template>
+
+                                  <!-- No results message -->
+                                  <template if:false={hasFilteredAggregateFields}>
+                                    <div class="slds-p-around_small slds-text-align_center slds-text-color_weak">
+                                      <template if:true={aggregateFieldSearchTerm}>
+                                        No fields found matching "{aggregateFieldSearchTerm}"
+                                      </template>
+                                      <template if:false={aggregateFieldSearchTerm}>
+                                        No fields available
+                                      </template>
+                                    </div>
+                                  </template>
+                                </template>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+                      </div>
+                      <template if:false={selectedFunctionRequiresField}>
+                        <div class="slds-form-element__help slds-text-color_weak">
+                          COUNT() will count all rows if no field is selected
                         </div>
                       </template>
                     </div>

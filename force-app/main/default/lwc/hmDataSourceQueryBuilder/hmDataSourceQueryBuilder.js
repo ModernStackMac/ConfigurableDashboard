@@ -107,6 +107,15 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     REFERENCE: "ID"
   };
 
+  static AGGREGATE_FUNCTIONS = [
+    { label: "COUNT", value: "COUNT", requiresField: false, fieldTypes: null },
+    { label: "COUNT_DISTINCT", value: "COUNT_DISTINCT", requiresField: true, fieldTypes: null },
+    { label: "SUM", value: "SUM", requiresField: true, fieldTypes: ["DOUBLE", "INTEGER", "CURRENCY", "PERCENT"] },
+    { label: "AVG", value: "AVG", requiresField: true, fieldTypes: ["DOUBLE", "INTEGER", "CURRENCY", "PERCENT"] },
+    { label: "MIN", value: "MIN", requiresField: true, fieldTypes: null },
+    { label: "MAX", value: "MAX", requiresField: true, fieldTypes: null }
+  ];
+
   // ==================== PUBLIC PROPERTIES ====================
   @api recordId; // Record ID from Quick Action context (for editing existing records)
 
@@ -130,6 +139,19 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     selectedObjectApiName: null,
     selectedObjectLabel: null
   };
+
+  // Query type state (List or Aggregate)
+  queryType = "List"; // 'List' | 'Aggregate'
+
+  // Aggregate mode state
+  aggregateFunction = null; // 'COUNT' | 'COUNT_DISTINCT' | 'SUM' | 'AVG' | 'MIN' | 'MAX'
+  aggregateFieldApiName = null; // Single field for aggregate target
+
+  // Aggregate field search state
+  aggregateFieldSearchTerm = "";
+  @track filteredAggregateFields = [];
+  isAggregateFieldListOpen = false;
+  aggregateFieldHighlightedIndex = -1;
 
   // Object search state
   allObjects = [];
@@ -443,6 +465,13 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       this.isObjectListOpen = false;
       this.highlightedIndex = -1;
 
+      // Reset all field/aggregate state when object changes
+      this.selectedFieldApiNames = [];
+      this.fieldSearchTerm = "";
+      this.aggregateFunction = null;
+      this.aggregateFieldApiName = null;
+      this.aggregateFieldSearchTerm = "";
+
       // Load fields for selected object
       this.loadFieldsForObject(obj.apiName);
     }
@@ -473,6 +502,187 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.updateSoqlPreview();
   }
 
+  // ==================== QUERY TYPE HANDLERS ====================
+
+  /**
+   * @description Handle query type toggle change
+   * @param {Event} event - Click event from button
+   */
+  handleQueryTypeChange(event) {
+    const newType = event.target.dataset.value;
+    if (newType === this.queryType) return;
+
+    this.queryType = newType;
+
+    // Reset mode-specific state when switching
+    if (newType === "List") {
+      this.aggregateFunction = null;
+      this.aggregateFieldApiName = null;
+      this.aggregateFieldSearchTerm = "";
+    } else {
+      this.selectedFieldApiNames = [];
+    }
+
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Handle aggregate function selection change
+   * @param {Event} event - Combobox change event
+   */
+  handleAggregateFunctionChange(event) {
+    this.aggregateFunction = event.detail.value;
+    // Reset field when function changes (field requirements may differ)
+    this.aggregateFieldApiName = null;
+    this.aggregateFieldSearchTerm = "";
+    this.filteredAggregateFields = [];
+    this.filterAggregateFields();
+    this.updateSoqlPreview();
+  }
+
+  // ==================== AGGREGATE FIELD SEARCH HANDLERS ====================
+
+  /**
+   * @description Filter aggregate fields based on search term and function type
+   */
+  filterAggregateFields() {
+    const func = this.getSelectedAggregateFunction();
+    if (!func) {
+      this.filteredAggregateFields = [];
+      return;
+    }
+
+    // First filter by field type based on function
+    let availableFields = this.allFields.filter((f) => {
+      if (!func.fieldTypes) return true;
+      return func.fieldTypes.includes(f.type);
+    });
+
+    // Then filter by search term
+    const searchLower = this.aggregateFieldSearchTerm.toLowerCase();
+    if (searchLower) {
+      availableFields = availableFields.filter(
+        (f) =>
+          f.label.toLowerCase().includes(searchLower) ||
+          f.apiName.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Map to display format with highlight class
+    this.filteredAggregateFields = availableFields.slice(0, 100).map((f, index) => ({
+      ...f,
+      displayLabel: `${f.label} (${f.apiName})`,
+      itemClass:
+        index === this.aggregateFieldHighlightedIndex
+          ? "slds-media slds-listbox__option slds-listbox__option_plain slds-media_small slds-is-selected"
+          : "slds-media slds-listbox__option slds-listbox__option_plain slds-media_small"
+    }));
+  }
+
+  /**
+   * @description Handle aggregate field search input
+   * @param {Event} event - Input event
+   */
+  handleAggregateFieldSearchInput(event) {
+    this.aggregateFieldSearchTerm = event.target.value;
+    this.aggregateFieldHighlightedIndex = -1;
+    this.filterAggregateFields();
+  }
+
+  /**
+   * @description Handle aggregate field focus
+   */
+  handleAggregateFieldFocus() {
+    this.isAggregateFieldListOpen = true;
+    this.filterAggregateFields();
+  }
+
+  /**
+   * @description Handle aggregate field blur
+   */
+  handleAggregateFieldBlur() {
+    // Delay to allow click to register
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    setTimeout(() => {
+      this.isAggregateFieldListOpen = false;
+      this.aggregateFieldHighlightedIndex = -1;
+    }, 200);
+  }
+
+  /**
+   * @description Handle aggregate field selection
+   * @param {Event} event - Click event
+   */
+  handleAggregateFieldSelect(event) {
+    const apiName = event.currentTarget.dataset.value;
+    const field = this.allFields.find((f) => f.apiName === apiName);
+    if (field) {
+      this.aggregateFieldApiName = field.apiName;
+      this.aggregateFieldSearchTerm = field.label;
+      this.isAggregateFieldListOpen = false;
+      this.aggregateFieldHighlightedIndex = -1;
+      this.updateSoqlPreview();
+    }
+  }
+
+  /**
+   * @description Clear aggregate field selection
+   */
+  handleAggregateFieldClear() {
+    this.aggregateFieldApiName = null;
+    this.aggregateFieldSearchTerm = "";
+    this.isAggregateFieldListOpen = false;
+    this.aggregateFieldHighlightedIndex = -1;
+    this.filterAggregateFields();
+    this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Handle keyboard navigation for aggregate field
+   * @param {Event} event - Keydown event
+   */
+  handleAggregateFieldKeydown(event) {
+    if (!this.isAggregateFieldListOpen && event.key !== "ArrowDown") {
+      return;
+    }
+
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        this.isAggregateFieldListOpen = true;
+        if (this.aggregateFieldHighlightedIndex < this.filteredAggregateFields.length - 1) {
+          this.aggregateFieldHighlightedIndex++;
+          this.filterAggregateFields();
+        }
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        if (this.aggregateFieldHighlightedIndex > 0) {
+          this.aggregateFieldHighlightedIndex--;
+          this.filterAggregateFields();
+        }
+        break;
+      case "Enter":
+        event.preventDefault();
+        if (this.aggregateFieldHighlightedIndex >= 0 && this.aggregateFieldHighlightedIndex < this.filteredAggregateFields.length) {
+          const field = this.filteredAggregateFields[this.aggregateFieldHighlightedIndex];
+          this.aggregateFieldApiName = field.apiName;
+          this.aggregateFieldSearchTerm = field.label;
+          this.isAggregateFieldListOpen = false;
+          this.aggregateFieldHighlightedIndex = -1;
+          this.updateSoqlPreview();
+        }
+        break;
+      case "Escape":
+        event.preventDefault();
+        this.isAggregateFieldListOpen = false;
+        this.aggregateFieldHighlightedIndex = -1;
+        break;
+      default:
+        break;
+    }
+  }
+
   /**
    * @description Clear object selection
    */
@@ -483,10 +693,13 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.isObjectListOpen = false;
     this.highlightedIndex = -1;
     this.filterObjects();
-    // Reset field selection
+    // Reset field selection and aggregate state
     this.allFields = [];
     this.selectedFieldApiNames = [];
     this.fieldSearchTerm = "";
+    this.aggregateFunction = null;
+    this.aggregateFieldApiName = null;
+    this.aggregateFieldSearchTerm = "";
     this.updateSoqlPreview();
   }
 
@@ -543,6 +756,12 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
           this.objectSearchTerm = obj.label;
           this.isObjectListOpen = false;
           this.highlightedIndex = -1;
+          // Reset all field/aggregate state when object changes
+          this.selectedFieldApiNames = [];
+          this.fieldSearchTerm = "";
+          this.aggregateFunction = null;
+          this.aggregateFieldApiName = null;
+          this.aggregateFieldSearchTerm = "";
           // Load fields for selected object
           this.loadFieldsForObject(obj.apiName);
         }
@@ -610,8 +829,25 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    * @description Execute the preview query and display results
    */
   async executeQueryPreview() {
-    if (!this.page2Data.selectedObjectApiName || this.selectedFieldApiNames.length === 0) {
-      this.queryError = "Object and fields are required";
+    // Validate based on query type
+    if (!this.page2Data.selectedObjectApiName) {
+      this.queryError = "Object is required";
+      return;
+    }
+
+    if (this.isListMode && this.selectedFieldApiNames.length === 0) {
+      this.queryError = "At least one field must be selected";
+      return;
+    }
+
+    if (this.isAggregateMode && !this.aggregateFunction) {
+      this.queryError = "Aggregate function is required";
+      return;
+    }
+
+    // For aggregate functions that require a field
+    if (this.isAggregateMode && this.selectedFunctionRequiresField && !this.aggregateFieldApiName) {
+      this.queryError = "Field is required for this aggregate function";
       return;
     }
 
@@ -624,30 +860,84 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     try {
       // Build WHERE clause for Apex
       const whereClause = this.buildWhereClause();
-      
-      const result = await executePreviewQuery({
-        objectApiName: this.page2Data.selectedObjectApiName,
-        fieldApiNames: this.selectedFieldApiNames,
-        whereClause: whereClause || null,
-        queryLimit: this.queryLimit
-      });
 
-      // Transform columns for lightning-datatable
-      this.queryColumns = result.columns.map((col) => ({
-        label: col.label,
-        fieldName: col.apiName,
-        type: this.mapFieldTypeToDataTableType(col.type)
-      }));
+      if (this.isListMode) {
+        // List query - use existing logic
+        const result = await executePreviewQuery({
+          objectApiName: this.page2Data.selectedObjectApiName,
+          fieldApiNames: this.selectedFieldApiNames,
+          whereClause: whereClause || null,
+          queryLimit: this.queryLimit
+        });
 
-      // Set results
-      this.queryResults = result.rows;
-      this.queryTotalCount = result.totalCount;
+        // Transform columns for lightning-datatable
+        this.queryColumns = result.columns.map((col) => ({
+          label: col.label,
+          fieldName: col.apiName,
+          type: this.mapFieldTypeToDataTableType(col.type)
+        }));
+
+        // Set results
+        this.queryResults = result.rows;
+        this.queryTotalCount = result.totalCount;
+      } else {
+        // Aggregate query - execute directly since we need different handling
+        await this.executeAggregatePreview(whereClause);
+      }
 
     } catch (error) {
       this.queryError = error.body?.message || error.message || "Error executing preview query";
     } finally {
       this.isQueryLoading = false;
     }
+  }
+
+  /**
+   * @description Execute aggregate query preview
+   * @param {string} whereClause - WHERE clause string
+   */
+  async executeAggregatePreview(whereClause) {
+    // Build the aggregate expression for display
+    let aggregateExpr;
+    if (this.aggregateFunction === "COUNT" && !this.aggregateFieldApiName) {
+      aggregateExpr = "COUNT()";
+    } else {
+      aggregateExpr = `${this.aggregateFunction}(${this.aggregateFieldApiName})`;
+    }
+
+    // For aggregate queries, show a simplified preview
+    // The actual execution happens when the query is saved and used
+    this.queryColumns = [{
+      label: "Aggregate Expression",
+      fieldName: "expression",
+      type: "text"
+    }, {
+      label: "Description",
+      fieldName: "description",
+      type: "text"
+    }];
+
+    this.queryResults = [{
+      expression: aggregateExpr,
+      description: this.getAggregateDescription()
+    }];
+    this.queryTotalCount = 1;
+  }
+
+  /**
+   * @description Get human-readable description of the aggregate query
+   * @returns {string} Description text
+   */
+  getAggregateDescription() {
+    const funcDescriptions = {
+      COUNT: "Counts the number of records",
+      COUNT_DISTINCT: "Counts unique values",
+      SUM: "Calculates the total sum",
+      AVG: "Calculates the average value",
+      MIN: "Finds the minimum value",
+      MAX: "Finds the maximum value"
+    };
+    return funcDescriptions[this.aggregateFunction] || "Aggregate query";
   }
 
   /**
@@ -1283,6 +1573,145 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
+   * @description Check if query type is List
+   * @returns {boolean} True if List mode
+   */
+  get isListMode() {
+    return this.queryType === "List";
+  }
+
+  /**
+   * @description Check if query type is Aggregate
+   * @returns {boolean} True if Aggregate mode
+   */
+  get isAggregateMode() {
+    return this.queryType === "Aggregate";
+  }
+
+  /**
+   * @description Get aggregate function options for dropdown
+   * @returns {Array} Options for combobox
+   */
+  get aggregateFunctionOptions() {
+    return HM_DataSourceQueryBuilder.AGGREGATE_FUNCTIONS.map((f) => ({
+      label: f.label,
+      value: f.value
+    }));
+  }
+
+  /**
+   * @description Get the selected aggregate function config
+   * @returns {Object|null} Function config or null
+   */
+  getSelectedAggregateFunction() {
+    if (!this.aggregateFunction) return null;
+    return HM_DataSourceQueryBuilder.AGGREGATE_FUNCTIONS.find(
+      (f) => f.value === this.aggregateFunction
+    );
+  }
+
+  /**
+   * @description Get field options filtered by selected aggregate function
+   * @returns {Array} Options for combobox
+   */
+  get aggregateFieldOptions() {
+    const func = this.getSelectedAggregateFunction();
+    if (!func) return [];
+
+    return this.allFields
+      .filter((f) => {
+        if (!func.fieldTypes) return true; // No filter for COUNT, COUNT_DISTINCT, MIN, MAX
+        return func.fieldTypes.includes(f.type);
+      })
+      .map((f) => ({
+        label: `${f.label} (${f.apiName})`,
+        value: f.apiName
+      }));
+  }
+
+  /**
+   * @description Check if selected function requires a field
+   * @returns {boolean} True if field is required
+   */
+  get selectedFunctionRequiresField() {
+    const func = this.getSelectedAggregateFunction();
+    return func?.requiresField ?? false;
+  }
+
+  /**
+   * @description Check if aggregate field selector should be shown
+   * @returns {boolean} True if field selector should show
+   */
+  get showAggregateFieldSelector() {
+    return this.aggregateFunction !== null;
+  }
+
+  /**
+   * @description Get label for aggregate field based on function
+   * @returns {string} Label text
+   */
+  get aggregateFieldLabel() {
+    if (this.aggregateFunction === "COUNT") {
+      return "Field (optional for COUNT)";
+    }
+    return "Field";
+  }
+
+  /**
+   * @description Get CSS classes for aggregate field combobox
+   * @returns {string} CSS classes
+   */
+  get aggregateFieldComboboxClasses() {
+    let classes = "slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click";
+    if (this.isAggregateFieldListOpen) {
+      classes += " slds-is-open";
+    }
+    return classes;
+  }
+
+  /**
+   * @description Check if there are filtered aggregate fields to display
+   * @returns {boolean} True if there are fields
+   */
+  get hasFilteredAggregateFields() {
+    return this.filteredAggregateFields && this.filteredAggregateFields.length > 0;
+  }
+
+  /**
+   * @description Get CSS class for List button in toggle
+   * @returns {string} CSS classes
+   */
+  get listButtonClass() {
+    const base = "slds-button query-type-btn";
+    return this.isListMode ? `${base} slds-button_brand` : `${base} slds-button_neutral`;
+  }
+
+  /**
+   * @description Get CSS class for Aggregate button in toggle
+   * @returns {string} CSS classes
+   */
+  get aggregateButtonClass() {
+    const base = "slds-button query-type-btn";
+    return this.isAggregateMode ? `${base} slds-button_brand` : `${base} slds-button_neutral`;
+  }
+
+  /**
+   * @description Check if field selection should be shown (List mode + object selected)
+   * @returns {boolean} True if field selection should show
+   */
+  get showFieldSelection() {
+    return this.page2Data.selectedObjectApiName && this.isListMode;
+  }
+
+  /**
+   * @description Check if aggregate section should be shown (Aggregate mode + object selected)
+   * @returns {boolean} True if aggregate section should show
+   */
+  get showAggregateSection() {
+    return this.page2Data.selectedObjectApiName && this.isAggregateMode;
+  }
+
+  /**
    * @description Check if currently on Page 3
    * @returns {boolean} True if on Page 3
    */
@@ -1411,10 +1840,29 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    * @returns {boolean} True if Page 2 has required selections
    */
   get isPage2Valid() {
-    return (
-      this.page2Data.selectedObjectApiName !== null &&
-      this.selectedFieldApiNames.length > 0
-    );
+    // Object must be selected
+    if (!this.page2Data.selectedObjectApiName) {
+      return false;
+    }
+
+    // List mode: at least one field must be selected
+    if (this.isListMode) {
+      return this.selectedFieldApiNames.length > 0;
+    }
+
+    // Aggregate mode: function must be selected, field required for most functions
+    if (this.isAggregateMode) {
+      if (!this.aggregateFunction) {
+        return false;
+      }
+      const func = this.getSelectedAggregateFunction();
+      if (func && func.requiresField && !this.aggregateFieldApiName) {
+        return false;
+      }
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -1566,25 +2014,65 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    * @returns {string} Formatted SOQL query or empty string
    */
   get generatedSoql() {
-    if (!this.page2Data.selectedObjectApiName || this.selectedFieldApiNames.length === 0) {
+    if (!this.page2Data.selectedObjectApiName) {
       return "";
     }
 
-    const fields = this.selectedFieldApiNames.join(",\n       ");
-    let query = `SELECT ${fields}\n  FROM ${this.page2Data.selectedObjectApiName}`;
+    // Handle List mode
+    if (this.isListMode) {
+      if (this.selectedFieldApiNames.length === 0) {
+        return "";
+      }
 
-    // Add WHERE clause if conditions exist
-    const whereClause = this.buildWhereClause();
-    if (whereClause) {
-      query += `\n WHERE ${whereClause}`;
+      const fields = this.selectedFieldApiNames.join(",\n       ");
+      let query = `SELECT ${fields}\n  FROM ${this.page2Data.selectedObjectApiName}`;
+
+      // Add WHERE clause if conditions exist
+      const whereClause = this.buildWhereClause();
+      if (whereClause) {
+        query += `\n WHERE ${whereClause}`;
+      }
+
+      // Add LIMIT clause if set
+      if (this.queryLimit) {
+        query += `\n LIMIT ${this.queryLimit}`;
+      }
+
+      return query;
     }
 
-    // Add LIMIT clause if set
-    if (this.queryLimit) {
-      query += `\n LIMIT ${this.queryLimit}`;
+    // Handle Aggregate mode
+    if (this.isAggregateMode) {
+      if (!this.aggregateFunction) {
+        return "";
+      }
+
+      // Build SELECT clause
+      let selectClause;
+      if (this.aggregateFunction === "COUNT" && !this.aggregateFieldApiName) {
+        selectClause = "COUNT()";
+      } else if (!this.aggregateFieldApiName) {
+        // Field required but not selected
+        return "";
+      } else {
+        selectClause = `${this.aggregateFunction}(${this.aggregateFieldApiName})`;
+      }
+
+      let query = `SELECT ${selectClause}\n  FROM ${this.page2Data.selectedObjectApiName}`;
+
+      // Add WHERE clause if conditions exist
+      const whereClause = this.buildWhereClause();
+      if (whereClause) {
+        query += `\n WHERE ${whereClause}`;
+      }
+
+      // Note: LIMIT is not typically used with aggregate queries
+      // but we can include it if set (SOQL allows it)
+
+      return query;
     }
 
-    return query;
+    return "";
   }
 
   /**
