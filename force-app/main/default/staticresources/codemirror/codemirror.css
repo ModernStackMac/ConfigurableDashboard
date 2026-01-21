@@ -1,0 +1,32 @@
+/* CodeMirror 6 Base Styles */
+/* Note: This is a minimal CSS file. For full styling, consider using a pre-built bundle or CDN */
+
+.cm-editor {
+  height: 100%;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
+.cm-scroller {
+  overflow: auto;
+  height: 100%;
+}
+
+.cm-content {
+  padding: 10px;
+  min-height: 100%;
+  line-height: 1.5;
+}
+
+.cm-focused {
+  outline: none;
+}
+
+/* Syntax highlighting colors */
+.cm-keyword { color: #0000ff; }
+.cm-string { color: #008000; }
+.cm-number { color: #098658; }
+.cm-comment { color: #6a9955; }
+.cm-operator { color: #000000; }
+.cm-variable { color: #001080; }
+.cm-property { color: #0451a5; }

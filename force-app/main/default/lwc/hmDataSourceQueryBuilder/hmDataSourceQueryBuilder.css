@@ -1,0 +1,229 @@
+/* Data Source Query Builder - Wizard Styles */
+
+/* ==================== Progress Indicator ==================== */
+.progress-container {
+  border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  padding-bottom: 1rem;
+}
+
+/* ==================== Form Container (Page 1) ==================== */
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ==================== Page 2 Layout ==================== */
+.page2-container {
+  max-width: 100%;
+  overflow: visible;
+}
+
+.page2-container .slds-grid {
+  overflow: visible;
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Object combobox wrapper - allows dropdown to escape overflow */
+.object-combobox-wrapper {
+  position: relative;
+  z-index: 10;
+}
+
+/* Form Field Container - Ensures proper alignment */
+.form-field-container {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+/* Ensure toggle aligns with input field by matching label height */
+.form-field-container .slds-form-element__label {
+  min-height: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Align toggle control with input field */
+.form-field-container .slds-form-element__control {
+  margin-top: 0;
+}
+
+/* Icon Input Container - Flex layout for input with icon preview */
+.icon-input-container {
+  display: flex;
+  align-items: center;
+}
+
+/* ==================== Combobox Dropdown ==================== */
+
+/* Object dropdown - custom dropdown list */
+.object-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 9999;
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: 1px solid var(--slds-g-color-border-base-1, #c9c9c9);
+  border-radius: 0.25rem;
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.16);
+  margin-top: 1px;
+}
+
+/* Ensure the combobox is the positioning context for the dropdown */
+.object-combobox-wrapper .slds-combobox {
+  position: relative;
+}
+
+/* Dropdown option hover and focus states */
+.slds-listbox__option:hover,
+.slds-listbox__option.slds-has-focus {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  cursor: pointer;
+}
+
+/* Object label styling */
+.object-label {
+  display: block;
+  font-weight: 500;
+  color: var(--slds-g-color-neutral-base-10, #181818);
+}
+
+/* Object API name styling */
+.object-api-name {
+  display: block;
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+  font-size: 0.75rem;
+}
+
+/* Clear button positioning */
+.slds-input__icon_right {
+  pointer-events: auto;
+}
+
+/* ==================== Help Text ==================== */
+.slds-form-element__help {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+/* ==================== Error Box ==================== */
+.slds-theme_error {
+  background-color: #fef7f7;
+  border-color: #c23934;
+}
+
+/* ==================== Selected Object Box ==================== */
+.slds-theme_shade {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+/* ==================== Field Checkbox List ==================== */
+.field-checkbox-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: 0.25rem;
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+}
+
+.field-checkbox-item {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+}
+
+.field-checkbox-item:last-child {
+  border-bottom: none;
+}
+
+.field-checkbox-item:hover {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+/* Selected count badge */
+.selected-count-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 0.9375rem;
+  background-color: var(--slds-g-color-brand-base-50, #0176d3);
+  color: var(--slds-g-color-neutral-base-100, #ffffff);
+}
+
+/* ==================== CodeMirror Container ==================== */
+.codemirror-container {
+  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: 0.25rem;
+  min-height: 280px;
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: "Salesforce Mono", Consolas, "Courier New", monospace;
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+/* Ensure CodeMirror editor fills container */
+.codemirror-container .cm-editor {
+  height: 100%;
+  min-height: 280px;
+}
+
+/* SOQL Preview fallback (when CodeMirror not available) */
+.soql-preview {
+  margin: 0;
+  padding: 0.75rem;
+  font-family: "Salesforce Mono", Consolas, "Courier New", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--slds-g-color-neutral-base-10, #181818);
+  background-color: transparent;
+}
+
+/* ==================== Responsive Adjustments ==================== */
+@media (max-width: 768px) {
+  .form-container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+
+  /* Stack columns on mobile */
+  .page2-container .slds-grid {
+    flex-direction: column;
+  }
+
+  .page2-container .slds-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex-basis: 100% !important;
+    margin-bottom: 1rem;
+  }
+
+  /* Reduce dropdown height on mobile */
+  .object-dropdown {
+    max-height: 180px;
+  }
+
+  /* Reduce checkbox list height on mobile */
+  .field-checkbox-container {
+    max-height: 150px;
+  }
+
+  .codemirror-container {
+    min-height: 150px;
+    max-height: 200px;
+  }
+}
