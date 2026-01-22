@@ -1,18 +1,17 @@
 import { api, track, wire, LightningElement } from "lwc";
 import { ShowToastEvent } from "lightning/platformShowToastEvent";
-import { CloseActionScreenEvent } from "lightning/actions";
 import { getRecord, getFieldValue } from "lightning/uiRecordApi";
 import { loadScript, loadStyle } from "lightning/platformResourceLoader";
 import CODEMIRROR from "@salesforce/resourceUrl/codemirror";
 import COMPONENT_TYPE_FIELD from "@salesforce/schema/HM_Dashboard_Component__c.HM_Type__c";
 import loadDataSource from "@salesforce/apex/HM_DataSourceBuilderService.loadDataSource";
-import saveDataSourceBasicInfo from "@salesforce/apex/HM_DataSourceBuilderService.saveDataSourceBasicInfo";
+import saveDataSourceComplete from "@salesforce/apex/HM_DataSourceBuilderService.saveDataSourceComplete";
 import getAccessibleObjects from "@salesforce/apex/HM_DataSourceBuilderService.getAccessibleObjects";
 import getObjectFields from "@salesforce/apex/HM_DataSourceBuilderService.getObjectFields";
 import executePreviewQuery from "@salesforce/apex/HM_DataSourceBuilderService.executePreviewQuery";
 
 /**
- * @description Data Source Query Builder - Multi-step wizard for creating/editing Data Sources
+ * @description Data Source Query Builder - Single-page layout for creating/editing Data Sources
  * @author High Meadows
  * @date 2024
  */
@@ -117,12 +116,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   ];
 
   // ==================== PUBLIC PROPERTIES ====================
-  @api recordId; // Record ID from Quick Action context (for editing existing records)
+  @api recordId; // Record ID for editing existing records (null for new records)
 
-  // ==================== WIZARD STATE ====================
-  currentStep = 1;
-
-  // ==================== PAGE 1 STATE ====================
+  // ==================== BASIC INFO STATE ====================
   @track formData = {
     name: "",
     active: true,
@@ -134,7 +130,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   componentType = null;
   isIconNameConfirmed = false; // True after user blurs the icon name input
 
-  // ==================== PAGE 2 STATE ====================
+  // ==================== QUERY SETUP STATE ====================
   @track page2Data = {
     selectedObjectApiName: null,
     selectedObjectLabel: null
@@ -168,7 +164,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   fieldCache = {};
   fieldSearchTerm = "";
 
-  // ==================== PAGE 3 STATE ====================
+  // ==================== FILTERS STATE ====================
   @track whereConditions = [];
   conditionIdCounter = 0;
   
@@ -180,23 +176,18 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   
   // Query limit (null means no limit)
   queryLimit = null;
-  
-  // Collapsible section states for Page 3
-  isQuickFiltersExpanded = true;
-  isConditionsExpanded = true;
 
   // CodeMirror state
   codeMirrorInitialized = false;
   codeMirrorEditor = null;
 
-  // ==================== PAGE 4 STATE ====================
+  // ==================== PREVIEW RESULTS STATE ====================
   @track queryResults = [];
   @track queryColumns = [];
   queryTotalCount = 0;
   isQueryLoading = false;
   queryError = null;
-  isSoqlSectionExpanded = true;
-  isResultsSectionExpanded = true;
+  isResultsExpanded = true; // Results section expanded by default
 
   // ==================== COMMON STATE ====================
   isLoading = false;
@@ -223,7 +214,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   // ==================== LIFECYCLE HOOKS ====================
 
   connectedCallback() {
-    // Load existing data if recordId is provided (from Quick Action context)
+    // Load objects for Step 1 (object selection is now on Step 1)
+    this.loadObjects();
+    
+    // Load existing data if recordId is provided (for editing)
     if (this.recordId) {
       this.loadExistingData();
     }
@@ -294,61 +288,42 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Handle Next button click - navigates to next page
+   * @description Handle Run Preview button click - expands results and executes query
    */
-  handleNext() {
-    this.clearError();
+  handleRunPreview(event) {
+    // Stop propagation to prevent toggleResultsExpanded from firing
+    event.stopPropagation();
+    this.isResultsExpanded = true;
+    this.executeQueryPreview();
+  }
 
-    if (this.currentStep === 1) {
-      if (!this.isPage1Valid) {
-        return;
-      }
-      // Navigate to Page 2
-      this.currentStep = 2;
-      // Load objects for Page 2
-      this.loadObjects();
-      // Initialize CodeMirror (deferred to allow DOM to render)
-      // eslint-disable-next-line @lwc/lwc/no-async-operation
-      setTimeout(() => {
-        this.initializeCodeMirror();
-      }, 100);
-    } else if (this.currentStep === 2) {
-      if (!this.isPage2Valid) {
-        return;
-      }
-      // Navigate to Page 3 (Filters)
-      this.currentStep = 3;
-    } else if (this.currentStep === 3) {
-      if (!this.isPage3Valid) {
-        return;
-      }
-      // Navigate to Page 4 (Preview)
-      this.currentStep = 4;
-      // Execute preview query
-      this.executeQueryPreview();
+  /**
+   * @description Toggle results section expanded/collapsed
+   */
+  toggleResultsExpanded() {
+    this.isResultsExpanded = !this.isResultsExpanded;
+  }
+
+  /**
+   * @description Handle Copy SOQL button click - copies SOQL to clipboard
+   */
+  handleCopySoql() {
+    if (this.generatedSoql) {
+      navigator.clipboard.writeText(this.generatedSoql).then(() => {
+        this.showToast("Copied", "SOQL copied to clipboard", "success");
+      }).catch(() => {
+        this.showError("Error", "Failed to copy SOQL to clipboard");
+      });
     }
   }
 
   /**
-   * @description Handle Back button click - returns to previous page
-   */
-  handleBack() {
-    this.clearError();
-    if (this.currentStep === 2) {
-      this.currentStep = 1;
-    } else if (this.currentStep === 3) {
-      this.currentStep = 2;
-    } else if (this.currentStep === 4) {
-      this.currentStep = 3;
-    }
-  }
-
-  /**
-   * @description Handle Save button click on final page - saves all wizard data
+   * @description Handle Save button click - saves all data
    */
   async handleSave() {
-    // Page 4 is preview - validation already done on Page 3
-    if (!this.isPage3Valid) {
+    // Validate form before saving
+    if (!this.isFormValid) {
+      this.showError("Validation Error", "Please complete all required fields and fix any invalid conditions");
       return;
     }
 
@@ -356,21 +331,25 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.clearError();
 
     try {
-      // Save all wizard data (Page 1 + Page 2 + Page 3)
-      await saveDataSourceBasicInfo({
-        recordId: this.recordId,
+      // Save complete wizard data (all pages) - returns the record ID
+      const savedRecordId = await saveDataSourceComplete({
+        recordId: this.recordId || null,
         name: this.formData.name.trim(),
         active: this.formData.active,
         dashboardComponentId: this.formData.dashboardComponentId,
         orderValue: this.formData.order,
-        rowIconName: this.formData.rowIconName?.trim() || null
+        rowIconName: this.formData.rowIconName?.trim() || null,
+        returnType: this.queryType,
+        soqlQuery: this.generatedSoql,
+        queryConfig: this.serializeQueryConfig()
       });
 
-      // TODO: Save Page 2 data (selected object, fields) when fields are added to Data Source
-      // TODO: Save Page 3 data (WHERE conditions) when fields are added to Data Source
-
       this.showToast("Success", "Data Source saved successfully", "success");
-      this.closePanel();
+      
+      // Dispatch savesuccess event with record ID for navigation
+      this.dispatchEvent(new CustomEvent("savesuccess", {
+        detail: { recordId: savedRecordId }
+      }));
     } catch (error) {
       const errorMessage = error.body?.message || error.message || "Error saving data source";
       this.showError("Error", errorMessage);
@@ -788,42 +767,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.updateSoqlPreview();
   }
 
-  // ==================== PAGE 4 HANDLERS ====================
-
-  /**
-   * @description Toggle SOQL section expanded/collapsed
-   */
-  toggleSoqlSection() {
-    this.isSoqlSectionExpanded = !this.isSoqlSectionExpanded;
-  }
-
-  /**
-   * @description Toggle Results section expanded/collapsed
-   */
-  toggleResultsSection() {
-    this.isResultsSectionExpanded = !this.isResultsSectionExpanded;
-  }
-
-  /**
-   * @description Toggle Quick Filters section expanded/collapsed
-   */
-  toggleQuickFiltersSection() {
-    this.isQuickFiltersExpanded = !this.isQuickFiltersExpanded;
-  }
-
-  /**
-   * @description Toggle Conditions section expanded/collapsed
-   */
-  toggleConditionsSection() {
-    this.isConditionsExpanded = !this.isConditionsExpanded;
-  }
-
-  /**
-   * @description Handle refresh preview button click
-   */
-  handleRefreshPreview() {
-    this.executeQueryPreview();
-  }
+  // ==================== PREVIEW QUERY HANDLERS ====================
 
   /**
    * @description Execute the preview query and display results
@@ -881,8 +825,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
         this.queryResults = result.rows;
         this.queryTotalCount = result.totalCount;
       } else {
-        // Aggregate query - execute directly since we need different handling
-        await this.executeAggregatePreview(whereClause);
+        // Aggregate query - show simplified preview
+        await this.executeAggregatePreview();
       }
 
     } catch (error) {
@@ -893,10 +837,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Execute aggregate query preview
-   * @param {string} whereClause - WHERE clause string
+   * @description Execute aggregate query preview - shows simplified preview for aggregate queries
    */
-  async executeAggregatePreview(whereClause) {
+  async executeAggregatePreview() {
     // Build the aggregate expression for display
     let aggregateExpr;
     if (this.aggregateFunction === "COUNT" && !this.aggregateFieldApiName) {
@@ -1509,17 +1452,22 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
 
     try {
       const data = await loadDataSource({ recordId: this.recordId });
-      
+
       if (!data) {
         throw new Error("No data returned from server");
       }
-      
+
+      // Page 1 - Basic Info
       this.formData.name = data.name || "";
       this.formData.active = data.active !== undefined ? data.active : true;
       this.formData.dashboardComponentId = data.dashboardComponentId || null;
       this.formData.order = data.order !== undefined ? data.order : 1;
       this.formData.rowIconName = data.rowIconName || "";
       // componentType is set by the wire adapter when dashboardComponentId changes
+
+      // Deserialize query config (Page 2 + 3 state)
+      await this.deserializeQueryConfig(data.queryConfig);
+
     } catch (error) {
       const errorMessage = error.body?.message || error.message || "Unknown error occurred";
       this.showError("Load Error", `Failed to load existing data source: ${errorMessage}`);
@@ -1531,45 +1479,72 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   // ==================== UI HELPERS ====================
 
   /**
-   * @description Get modal title based on current step
-   * @returns {string} Modal title
+   * @description Get page title
+   * @returns {string} Page title
    */
-  get modalTitle() {
-    const prefix = this.recordId ? "Edit" : "Create";
-    switch (this.currentStep) {
-      case 1:
-        return `${prefix} Data Source - Basic Info`;
-      case 2:
-        return `${prefix} Data Source - Select Object & Fields`;
-      case 3:
-        return `${prefix} Data Source - Filters`;
-      default:
-        return `${prefix} Data Source`;
+  get pageTitle() {
+    return this.recordId ? "Edit Data Source" : "New Data Source";
+  }
+
+  /**
+   * @description Get page subtitle with context
+   * @returns {string} Subtitle text
+   */
+  get pageSubtitle() {
+    if (this.formData.name) {
+      return `Configure query for "${this.formData.name}"`;
     }
+    return "Configure query parameters and save";
   }
 
   /**
-   * @description Get current step value as string for progress indicator
-   * @returns {string} Current step value
+   * @description Get CSS class for results container
+   * @returns {string} CSS classes
    */
-  get currentStepValue() {
-    return String(this.currentStep);
+  get resultsContainerClass() {
+    return this.isResultsExpanded ? "results-container expanded" : "results-container collapsed";
   }
 
   /**
-   * @description Check if currently on Page 1
-   * @returns {boolean} True if on Page 1
+   * @description Get icon for results expand/collapse button
+   * @returns {string} Icon name
    */
-  get isPage1() {
-    return this.currentStep === 1;
+  get resultsExpandIcon() {
+    return this.isResultsExpanded ? "utility:chevrondown" : "utility:chevronright";
   }
 
   /**
-   * @description Check if currently on Page 2
-   * @returns {boolean} True if on Page 2
+   * @description Get active accordion sections (all open by default)
+   * @returns {Array} Array of section names to open
    */
-  get isPage2() {
-    return this.currentStep === 2;
+  get activeSections() {
+    const sections = ["settings", "query"];
+    if (this.page2Data.selectedObjectApiName) {
+      if (this.isListMode) {
+        sections.push("fields");
+      } else {
+        sections.push("aggregate");
+      }
+      sections.push("filters");
+    }
+    return sections;
+  }
+
+  /**
+   * @description Get fields accordion label with count
+   * @returns {string} Label with field count
+   */
+  get fieldsAccordionLabel() {
+    return `Fields (${this.selectedFieldCount} selected)`;
+  }
+
+  /**
+   * @description Get filters accordion label with count
+   * @returns {string} Label with condition count
+   */
+  get filtersAccordionLabel() {
+    const count = this.whereConditions.length;
+    return count > 0 ? `Filters (${count})` : "Filters";
   }
 
   /**
@@ -1711,53 +1686,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     return this.page2Data.selectedObjectApiName && this.isAggregateMode;
   }
 
-  /**
-   * @description Check if currently on Page 3
-   * @returns {boolean} True if on Page 3
-   */
-  get isPage3() {
-    return this.currentStep === 3;
-  }
-
-  /**
-   * @description Check if currently on Page 4 (Preview)
-   * @returns {boolean} True if on Page 4
-   */
-  get isPage4() {
-    return this.currentStep === 4;
-  }
-
-  /**
-   * @description Check if SOQL section is expanded (for collapsible)
-   * @returns {string} Icon name for SOQL section toggle
-   */
-  get soqlSectionIcon() {
-    return this.isSoqlSectionExpanded ? "utility:chevrondown" : "utility:chevronright";
-  }
-
-  /**
-   * @description Get icon for Results section toggle
-   * @returns {string} Icon name
-   */
-  get resultsSectionIcon() {
-    return this.isResultsSectionExpanded ? "utility:chevrondown" : "utility:chevronright";
-  }
-
-  /**
-   * @description Get icon for Quick Filters section toggle
-   * @returns {string} Icon name
-   */
-  get quickFiltersSectionIcon() {
-    return this.isQuickFiltersExpanded ? "utility:chevrondown" : "utility:chevronright";
-  }
-
-  /**
-   * @description Get icon for Conditions section toggle
-   * @returns {string} Icon name
-   */
-  get conditionsSectionIcon() {
-    return this.isConditionsExpanded ? "utility:chevrondown" : "utility:chevronright";
-  }
 
   /**
    * @description Check if there are query results
@@ -1776,75 +1704,42 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Check if Next button should be disabled
-   * @returns {boolean} True if Next should be disabled
+   * @description Check if Save button should be disabled
+   * @returns {boolean} True if save should be disabled
    */
-  get isNextDisabled() {
-    if (this.isSaving || this.isLoading) {
-      return true;
+  get isSaveDisabled() {
+    return this.isSaving || this.isLoading || !this.isFormValid;
+  }
+
+  /**
+   * @description Check if the entire form is valid (all required fields filled)
+   * @returns {boolean} True if form is valid and ready to save
+   */
+  get isFormValid() {
+    // Basic Info validation
+    if (!this.hasRequiredBasicInfo || !this.isIconNameValidOrEmpty) {
+      return false;
     }
-    if (this.currentStep === 1) {
-      return !this.isPage1Valid;
+    // Object must be selected
+    if (!this.page2Data.selectedObjectApiName) {
+      return false;
     }
-    if (this.currentStep === 2) {
-      return !this.isPage2Valid;
+    // Field/Aggregate validation
+    if (!this.isFieldSelectionValid) {
+      return false;
     }
-    if (this.currentStep === 3) {
-      return !this.isPage3Valid;
+    // WHERE conditions validation
+    if (!this.areConditionsValid) {
+      return false;
     }
     return true;
   }
 
   /**
-   * @description Check if Save button should be disabled (Page 4)
-   * @returns {boolean} True if save should be disabled
+   * @description Check if field selection is valid based on query type
+   * @returns {boolean} True if field selection is valid
    */
-  get isSaveDisabled() {
-    return this.isSaving || this.isLoading;
-  }
-
-  /**
-   * @description Check if Next button should be shown
-   * @returns {boolean} True if on Page 1, 2, or 3
-   */
-  get showNextButton() {
-    return this.currentStep === 1 || this.currentStep === 2 || this.currentStep === 3;
-  }
-
-  /**
-   * @description Check if Save button should be shown
-   * @returns {boolean} True if on Page 4
-   */
-  get showSaveButton() {
-    return this.currentStep === 4;
-  }
-
-  /**
-   * @description Check if Back button should be shown
-   * @returns {boolean} True if on Page 2, 3, or 4
-   */
-  get showBackButton() {
-    return this.currentStep === 2 || this.currentStep === 3 || this.currentStep === 4;
-  }
-
-  /**
-   * @description Check if Page 1 form is valid
-   * @returns {boolean} True if Page 1 has all required fields filled and valid
-   */
-  get isPage1Valid() {
-    return this.hasRequiredPage1Fields && this.isIconNameValidOrEmpty;
-  }
-
-  /**
-   * @description Check if Page 2 is valid (object and at least one field selected)
-   * @returns {boolean} True if Page 2 has required selections
-   */
-  get isPage2Valid() {
-    // Object must be selected
-    if (!this.page2Data.selectedObjectApiName) {
-      return false;
-    }
-
+  get isFieldSelectionValid() {
     // List mode: at least one field must be selected
     if (this.isListMode) {
       return this.selectedFieldApiNames.length > 0;
@@ -1866,10 +1761,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Check if Page 3 is valid (WHERE conditions are optional but must be complete if present)
-   * @returns {boolean} True if Page 3 is valid (conditions optional, but if present must be valid)
+   * @description Check if WHERE conditions are valid (optional but must be complete if present)
+   * @returns {boolean} True if conditions are valid
    */
-  get isPage3Valid() {
+  get areConditionsValid() {
     // WHERE conditions are optional
     if (this.whereConditions.length === 0) {
       return true;
@@ -1899,10 +1794,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Check if Page 1 has all required fields
+   * @description Check if basic info has all required fields
    * @returns {boolean} True if required fields are filled
    */
-  get hasRequiredPage1Fields() {
+  get hasRequiredBasicInfo() {
     return (
       this.formData.name &&
       this.formData.name.trim() !== "" &&
@@ -2229,6 +2124,97 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
+   * @description SQL keywords for syntax highlighting
+   */
+  static SQL_KEYWORDS = [
+    "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "LIKE",
+    "ORDER", "BY", "ASC", "DESC", "NULLS", "FIRST", "LAST",
+    "LIMIT", "OFFSET", "GROUP", "HAVING", "WITH", "USING", "SCOPE"
+  ];
+
+  /**
+   * @description SQL functions and operators for syntax highlighting
+   */
+  static SQL_FUNCTIONS = [
+    "COUNT", "COUNT_DISTINCT", "SUM", "AVG", "MIN", "MAX",
+    "CALENDAR_MONTH", "CALENDAR_YEAR", "DAY_IN_MONTH", "DAY_IN_WEEK",
+    "FISCAL_MONTH", "FISCAL_QUARTER", "FISCAL_YEAR", "HOUR_IN_DAY",
+    "WEEK_IN_MONTH", "WEEK_IN_YEAR"
+  ];
+
+  /**
+   * @description Date literals for syntax highlighting
+   */
+  static SQL_DATE_LITERALS = [
+    "TODAY", "YESTERDAY", "TOMORROW", "LAST_WEEK", "THIS_WEEK", "NEXT_WEEK",
+    "LAST_MONTH", "THIS_MONTH", "NEXT_MONTH", "LAST_90_DAYS", "NEXT_90_DAYS",
+    "LAST_N_DAYS", "NEXT_N_DAYS", "THIS_QUARTER", "LAST_QUARTER", "NEXT_QUARTER",
+    "THIS_YEAR", "LAST_YEAR", "NEXT_YEAR", "THIS_FISCAL_QUARTER", "LAST_FISCAL_QUARTER",
+    "NEXT_FISCAL_QUARTER", "THIS_FISCAL_YEAR", "LAST_FISCAL_YEAR", "NEXT_FISCAL_YEAR"
+  ];
+
+  /**
+   * @description Tokenize SOQL for syntax highlighting
+   * @returns {Array} Array of token objects with id, value, and className
+   */
+  get soqlTokens() {
+    const soql = this.generatedSoql;
+    if (!soql) return [];
+
+    const tokens = [];
+    let tokenId = 0;
+
+    // Regex to match different token types
+    const tokenRegex = /(:[\w.]+\(\))|('[^']*')|(\d+)|([A-Za-z_][\w_.]*)|(\s+)|([^\s\w]+)/g;
+    let match;
+
+    while ((match = tokenRegex.exec(soql)) !== null) {
+      const value = match[0];
+      let className = "sql-field"; // default
+
+      const upperValue = value.toUpperCase();
+
+      if (/^\s+$/.test(value)) {
+        // Whitespace - preserve formatting
+        className = "";
+      } else if (value.startsWith(":")) {
+        // Apex variable binding
+        className = "sql-variable";
+      } else if (value.startsWith("'") && value.endsWith("'")) {
+        // String literal
+        className = "sql-string";
+      } else if (/^\d+$/.test(value)) {
+        // Number
+        className = "sql-number";
+      } else if (HM_DataSourceQueryBuilder.SQL_KEYWORDS.includes(upperValue)) {
+        // SQL keyword
+        className = "sql-keyword";
+      } else if (HM_DataSourceQueryBuilder.SQL_FUNCTIONS.some(f => upperValue.startsWith(f))) {
+        // SQL function
+        className = "sql-function";
+      } else if (HM_DataSourceQueryBuilder.SQL_DATE_LITERALS.some(d => upperValue.startsWith(d))) {
+        // Date literal
+        className = "sql-literal";
+      } else if (/^[=!<>]+$/.test(value) || value === "(" || value === ")" || value === ",") {
+        // Operator/punctuation
+        className = "sql-operator";
+      } else if (this.page2Data.selectedObjectApiName && 
+                 upperValue === this.page2Data.selectedObjectApiName.toUpperCase()) {
+        // Object name
+        className = "sql-object";
+      }
+
+      tokens.push({
+        id: `token-${tokenId++}`,
+        value: value,
+        className: className
+      });
+    }
+
+    return tokens;
+  }
+
+  /**
    * @description Initialize CodeMirror editor
    */
   async initializeCodeMirror() {
@@ -2257,9 +2243,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
           this.codeMirrorInitialized = true;
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // CodeMirror failed to load - fallback to plain text display
       this.codeMirrorInitialized = false;
+      console.error("Error initializing CodeMirror:", _error);
     }
   }
 
@@ -2280,13 +2267,90 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     // If CodeMirror not available, the template will use the generatedSoql getter directly
   }
 
+  // ==================== CONFIG SERIALIZATION ====================
+
+  /**
+   * @description Serialize wizard state to JSON for storage
+   * @returns {string} JSON string of wizard configuration
+   */
+  serializeQueryConfig() {
+    return JSON.stringify({
+      objectApiName: this.page2Data.selectedObjectApiName,
+      objectLabel: this.page2Data.selectedObjectLabel,
+      queryType: this.queryType,
+      selectedFields: this.selectedFieldApiNames,
+      aggregateFunction: this.aggregateFunction,
+      aggregateFieldApiName: this.aggregateFieldApiName,
+      aggregateFieldSearchTerm: this.aggregateFieldSearchTerm,
+      whereConditions: this.whereConditions.map((c) => ({
+        id: c.id,
+        fieldApiName: c.fieldApiName,
+        fieldLabel: c.fieldLabel,
+        fieldType: c.fieldType,
+        operator: c.operator,
+        value: c.value,
+        conjunction: c.conjunction
+      })),
+      activeOwnerFilter: this.activeOwnerFilter,
+      queryLimit: this.queryLimit
+    });
+  }
+
+  /**
+   * @description Deserialize stored JSON config back into wizard state
+   * @param {string} configJson - JSON string of wizard configuration
+   */
+  async deserializeQueryConfig(configJson) {
+    if (!configJson) return;
+
+    try {
+      const config = JSON.parse(configJson);
+
+      // Restore Page 2 state
+      this.page2Data.selectedObjectApiName = config.objectApiName || null;
+      this.page2Data.selectedObjectLabel = config.objectLabel || null;
+      this.objectSearchTerm = config.objectLabel || "";
+      this.queryType = config.queryType || "List";
+      this.aggregateFunction = config.aggregateFunction || null;
+      this.aggregateFieldApiName = config.aggregateFieldApiName || null;
+      this.aggregateFieldSearchTerm = config.aggregateFieldSearchTerm || "";
+
+      // Load fields for the object (needed for field labels, WHERE dropdowns)
+      // Note: loadFieldsForObject resets selectedFieldApiNames, so we restore them AFTER
+      if (config.objectApiName) {
+        await this.loadFieldsForObject(config.objectApiName);
+        // Filter aggregate fields if in aggregate mode
+        if (this.isAggregateMode && this.aggregateFunction) {
+          this.filterAggregateFields();
+        }
+      }
+
+      // Restore selected fields AFTER loadFieldsForObject (which resets them)
+      this.selectedFieldApiNames = config.selectedFields || [];
+
+      // Restore Page 3 state
+      this.whereConditions = (config.whereConditions || []).map((c) => ({
+        ...c,
+        id: c.id || `cond_${++this.conditionIdCounter}`
+      }));
+      this.activeOwnerFilter = config.activeOwnerFilter || null;
+      this.queryLimit = config.queryLimit || null;
+
+      // Update SOQL preview
+      this.updateSoqlPreview();
+    } catch (e) {
+      // Config parsing failed - leave state as default
+      console.error("Error deserializing query config:", e);
+    }
+  }
+
   // ==================== UTILITY METHODS ====================
 
   /**
-   * @description Close quick action panel
+   * @description Close the wizard - dispatches event for Aura wrapper to handle navigation
    */
   closePanel() {
-    this.dispatchEvent(new CloseActionScreenEvent());
+    this.dispatchEvent(new CustomEvent("close"));
   }
 
   /**
