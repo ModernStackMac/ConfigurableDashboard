@@ -2,6 +2,12 @@
  * @description Service class for Dashboard Data Source Builder component
  * Provides metadata and validation services for SOQL query building
  * 
+ * Key responsibilities:
+ * - Load and save Data Source records with CRUD/FLS enforcement
+ * - Retrieve accessible SObjects and fields for query builder UI
+ * - Execute preview queries with limited results (max 5 rows)
+ * - Validate and escape user input for safe SOQL construction
+ * 
  * @author High Meadows
  * @date 2024
  */
@@ -287,11 +293,13 @@ public with sharing class HM_DataSourceBuilderService {
   
   /**
    * @description Execute a preview query and return limited results
+   * Note: Preview results are ALWAYS limited to 5 rows for performance, regardless of queryLimit.
+   * The queryLimit parameter only affects the totalCount calculation.
    * @param objectApiName API name of the object to query
    * @param fieldApiNames List of field API names to select
    * @param whereClause WHERE clause conditions (without 'WHERE' keyword)
-   * @param queryLimit User-specified limit (used for count, preview always limited to 5)
-   * @return QueryResult Query results with columns, rows, and total count
+   * @param queryLimit User-specified limit (used for count display, preview always limited to 5)
+   * @return QueryResult Query results with columns (5 max), rows, and total count
    */
   @AuraEnabled(cacheable=false)
   public static QueryResult executePreviewQuery(
@@ -360,23 +368,15 @@ public with sharing class HM_DataSourceBuilderService {
       String fieldList = String.join(orderedFields, ', ');
       String soql = 'SELECT ' + fieldList + ' FROM ' + String.escapeSingleQuotes(objectApiName);
       
-      // Add WHERE clause if provided
-      if (String.isNotBlank(whereClause)) {
-        // Replace merge fields
-        String processedWhere = whereClause;
-        if (processedWhere.contains(':UserInfo.getUserId()')) {
-          processedWhere = processedWhere.replace(':UserInfo.getUserId()', '\'' + String.escapeSingleQuotes(UserInfo.getUserId()) + '\'');
-        }
+      // Add WHERE clause if provided (replace Apex bindings for dynamic SOQL)
+      String processedWhere = replaceApexBindings(whereClause);
+      if (String.isNotBlank(processedWhere)) {
         soql += ' WHERE ' + processedWhere;
       }
       
       // Get total count (respecting user's limit if set)
       String countSoql = 'SELECT COUNT() FROM ' + String.escapeSingleQuotes(objectApiName);
-      if (String.isNotBlank(whereClause)) {
-        String processedWhere = whereClause;
-        if (processedWhere.contains(':UserInfo.getUserId()')) {
-          processedWhere = processedWhere.replace(':UserInfo.getUserId()', '\'' + String.escapeSingleQuotes(UserInfo.getUserId()) + '\'');
-        }
+      if (String.isNotBlank(processedWhere)) {
         countSoql += ' WHERE ' + processedWhere;
       }
       
@@ -433,6 +433,29 @@ public with sharing class HM_DataSourceBuilderService {
     return result;
   }
   
+  // ==================== PRIVATE HELPER METHODS ====================
+
+  /**
+   * @description Replace Apex binding syntax with actual values for preview execution
+   * Handles :UserInfo.getUserId() binding which cannot be used in dynamic SOQL
+   * @param query String containing potential Apex bindings
+   * @return String with bindings replaced by escaped literal values
+   */
+  private static String replaceApexBindings(String query) {
+    if (String.isBlank(query)) {
+      return query;
+    }
+    
+    String result = query;
+    if (result.contains(':UserInfo.getUserId()')) {
+      result = result.replace(
+        ':UserInfo.getUserId()', 
+        '\'' + String.escapeSingleQuotes(UserInfo.getUserId()) + '\''
+      );
+    }
+    return result;
+  }
+
   // ==================== INNER CLASSES ====================
   
   /**

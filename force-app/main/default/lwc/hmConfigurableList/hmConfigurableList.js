@@ -4,9 +4,17 @@ import getComponentConfiguration from "@salesforce/apex/HM_DashboardConfigServic
 import executeComponentQuery from "@salesforce/apex/HM_ComponentDataService.executeComponentQuery";
 
 /**
- * @description Clean, simplified configurable list component
- * Displays tabular data from SOQL queries or Apex methods
- * Supports object-specific columns and row icons
+ * @description Configurable list component for displaying tabular data
+ * Displays records from SOQL queries defined in Data Source configurations.
+ * 
+ * Key capabilities:
+ * - Object-specific column visibility based on record type
+ * - Pagination with configurable page size
+ * - Column sorting (ascending/descending)
+ * - Dynamic filters based on object types in data
+ * - Custom badge rendering for date fields (days until/over)
+ * - Row icons from data source configuration
+ * - Dark mode support
  */
 export default class HM_ConfigurableList extends NavigationMixin(
   LightningElement
@@ -518,7 +526,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
          column.badgeType === HM_ConfigurableList.BADGE_TYPES.DAYS_LEFT) && value != null) {
       try {
         badge = this.calculateDaysBadge(value, column.badgeVariant);
-      } catch (error) {
+      } catch {
         // Graceful degradation: Badge calculation is non-critical UI enhancement.
         // If calculation fails (invalid date format, etc.), continue without badge
         // rather than breaking row rendering. Badge will be null and row displays normally.
@@ -625,7 +633,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
         icon: iconName,
         className: `cc-custom-badge cc-badge-${variant}` // Pre-computed class name for template
       };
-    } catch (error) {
+    } catch {
       // If calculation fails, return null (no badge)
       return null;
     }
@@ -788,9 +796,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
         const hasNameColumnWithNoRestriction = this.columns.some(
           col => col.fieldApiName === 'Name' && (!col.objectType || col.objectType.length === 0)
         );
-        const hasCaseNumberColumnWithNoRestriction = this.columns.some(
-          col => col.fieldApiName === 'CaseNumber' && (!col.objectType || col.objectType.length === 0)
-        );
+        // Note: CaseNumber check not needed since smart Name column handles both Name and CaseNumber display
         const hasCreatedDateColumnWithNoRestriction = this.columns.some(
           col => col.fieldApiName === 'CreatedDate' && (!col.objectType || col.objectType.length === 0)
         );
@@ -922,13 +928,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     return null;
   }
 
-  /**
-   * @description Get field value from record (supports nested fields)
-   * Handles dot notation for parent relationships (e.g., "Account.Name")
-   * @param {Object} record - Record object to get value from
-   * @param {String} fieldApiName - Field API name, supports dot notation for nested fields
-   * @return {*} Field value or null if not found
-   */
   /**
    * @description Get field value from record, supporting nested field paths
    * Handles dot notation for relationship fields (e.g., "Account.Name")
@@ -1518,8 +1517,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
       // Get visible columns (might include virtual columns)
       const visibleCols = this.visibleColumns;
       column = visibleCols.find(col => col.key === columnKey);
-    } catch (e) {
-      // If visibleColumns getter has issues, fall back to configured columns
+    } catch {
+      // Intentional graceful degradation: visibleColumns getter can fail during
+      // component initialization or filter changes. Fall back to configured columns
+      // rather than breaking the sort operation. This is non-critical for sorting.
+      column = null;
     }
     
     if (!column) {
@@ -1533,9 +1535,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
         if (column.isSmartNameColumn) {
           if (row.objectType === 'Case') {
             return this.getFieldValue(row.record, 'CaseNumber');
-          } else {
-            return this.getFieldValue(row.record, 'Name');
           }
+          return this.getFieldValue(row.record, 'Name');
         }
         // Regular virtual column
         return this.getFieldValue(row.record, column.fieldApiName);

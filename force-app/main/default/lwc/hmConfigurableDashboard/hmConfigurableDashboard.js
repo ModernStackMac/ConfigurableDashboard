@@ -5,7 +5,14 @@ import getDashboardConfiguration from "@salesforce/apex/HM_DashboardConfigServic
 
 /**
  * @description Top-level configurable dashboard component
- * Orchestrates dashboard groups and components based on custom object configuration
+ * Orchestrates dashboard groups and components based on custom object configuration.
+ * 
+ * Key capabilities:
+ * - Load dashboard configuration by ID or Name
+ * - Render component groups with their nested tiles and lists
+ * - Actions menu with standard actions (New Opp, New Case, etc.) and custom actions
+ * - Dark mode toggle with persistence and propagation to child components
+ * - Navigation support for object pages, record pages, and LWC components
  */
 export default class HM_ConfigurableDashboard extends NavigationMixin(
   LightningElement
@@ -78,7 +85,7 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
 
   // Wire user name
   @wire(getUserName)
-  wiredUserName({ error, data }) {
+  wiredUserName({ data }) {
     if (data) {
       this.userName = data;
     }
@@ -268,8 +275,9 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
     );
     if (menuButton) {
       // Mark dropdown after a short delay to allow DOM to render
+      // eslint-disable-next-line @lwc/lwc/no-async-operation
       setTimeout(() => {
-        this.markOurMenuDropdown(menuButton);
+        this.markOurMenuDropdown();
       }, 100);
     }
     this.styleMenuDropdown();
@@ -279,8 +287,9 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   /**
    * @description Mark our dropdown menu with a class for easier targeting
    */
-  markOurMenuDropdown(menuButton) {
+  markOurMenuDropdown() {
     // Find the dropdown that appeared after our button
+    // eslint-disable-next-line @lwc/lwc/no-document-query
     const dropdowns = document.querySelectorAll(".slds-dropdown");
     dropdowns.forEach((dropdown) => {
       // Check if this dropdown contains our toggleDarkMode item
@@ -341,6 +350,7 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
     }
 
     // Use a single debounced attempt with retry logic
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
     this.menuStyleTimeoutId = setTimeout(() => {
       this.attemptStyleMenuDropdown(0);
     }, 50);
@@ -363,9 +373,10 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
     );
 
     if (menuButton) {
-      this.applyMenuDropdownStyles(menuButton);
+      this.applyMenuDropdownStyles();
     } else if (attemptCount < MAX_ATTEMPTS - 1) {
       // Retry with next delay
+      // eslint-disable-next-line @lwc/lwc/no-async-operation
       this.menuStyleTimeoutId = setTimeout(() => {
         this.attemptStyleMenuDropdown(attemptCount + 1);
       }, DELAYS[attemptCount] || 200);
@@ -374,11 +385,11 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
 
   /**
    * @description Apply dark mode styles to the menu dropdown
-   * @param {HTMLElement} menuButton - The menu button element
    */
-  applyMenuDropdownStyles(menuButton) {
+  applyMenuDropdownStyles() {
     // Find dropdown menus - but only ones that belong to our menu
     // Check if dropdown contains our toggleDarkMode menu item
+    // eslint-disable-next-line @lwc/lwc/no-document-query
     const dropdowns = document.querySelectorAll(
       '.slds-dropdown, [role="menu"]'
     );
@@ -508,9 +519,14 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
   /**
    * @description Propagate dark mode state to child components
    * Updates isDarkMode property on all child component groups, tiles, and lists
+   * Uses setTimeout(0) to defer execution until after the current render cycle completes,
+   * ensuring child components exist in DOM before we attempt to update their properties.
+   * This is necessary because LWC renders asynchronously and child components may not
+   * be available immediately after a state change that affects their visibility.
    */
   propagateDarkMode() {
-    // Use setTimeout to ensure DOM is updated
+    // Defer to next microtask to ensure child components are rendered
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
     setTimeout(() => {
       const groupComponents = this.template.querySelectorAll(
         "c-hm-configurable-component-group"
@@ -596,6 +612,7 @@ export default class HM_ConfigurableDashboard extends NavigationMixin(
    */
   removeDarkModeStyles() {
     if (this.darkModeStyleId) {
+      // eslint-disable-next-line @lwc/lwc/no-document-query
       const existingStyle = document.getElementById(this.darkModeStyleId);
       if (existingStyle) {
         existingStyle.remove();

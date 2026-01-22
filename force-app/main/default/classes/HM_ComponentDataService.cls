@@ -5,6 +5,13 @@
  * Multiple Data Sources per Component are supported and processed in order.
  * Supports both standard record queries and aggregate queries.
  * 
+ * Key responsibilities:
+ * - Execute SOQL queries defined in Data Source records
+ * - Replace merge fields ({!UserId}, etc.) and Apex bindings in queries
+ * - Process both LIST and AGGREGATE return types
+ * - Enforce CRUD/FLS via Security.stripInaccessible for SObject queries
+ * - Combine multiple data sources for List components
+ * 
  * @author High Meadows
  * @date 2024
  */
@@ -141,41 +148,32 @@ public with sharing class HM_ComponentDataService {
       }
 
       // Query Component Detail Maps with Map Type "Subtitle" and "Tile Badge" for tile components
+      // Combined into single query for performance optimization
       HM_Component_Detail_Map__c subtitleDetailMap = null;
       HM_Component_Detail_Map__c badgeDetailMap = null;
       if (component.HM_Type__c == COMPONENT_TYPE_TILE) {
         // Check object accessibility for Component Detail Maps
         if (Schema.sObjectType.HM_Component_Detail_Map__c.isAccessible()) {
-          // Query subtitle detail map
-          List<HM_Component_Detail_Map__c> subtitleMaps = [
+          // Single query for both subtitle and badge detail maps
+          List<HM_Component_Detail_Map__c> tileDetailMaps = [
             SELECT
               Id,
               HM_Data_Source_Name__c,
               HM_Field_API_Name__c,
-              HM_Format_Type__c
+              HM_Format_Type__c,
+              HM_Map_Type__c
             FROM HM_Component_Detail_Map__c
             WHERE HM_Dashboard_Component__c = :componentId
-              AND HM_Map_Type__c = 'Subtitle'
-            LIMIT 1
+              AND HM_Map_Type__c IN ('Subtitle', 'Tile Badge')
           ];
-          if (!subtitleMaps.isEmpty()) {
-            subtitleDetailMap = subtitleMaps[0];
-          }
           
-          // Query badge detail map
-          List<HM_Component_Detail_Map__c> badgeMaps = [
-            SELECT
-              Id,
-              HM_Data_Source_Name__c,
-              HM_Field_API_Name__c,
-              HM_Format_Type__c
-            FROM HM_Component_Detail_Map__c
-            WHERE HM_Dashboard_Component__c = :componentId
-              AND HM_Map_Type__c = 'Tile Badge'
-            LIMIT 1
-          ];
-          if (!badgeMaps.isEmpty()) {
-            badgeDetailMap = badgeMaps[0];
+          // Process results into separate maps
+          for (HM_Component_Detail_Map__c detailMap : tileDetailMaps) {
+            if (detailMap.HM_Map_Type__c == 'Subtitle' && subtitleDetailMap == null) {
+              subtitleDetailMap = detailMap;
+            } else if (detailMap.HM_Map_Type__c == 'Tile Badge' && badgeDetailMap == null) {
+              badgeDetailMap = detailMap;
+            }
           }
         }
       }
@@ -400,7 +398,10 @@ public with sharing class HM_ComponentDataService {
           AggregateResult ar = (AggregateResult) records[0];
           Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
           
-          // Try "totalWon" alias first, then first key
+          // Aggregate alias resolution strategy:
+          // 1. 'totalWon' - Legacy alias used in some dashboard configurations for SUM(Amount)
+          // 2. First available key - Fallback for queries without explicit aliases (expr0, expr1, etc.)
+          // Note: Salesforce generates default aliases like 'expr0' for unnamed aggregate expressions
           Object value = fields.containsKey('totalWon') 
             ? fields.get('totalWon') 
             : fields.values()[0];
@@ -852,13 +853,15 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Build aggregate response from AggregateResult
+   * Extracts value using standard alias resolution strategy
    * @param ar AggregateResult to extract value from
    * @return Map<String, Object> Response with AGGREGATE shape
    */
   private static Map<String, Object> buildAggregateResponseFromAggregate(AggregateResult ar) {
     Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
     
-    // Try "totalWon" alias first, then first key
+    // Aggregate alias resolution (same strategy as executeSOQLQuery):
+    // 'totalWon' for legacy compatibility, otherwise first available value
     Object value = fields.containsKey('totalWon') 
       ? fields.get('totalWon') 
       : fields.values()[0];
@@ -1243,6 +1246,10 @@ public with sharing class HM_ComponentDataService {
       return extractNestedFieldValue(firstRow, fieldApiName);
     }
     
+    // Fallback value extraction for aggregate/unnamed results:
+    // 1. 'expr0' - Default Salesforce alias for first unnamed aggregate expression
+    // 2. 'totalWon' - Legacy alias used in some dashboard configurations
+    // 3. First non-Id key - Last resort fallback for any other field
     if (firstRow.containsKey('expr0')) {
       return firstRow.get('expr0');
     }
@@ -1251,6 +1258,7 @@ public with sharing class HM_ComponentDataService {
       return firstRow.get('totalWon');
     }
     
+    // Last resort: return first non-Id field value
     for (String key : firstRow.keySet()) {
       if (key != 'Id') {
         return firstRow.get(key);

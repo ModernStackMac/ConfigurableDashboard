@@ -10,6 +10,19 @@ import executePreviewQuery from "@salesforce/apex/HM_DataSourceBuilderService.ex
 
 /**
  * @description Data Source Query Builder - Single-page layout for creating/editing Data Sources
+ * Provides a visual interface for building SOQL queries without writing code.
+ * 
+ * Key capabilities:
+ * - Object and field selection with search/filter
+ * - List mode (SELECT fields) and Aggregate mode (COUNT, SUM, AVG, etc.)
+ * - WHERE clause builder with field-type-aware operators
+ * - Quick filters for owner (My Records, Queue Records)
+ * - Real-time SOQL preview with syntax highlighting
+ * - Query preview execution (limited to 5 rows)
+ * - Serialization/deserialization for saving query state
+ * 
+ * Security: All user inputs are escaped before SOQL construction
+ * 
  * @author High Meadows
  * @date 2024
  */
@@ -1185,8 +1198,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Helper to add a quick filter condition (kept for extensibility)
-   * @param {Object} filterData - Filter condition data
+   * @description Helper to add a quick filter condition programmatically
+   * Retained for API extensibility - allows parent components or future features
+   * to inject pre-configured filter conditions (e.g., "Created Today", "My Records")
+   * @param {Object} filterData - Filter condition data with fieldApiName, fieldLabel, fieldType, operator, value
    */
   addQuickFilterCondition(filterData) {
     this.conditionIdCounter++;
@@ -2066,15 +2081,18 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `${field} = NEXT_N_DAYS:${condition.value}`;
     }
 
-    // Handle LIKE operators
+    // Handle LIKE operators - escape single quotes to prevent SOQL injection
     if (condition.operator === "contains") {
-      return `${field} LIKE '%${condition.value}%'`;
+      const escapedValue = this.escapeSoqlValue(condition.value);
+      return `${field} LIKE '%${escapedValue}%'`;
     }
     if (condition.operator === "starts_with") {
-      return `${field} LIKE '${condition.value}%'`;
+      const escapedValue = this.escapeSoqlValue(condition.value);
+      return `${field} LIKE '${escapedValue}%'`;
     }
     if (condition.operator === "ends_with") {
-      return `${field} LIKE '%${condition.value}'`;
+      const escapedValue = this.escapeSoqlValue(condition.value);
+      return `${field} LIKE '%${escapedValue}'`;
     }
 
     // Handle special values
@@ -2093,13 +2111,15 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `${field} ${operator} ${condition.value}`;
     }
 
-    // Handle INCLUDES/EXCLUDES for multipicklist
+    // Handle INCLUDES/EXCLUDES for multipicklist - escape value
     if (condition.operator === "includes" || condition.operator === "excludes") {
-      return `${field} ${operator} ('${condition.value}')`;
+      const escapedValue = this.escapeSoqlValue(condition.value);
+      return `${field} ${operator} ('${escapedValue}')`;
     }
 
-    // Default: string value with quotes
-    return `${field} ${operator} '${condition.value}'`;
+    // Default: string value with quotes - escape to prevent SOQL injection
+    const escapedValue = this.escapeSoqlValue(condition.value);
+    return `${field} ${operator} '${escapedValue}'`;
   }
 
   /**
@@ -2314,8 +2334,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       // Update SOQL preview
       this.updateSoqlPreview();
     } catch (e) {
-      // Config parsing failed - notify user
-      this.showError("Configuration Error", "Failed to load saved query configuration" + e.message);
+      // Config parsing failed - notify user with safe error message
+      const errorMsg = e && e.message ? e.message : "Unknown error";
+      this.showError("Configuration Error", "Failed to load saved query configuration: " + errorMsg);
     }
   }
 
@@ -2359,6 +2380,20 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
         variant: variant
       })
     );
+  }
+
+  /**
+   * @description Escape special characters in SOQL string values to prevent injection
+   * Escapes single quotes and backslashes per Salesforce SOQL specification
+   * @param {string} value - Raw string value to escape
+   * @returns {string} Escaped string safe for SOQL query construction
+   */
+  escapeSoqlValue(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    // Escape backslashes first, then single quotes
+    return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   }
 
   /**
