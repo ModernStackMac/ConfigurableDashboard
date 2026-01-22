@@ -2,7 +2,7 @@
   <div class="page-container">
     <!-- Page Header -->
     <div class="page-header">
-      <div class="slds-page-header">
+      <div class="slds-page-header hm-page-header-inner">
         <div class="slds-page-header__row">
           <div class="slds-page-header__col-title">
             <div class="slds-media">
@@ -17,7 +17,7 @@
                     </h1>
                   </div>
                 </div>
-                <p class="slds-page-header__name-meta">{pageSubtitle}</p>
+                <p class="slds-page-header__name-meta hm-page-subtitle">{pageSubtitle}</p>
               </div>
             </div>
           </div>
@@ -35,9 +35,9 @@
     <!-- Main Content Area -->
     <template if:false={isLoading}>
       <div class="main-content">
-        <div class="slds-grid slds-gutters">
+        <div class="slds-grid slds-gutters hm-main-grid">
           <!-- ==================== LEFT COLUMN: Configuration Panel ==================== -->
-          <div class="slds-col slds-size_8-of-12 config-panel">
+          <div class="slds-col slds-size_8-of-12 config-panel hm-config-col">
             <div class="config-card">
               <!-- Loading overlay when fields are loading -->
               <template if:true={isLoadingFields}>
@@ -621,7 +621,7 @@
           </div>
 
           <!-- ==================== RIGHT COLUMN: SOQL Preview ==================== -->
-          <div class="slds-col slds-size_4-of-12 preview-panel">
+          <div class="slds-col slds-size_4-of-12 preview-panel hm-preview-col">
             <div class="preview-card">
               <div class="preview-card-header">
                 <lightning-icon icon-name="utility:preview" size="x-small" class="slds-m-right_x-small"></lightning-icon>

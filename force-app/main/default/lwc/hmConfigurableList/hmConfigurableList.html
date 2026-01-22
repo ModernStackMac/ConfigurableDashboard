@@ -10,7 +10,7 @@
                   icon-name={headerIcon}
                   size="small"
                   class="cc-header-icon"
-                  alternative-text=""
+                  alternative-text="List icon"
                 ></lightning-icon>
               </template>
               <h2 class="cc-card-title">{title}</h2>
@@ -51,17 +51,21 @@
 
         <template if:false={errorMessage}>
           <!-- Table Header -->
-          <div class="cc-table-header">
+          <div class="cc-table-header" role="row">
             <template if:true={hasRowIcons}>
-              <div class="cc-col-icon"></div>
+              <div class="cc-col-icon" role="columnheader"></div>
             </template>
             <template for:each={visibleColumns} for:item="column">
               <div
                 key={column.key}
                 class={column.headerClass}
                 onclick={handleColumnSort}
+                onkeydown={handleColumnSortKeydown}
                 data-column-key={column.key}
                 title={column.title}
+                role="columnheader"
+                tabindex="0"
+                aria-sort={column.ariaSort}
               >
                 <span class="cc-col-label">{column.label}</span>
                 <template if:true={column.sortIcon}>
@@ -77,15 +81,18 @@
           </div>
 
           <!-- Table Body -->
-          <div class="cc-table-body">
+          <div class="cc-table-body" role="rowgroup">
             <template if:true={paginatedRows.length}>
               <template for:each={paginatedRows} for:item="row">
                 <div
                   key={row.id}
                   class="cc-table-row"
                   onclick={handleRowClick}
+                  onkeydown={handleRowKeydown}
                   data-record-id={row.recordId}
                   data-object-type={row.objectType}
+                  role="row"
+                  tabindex="0"
                 >
                   <!-- Row Icon -->
                   <template if:true={hasRowIcons}>

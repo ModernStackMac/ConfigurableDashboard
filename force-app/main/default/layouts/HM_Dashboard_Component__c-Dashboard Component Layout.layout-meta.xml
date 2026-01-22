@@ -81,12 +81,7 @@
         <editHeading>true</editHeading>
         <label>Data Configuration</label>
         <layoutColumns/>
-        <layoutColumns>
-            <layoutItems>
-                <behavior>Edit</behavior>
-                <field>HM_Apex_Parameters__c</field>
-            </layoutItems>
-        </layoutColumns>
+        <layoutColumns/>
         <style>TwoColumnsLeftToRight</style>
     </layoutSections>
     <layoutSections>

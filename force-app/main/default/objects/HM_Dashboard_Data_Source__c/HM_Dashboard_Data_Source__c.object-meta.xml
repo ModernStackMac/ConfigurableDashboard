@@ -62,8 +62,10 @@
     </actionOverrides>
     <actionOverrides>
         <actionName>Edit</actionName>
+        <content>hmDataSourceEdit</content>
         <formFactor>Large</formFactor>
-        <type>Default</type>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
+        <type>LightningComponent</type>
     </actionOverrides>
     <actionOverrides>
         <actionName>Edit</actionName>
@@ -90,8 +92,10 @@
     </actionOverrides>
     <actionOverrides>
         <actionName>New</actionName>
+        <content>hmDataSourceNew</content>
         <formFactor>Large</formFactor>
-        <type>Default</type>
+        <skipRecordTypeSelect>false</skipRecordTypeSelect>
+        <type>LightningComponent</type>
     </actionOverrides>
     <actionOverrides>
         <actionName>New</actionName>

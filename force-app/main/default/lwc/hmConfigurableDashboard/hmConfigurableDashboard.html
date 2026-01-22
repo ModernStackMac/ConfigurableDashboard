@@ -45,7 +45,7 @@
     <!-- Error State -->
     <template if:false={isLoading}>
       <template if:true={error}>
-        <div class="cc-error-message">
+        <div class="cc-error-message" role="alert" aria-live="assertive">
           Error loading dashboard: {errorMessage}
         </div>
       </template>
@@ -64,7 +64,7 @@
           </template>
         </template>
         <template if:false={groups.length}>
-          <div class="cc-empty-dashboard">
+          <div class="cc-empty-dashboard" role="status">
             <p>No component groups configured for this dashboard</p>
           </div>
         </template>

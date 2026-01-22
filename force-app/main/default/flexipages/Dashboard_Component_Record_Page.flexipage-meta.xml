@@ -4,16 +4,30 @@
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
+                    <name>actionNames</name>
+                    <valueList>
+                        <valueListItems>
+                            <value>Edit</value>
+                        </valueListItems>
+                        <valueListItems>
+                            <value>Clone</value>
+                        </valueListItems>
+                        <valueListItems>
+                            <value>Delete</value>
+                        </valueListItems>
+                    </valueList>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
                     <name>collapsed</name>
                     <value>false</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>enableActionsConfiguration</name>
-                    <value>false</value>
+                    <value>true</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>enableActionsInNative</name>
-                    <value>false</value>
+                    <value>true</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>hideChatterActions</name>
@@ -73,6 +87,16 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Dashboard_Component_Group__c</fieldItem>
                 <identifier>RecordHM_Dashboard_Component_Group_cField</identifier>
+            </fieldInstance>
+        </itemInstances>
+        <itemInstances>
+            <fieldInstance>
+                <fieldInstanceProperties>
+                    <name>uiBehavior</name>
+                    <value>none</value>
+                </fieldInstanceProperties>
+                <fieldItem>Record.HM_Display_Order__c</fieldItem>
+                <identifier>RecordHM_Display_Order_cField</identifier>
             </fieldInstance>
         </itemInstances>
         <name>Facet-9b0dca4b-76bc-492a-b285-6de597d38871</name>
@@ -177,8 +201,8 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Display_Order__c</fieldItem>
-                <identifier>RecordHM_Display_Order_cField</identifier>
+                <fieldItem>Record.HM_Icon_Background_Color__c</fieldItem>
+                <identifier>RecordHM_Icon_Background_Color_cField</identifier>
             </fieldInstance>
         </itemInstances>
         <name>Facet-4fa27a20-61fc-4d7d-8329-fb4c3bab6bc8</name>
@@ -217,6 +241,16 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Enable_Column_Sorting__c</fieldItem>
                 <identifier>RecordHM_Enable_Column_Sorting_cField</identifier>
+            </fieldInstance>
+        </itemInstances>
+        <itemInstances>
+            <fieldInstance>
+                <fieldInstanceProperties>
+                    <name>uiBehavior</name>
+                    <value>none</value>
+                </fieldInstanceProperties>
+                <fieldItem>Record.HM_Show_All_Records_Filter__c</fieldItem>
+                <identifier>RecordHM_Show_All_Records_Filter_cField</identifier>
             </fieldInstance>
         </itemInstances>
         <name>Facet-32b7a1ae-5182-47b0-8727-32c7efb41398</name>
