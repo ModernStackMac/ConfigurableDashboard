@@ -428,22 +428,29 @@
                   <div class="conditions-section">
                     <template if:true={hasConditions}>
                       <template for:each={conditionsWithMeta} for:item="cond">
-                        <div key={cond.id} class="condition-row slds-grid slds-gutters_x-small slds-m-bottom_x-small">
-                          <div class="slds-col conjunction-col">
+                        <div key={cond.id} class="condition-row">
+                          <div class="conjunction-col">
                             <template if:true={cond.showConjunction}>
-                              <lightning-combobox
-                                value={cond.conjunction}
-                                options={conjunctionOptions}
-                                data-id={cond.id}
-                                onchange={handleConditionConjunctionChange}
-                                variant="label-hidden">
-                              </lightning-combobox>
+                              <div class="conjunction-toggle" role="group">
+                                <button
+                                  type="button"
+                                  class={cond.andButtonClass}
+                                  data-id={cond.id}
+                                  data-value="AND"
+                                  onclick={handleConditionConjunctionChange}>AND</button>
+                                <button
+                                  type="button"
+                                  class={cond.orButtonClass}
+                                  data-id={cond.id}
+                                  data-value="OR"
+                                  onclick={handleConditionConjunctionChange}>OR</button>
+                              </div>
                             </template>
                             <template if:false={cond.showConjunction}>
                               <span class="where-label">WHERE</span>
                             </template>
                           </div>
-                          <div class="slds-col slds-grow field-combobox-wrapper">
+                          <div class="field-combobox-wrapper">
                             <div class="slds-combobox_container">
                               <div class="slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click" role="combobox">
                                 <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
@@ -488,7 +495,7 @@
                               </div>
                             </div>
                           </div>
-                          <div class="slds-col operator-col">
+                          <div class="operator-col">
                             <lightning-combobox
                               placeholder="Operator..."
                               value={cond.operator}
@@ -499,7 +506,7 @@
                               disabled={cond.isOperatorDisabled}>
                             </lightning-combobox>
                           </div>
-                          <div class="slds-col slds-grow value-col">
+                          <div class="value-col">
                             <template if:true={cond.showValueInput}>
                               <template if:true={cond.isPicklistField}>
                                 <lightning-combobox
@@ -555,15 +562,14 @@
                               </template>
                             </template>
                           </div>
-                          <div class="slds-col slds-no-flex remove-col">
-                            <lightning-button-icon
-                              icon-name="utility:delete"
-                              variant="bare"
-                              alternative-text="Remove"
-                              data-id={cond.id}
-                              onclick={handleRemoveCondition}
-                              class="remove-button">
-                            </lightning-button-icon>
+                          <div class="remove-col">
+                            <div class="remove-button-wrapper" data-id={cond.id} onclick={handleRemoveCondition}>
+                              <lightning-button-icon
+                                icon-name="utility:delete"
+                                variant="bare"
+                                alternative-text="Remove">
+                              </lightning-button-icon>
+                            </div>
                           </div>
                         </div>
                       </template>

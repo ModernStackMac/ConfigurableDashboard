@@ -1009,11 +1009,12 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
 
   /**
    * @description Handle condition conjunction change (AND/OR)
-   * @param {Event} event - Combobox change event
+   * @param {Event} event - Button click event
    */
   handleConditionConjunctionChange(event) {
     const conditionId = event.currentTarget.dataset.id;
-    const conjunction = event.detail.value;
+    // Support both button click (data-value) and combobox (detail.value)
+    const conjunction = event.currentTarget.dataset.value || event.detail?.value;
     
     this.whereConditions = this.whereConditions.map((condition) => {
       if (condition.id === conditionId) {
@@ -1244,6 +1245,14 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
         .map((f) => ({ ...f }));
       const noFieldsMatch = isFieldListOpen && filteredFieldOptions.length === 0 && searchTermLower;
       
+      // Button classes for AND/OR toggle
+      const andButtonClass = condition.conjunction === "AND" 
+        ? "conjunction-btn conjunction-btn-active" 
+        : "conjunction-btn";
+      const orButtonClass = condition.conjunction === "OR" 
+        ? "conjunction-btn conjunction-btn-active" 
+        : "conjunction-btn";
+
       return {
         ...condition,
         index,
@@ -1265,7 +1274,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
         fieldSearchTerm,
         isFieldListOpen,
         filteredFieldOptions,
-        noFieldsMatch
+        noFieldsMatch,
+        // AND/OR toggle classes
+        andButtonClass,
+        orButtonClass
       };
     });
   }

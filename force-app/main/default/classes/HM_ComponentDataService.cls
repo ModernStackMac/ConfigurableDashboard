@@ -340,6 +340,20 @@ public with sharing class HM_ComponentDataService {
   }
 
   /**
+   * @description Check if query is a simple COUNT() query (no field argument)
+   * @param query SOQL query string
+   * @return True if query uses COUNT() without field argument
+   */
+  private static Boolean isCountQuery(String query) {
+    if (String.isBlank(query)) {
+      return false;
+    }
+    // Match SELECT COUNT() - note: COUNT(fieldName) should NOT match
+    String normalized = query.toUpperCase().replaceAll('\\s+', ' ').trim();
+    return normalized.startsWith('SELECT COUNT()');
+  }
+
+  /**
    * @description Execute SOQL query with merge field replacement
    * @param soqlQuery SOQL query string (may contain merge fields)
    * @param context Context for merge field replacement
@@ -368,6 +382,12 @@ public with sharing class HM_ComponentDataService {
       
       // Replace merge fields
       processedQuery = replaceMergeFields(queryToProcess, context);
+
+      // Check if this is a COUNT() query (requires countQuery instead of query)
+      if (isCountQuery(processedQuery)) {
+        Integer countResult = Database.countQuery(processedQuery);
+        return buildAggregateResponse(countResult);
+      }
 
       // Execute query
       List<SObject> records = Database.query(processedQuery);
@@ -524,7 +544,8 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Enhance SOQL query with standard fields if they're missing
-   * Automatically injects Id, Name, CreatedDate, LastModifiedDate if not already present
+   * Automatically injects Id, Name/CaseNumber, CreatedDate, LastModifiedDate if not already present
+   * Uses Schema.describe to check which fields actually exist on the object
    * Used when showAllRecordsFilter is enabled to ensure common columns are available
    * @param query Normalized SOQL query string
    * @return String Enhanced query with standard fields added if missing
@@ -534,10 +555,6 @@ public with sharing class HM_ComponentDataService {
       return query;
     }
 
-    // Standard fields to ensure are present (exist on all standard objects)
-    // Note: Id is almost always present, but we check for all to be safe
-    Set<String> standardFields = new Set<String>{ 'Id', 'Name', 'CreatedDate', 'LastModifiedDate' };
-    
     // Parse SELECT clause (everything between SELECT and FROM)
     String queryUpper = query.toUpperCase();
     Integer selectIndex = queryUpper.indexOf('SELECT');
@@ -554,6 +571,40 @@ public with sharing class HM_ComponentDataService {
     if (selectClauseOriginal.contains('(') || selectClauseOriginal.contains(')')) {
       // Likely contains functions or subqueries - return as-is to avoid breaking
       return query;
+    }
+    
+    // Extract object name to check available fields via Schema.describe
+    String objectName = extractObjectNameFromQuery(query);
+    if (String.isBlank(objectName)) {
+      return query;
+    }
+    
+    // Get object describe to check which fields actually exist
+    Schema.SObjectType objType = Schema.getGlobalDescribe().get(objectName);
+    if (objType == null) {
+      return query;
+    }
+    Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
+    
+    // Build list of standard fields to inject (only if they exist on the object)
+    Set<String> fieldsToInject = new Set<String>();
+    
+    // Always try to add Id, CreatedDate, LastModifiedDate if they exist
+    if (fieldMap.containsKey('id')) {
+      fieldsToInject.add('Id');
+    }
+    if (fieldMap.containsKey('createddate')) {
+      fieldsToInject.add('CreatedDate');
+    }
+    if (fieldMap.containsKey('lastmodifieddate')) {
+      fieldsToInject.add('LastModifiedDate');
+    }
+    
+    // For Name field: check if exists, otherwise try CaseNumber (for Case object)
+    if (fieldMap.containsKey('name')) {
+      fieldsToInject.add('Name');
+    } else if (fieldMap.containsKey('casenumber')) {
+      fieldsToInject.add('CaseNumber');
     }
     
     // Extract SELECT clause and rest of query
@@ -591,10 +642,10 @@ public with sharing class HM_ComponentDataService {
       }
     }
     
-    // Add missing standard fields (only if not already present)
-    for (String standardField : standardFields) {
-      if (!existingFields.contains(standardField.toUpperCase())) {
-        fieldList.add(standardField);
+    // Add missing standard fields (only if not already present and exist on object)
+    for (String fieldToInject : fieldsToInject) {
+      if (!existingFields.contains(fieldToInject.toUpperCase())) {
+        fieldList.add(fieldToInject);
       }
     }
     
