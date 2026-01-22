@@ -181,7 +181,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   queryTotalCount = 0;
   isQueryLoading = false;
   queryError = null;
-  isResultsExpanded = true; // Results section expanded by default
 
   // ==================== COMMON STATE ====================
   isLoading = false;
@@ -190,6 +189,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
 
   // Timeout IDs for cleanup on disconnect
   _blurTimeoutIds = [];
+  
+  // Auto-refresh debounce timer
+  _autoRefreshTimeoutId = null;
 
   // ==================== WIRE ADAPTERS ====================
 
@@ -224,6 +226,12 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     // Clear any pending blur timeouts to prevent memory leaks
     this._blurTimeoutIds.forEach((timeoutId) => clearTimeout(timeoutId));
     this._blurTimeoutIds = [];
+    
+    // Clear auto-refresh timeout
+    if (this._autoRefreshTimeoutId) {
+      clearTimeout(this._autoRefreshTimeoutId);
+      this._autoRefreshTimeoutId = null;
+    }
   }
 
   // ==================== FORM HANDLERS ====================
@@ -290,22 +298,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.closePanel();
   }
 
-  /**
-   * @description Handle Run Preview button click - expands results and executes query
-   */
-  handleRunPreview(event) {
-    // Stop propagation to prevent toggleResultsExpanded from firing
-    event.stopPropagation();
-    this.isResultsExpanded = true;
-    this.executeQueryPreview();
-  }
-
-  /**
-   * @description Toggle results section expanded/collapsed
-   */
-  toggleResultsExpanded() {
-    this.isResultsExpanded = !this.isResultsExpanded;
-  }
 
   /**
    * @description Handle Copy SOQL button click - copies SOQL to clipboard
@@ -453,6 +445,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       this.aggregateFunction = null;
       this.aggregateFieldApiName = null;
       this.aggregateFieldSearchTerm = "";
+
+      // Clear preview results when object changes
+      this.clearPreviewResults();
 
       // Load fields for selected object
       this.loadFieldsForObject(obj.apiName);
@@ -683,6 +678,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.aggregateFunction = null;
     this.aggregateFieldApiName = null;
     this.aggregateFieldSearchTerm = "";
+    // Clear preview results
+    this.clearPreviewResults();
     this.updateSoqlPreview();
   }
 
@@ -773,6 +770,16 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   // ==================== PREVIEW QUERY HANDLERS ====================
+
+  /**
+   * @description Clear preview results and reset state
+   */
+  clearPreviewResults() {
+    this.queryResults = [];
+    this.queryColumns = [];
+    this.queryTotalCount = 0;
+    this.queryError = null;
+  }
 
   /**
    * @description Execute the preview query and display results
@@ -1494,22 +1501,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Get CSS class for results container
-   * @returns {string} CSS classes
-   */
-  get resultsContainerClass() {
-    return this.isResultsExpanded ? "results-container expanded" : "results-container collapsed";
-  }
-
-  /**
-   * @description Get icon for results expand/collapse button
-   * @returns {string} Icon name
-   */
-  get resultsExpandIcon() {
-    return this.isResultsExpanded ? "utility:chevrondown" : "utility:chevronright";
-  }
-
-  /**
    * @description Get active accordion sections (all open by default)
    * @returns {Array} Array of section names to open
    */
@@ -2211,11 +2202,44 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Update SOQL preview display
-   * Note: Template uses generatedSoql getter with reactive binding - this method is retained for compatibility
+   * @description Update SOQL preview display and trigger auto-refresh
+   * Triggers debounced preview query execution when configuration changes
    */
   updateSoqlPreview() {
-    // No-op: LWC reactive getters automatically update the template
+    // Clear any pending auto-refresh
+    if (this._autoRefreshTimeoutId) {
+      clearTimeout(this._autoRefreshTimeoutId);
+    }
+
+    // Debounce auto-refresh to avoid excessive queries during rapid changes
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    this._autoRefreshTimeoutId = setTimeout(() => {
+      this.triggerAutoRefresh();
+    }, 750);
+  }
+
+  /**
+   * @description Trigger auto-refresh of preview results
+   * Only executes if we have a valid query configuration
+   */
+  triggerAutoRefresh() {
+    // Only auto-refresh if we have valid query configuration
+    if (!this.page2Data.selectedObjectApiName) {
+      return;
+    }
+
+    // For List mode, need at least one field selected
+    if (this.isListMode && this.selectedFieldApiNames.length === 0) {
+      return;
+    }
+
+    // For Aggregate mode, need a function selected
+    if (this.isAggregateMode && !this.aggregateFunction) {
+      return;
+    }
+
+    // Execute preview query
+    this.executeQueryPreview();
   }
 
   // ==================== CONFIG SERIALIZATION ====================

@@ -620,8 +620,9 @@
             </div><!-- end config-card -->
           </div>
 
-          <!-- ==================== RIGHT COLUMN: SOQL Preview ==================== -->
+          <!-- ==================== RIGHT COLUMN: SOQL Preview & Results ==================== -->
           <div class="slds-col slds-size_4-of-12 preview-panel hm-preview-col">
+            <!-- SOQL Preview Card -->
             <div class="preview-card">
               <div class="preview-card-header">
                 <lightning-icon icon-name="utility:preview" size="x-small" class="slds-m-right_x-small"></lightning-icon>
@@ -653,74 +654,58 @@
                 </template>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- ==================== PREVIEW RESULTS SECTION ==================== -->
-        <div class={resultsContainerClass}>
-          <div class="results-header" onclick={toggleResultsExpanded}>
-            <lightning-icon icon-name="utility:table" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-            <span class="results-header-title">Preview Results</span>
-            <template if:true={hasQueryResults}>
-              <span class="slds-badge slds-m-left_x-small">{queryTotalCount}</span>
-            </template>
-            <div class="results-header-actions">
-              <lightning-button
-                label="Run Preview"
-                icon-name="utility:play"
-                onclick={handleRunPreview}
-                variant="neutral"
-                disabled={isQueryLoading}
-                class="slds-m-right_small">
-              </lightning-button>
-              <lightning-button-icon
-                icon-name={resultsExpandIcon}
-                variant="border-filled"
-                alternative-text="Toggle Results">
-              </lightning-button-icon>
-            </div>
-          </div>
-          <template if:true={isResultsExpanded}>
-            <div class="results-content">
-              <template if:true={isQueryLoading}>
-                <div class="slds-align_absolute-center slds-p-around_large">
-                  <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
-                </div>
-              </template>
-              <template if:true={queryError}>
-                <div class="slds-notify slds-notify_alert slds-alert_error slds-m-around_medium" role="alert">
-                  <lightning-icon icon-name="utility:error" size="small" class="slds-m-right_x-small" variant="inverse"></lightning-icon>
-                  <h2>{queryError}</h2>
-                </div>
-              </template>
-              <template if:false={isQueryLoading}>
+            <!-- Preview Results Card -->
+            <div class="results-card">
+              <div class="results-card-header">
+                <lightning-icon icon-name="utility:table" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                <span class="results-card-title">Preview Results</span>
                 <template if:true={hasQueryResults}>
-                  <div class="results-table-container">
-                    <lightning-datatable
-                      key-field="Id"
-                      data={queryResults}
-                      columns={queryColumns}
-                      hide-checkbox-column
-                      show-row-number-column>
-                    </lightning-datatable>
-                  </div>
-                  <div class="results-footer">
-                    <span class="slds-text-body_small slds-text-color_weak">
-                      Showing {queryResultsCount} of {queryTotalCount} records
-                    </span>
+                  <span class="results-count-badge">{queryTotalCount}</span>
+                </template>
+                <template if:true={isQueryLoading}>
+                  <lightning-spinner alternative-text="Loading..." size="x-small" class="slds-m-left_x-small"></lightning-spinner>
+                </template>
+              </div>
+              <div class="results-card-content">
+                <template if:true={queryError}>
+                  <div class="results-error">
+                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                    <span>{queryError}</span>
                   </div>
                 </template>
-                <template if:false={hasQueryResults}>
-                  <template if:false={queryError}>
-                    <div class="empty-state slds-p-around_large slds-text-align_center">
-                      <lightning-icon icon-name="utility:preview" size="large" class="slds-m-bottom_small empty-icon"></lightning-icon>
-                      <p class="slds-text-body_regular slds-text-color_weak">Click "Run Preview" to see query results</p>
+                <template if:false={queryError}>
+                  <template if:true={hasQueryResults}>
+                    <div class="results-table-wrapper">
+                      <lightning-datatable
+                        key-field="Id"
+                        data={queryResults}
+                        columns={queryColumns}
+                        hide-checkbox-column
+                        show-row-number-column>
+                      </lightning-datatable>
+                    </div>
+                    <div class="results-card-footer">
+                      <span>Showing {queryResultsCount} of {queryTotalCount}</span>
                     </div>
                   </template>
+                  <template if:false={hasQueryResults}>
+                    <template if:false={isQueryLoading}>
+                      <div class="results-empty-state">
+                        <lightning-icon icon-name="utility:preview" size="small" class="slds-m-bottom_xx-small"></lightning-icon>
+                        <p>Configure query to see results</p>
+                      </div>
+                    </template>
+                    <template if:true={isQueryLoading}>
+                      <div class="results-loading-state">
+                        <p>Loading preview...</p>
+                      </div>
+                    </template>
+                  </template>
                 </template>
-              </template>
+              </div>
             </div>
-          </template>
+          </div>
         </div>
 
         <!-- Error Display -->
