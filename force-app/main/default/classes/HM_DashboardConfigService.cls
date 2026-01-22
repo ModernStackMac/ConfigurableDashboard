@@ -259,10 +259,7 @@ public with sharing class HM_DashboardConfigService {
         SELECT
           Id,
           Name,
-          HM_Type__c,
           HM_SOQL_Query__c,
-          HM_Apex_Class_Name__c,
-          HM_Apex_Method_Name__c,
           HM_Return_Type__c,
           HM_Active__c,
           HM_Order__c,
@@ -456,10 +453,7 @@ public with sharing class HM_DashboardConfigService {
     Map<String, Object> mapData = new Map<String, Object>();
     mapData.put('id', dataSource.Id);
     mapData.put('name', dataSource.Name);
-    mapData.put('type', dataSource.HM_Type__c);
     mapData.put('soqlQuery', dataSource.HM_SOQL_Query__c);
-    mapData.put('apexClassName', dataSource.HM_Apex_Class_Name__c);
-    mapData.put('apexMethodName', dataSource.HM_Apex_Method_Name__c);
     mapData.put('returnType', dataSource.HM_Return_Type__c);
     mapData.put('active', dataSource.HM_Active__c);
     mapData.put('order', dataSource.HM_Order__c);

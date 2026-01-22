@@ -27,7 +27,7 @@ public with sharing class HM_DataSourceBuilderService {
       }
       
       List<HM_Dashboard_Data_Source__c> dataSources = [
-        SELECT Id, Name, HM_Active__c, HM_Dashboard_Component__c, HM_SOQL_Query__c, HM_Type__c,
+        SELECT Id, Name, HM_Active__c, HM_Dashboard_Component__c, HM_SOQL_Query__c,
                HM_Order__c, HM_Row_Icon_Name__c, HM_Return_Type__c, HM_Query_Config__c,
                HM_Dashboard_Component__r.HM_Type__c
         FROM HM_Dashboard_Data_Source__c
@@ -51,7 +51,6 @@ public with sharing class HM_DataSourceBuilderService {
       info.active = dataSource.HM_Active__c != null ? dataSource.HM_Active__c : true;
       info.dashboardComponentId = dataSource.HM_Dashboard_Component__c;
       info.soqlQuery = dataSource.HM_SOQL_Query__c;
-      info.type = dataSource.HM_Type__c;
       info.order = dataSource.HM_Order__c != null ? Integer.valueOf(dataSource.HM_Order__c) : 1;
       info.rowIconName = dataSource.HM_Row_Icon_Name__c;
       info.componentType = dataSource.HM_Dashboard_Component__r?.HM_Type__c;
@@ -129,7 +128,7 @@ public with sharing class HM_DataSourceBuilderService {
       List<String> fieldsToCheck = new List<String>{
         'Name', 'HM_Active__c', 'HM_Dashboard_Component__c', 'HM_Order__c',
         'HM_Row_Icon_Name__c', 'HM_Return_Type__c', 'HM_SOQL_Query__c',
-        'HM_Query_Config__c', 'HM_Type__c'
+        'HM_Query_Config__c'
       };
       
       for (String fieldName : fieldsToCheck) {
@@ -171,7 +170,6 @@ public with sharing class HM_DataSourceBuilderService {
         dataSource.HM_Return_Type__c = returnType;
         dataSource.HM_SOQL_Query__c = soqlQuery;
         dataSource.HM_Query_Config__c = queryConfig;
-        dataSource.HM_Type__c = 'SOQL';
         
         update dataSource;
       } else {
@@ -184,8 +182,7 @@ public with sharing class HM_DataSourceBuilderService {
           HM_Row_Icon_Name__c = rowIconName,
           HM_Return_Type__c = returnType,
           HM_SOQL_Query__c = soqlQuery,
-          HM_Query_Config__c = queryConfig,
-          HM_Type__c = 'SOQL'
+          HM_Query_Config__c = queryConfig
         );
         
         insert dataSource;
@@ -448,7 +445,6 @@ public with sharing class HM_DataSourceBuilderService {
     @AuraEnabled public Boolean active;
     @AuraEnabled public Id dashboardComponentId;
     @AuraEnabled public String soqlQuery;
-    @AuraEnabled public String type;
     @AuraEnabled public Integer order;
     @AuraEnabled public String rowIconName;
     @AuraEnabled public String componentType;

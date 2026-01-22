@@ -410,4 +410,290 @@ private class HM_DataSourceBuilderServiceTest {
     System.assertEquals('Account Name', col.label, 'Label should be settable');
     System.assertEquals('STRING', col.type, 'Type should be settable');
   }
+
+  // ==================== SAVE DATA SOURCE COMPLETE TESTS ====================
+
+  /**
+   * @description Create test data for save/load tests
+   */
+  @TestSetup
+  static void setupTestData() {
+    // Create Dashboard
+    HM_Dashboard__c dashboard = new HM_Dashboard__c(Name = 'Test Dashboard');
+    insert dashboard;
+
+    // Create Dashboard Component
+    HM_Dashboard_Component__c component = new HM_Dashboard_Component__c(
+      Name = 'Test Component',
+      HM_Dashboard__c = dashboard.Id,
+      HM_Type__c = 'List'
+    );
+    insert component;
+  }
+
+  /**
+   * @description Test saveDataSourceComplete creates new record
+   */
+  @IsTest
+  static void testSaveDataSourceCompleteInsert() {
+    HM_Dashboard_Component__c component = [SELECT Id FROM HM_Dashboard_Component__c LIMIT 1];
+    
+    String queryConfig = '{"objectApiName":"Account","selectedFields":["Id","Name"]}';
+    String soqlQuery = 'SELECT Id, Name FROM Account';
+
+    Test.startTest();
+    Id savedId = HM_DataSourceBuilderService.saveDataSourceComplete(
+      null, // new record
+      'Test Data Source',
+      true,
+      component.Id,
+      1,
+      'standard:account',
+      'List',
+      soqlQuery,
+      queryConfig
+    );
+    Test.stopTest();
+
+    System.assertNotEquals(null, savedId, 'Should return saved record Id');
+
+    // Verify saved data
+    HM_Dashboard_Data_Source__c saved = [
+      SELECT Id, Name, HM_Active__c, HM_Dashboard_Component__c, HM_Order__c,
+             HM_Row_Icon_Name__c, HM_Return_Type__c, HM_SOQL_Query__c, 
+             HM_Query_Config__c
+      FROM HM_Dashboard_Data_Source__c
+      WHERE Id = :savedId
+    ];
+
+    System.assertEquals('Test Data Source', saved.Name, 'Name should match');
+    System.assertEquals(true, saved.HM_Active__c, 'Active should match');
+    System.assertEquals(component.Id, saved.HM_Dashboard_Component__c, 'Component should match');
+    System.assertEquals(1, saved.HM_Order__c, 'Order should match');
+    System.assertEquals('standard:account', saved.HM_Row_Icon_Name__c, 'Icon should match');
+    System.assertEquals('List', saved.HM_Return_Type__c, 'Return type should match');
+    System.assertEquals(soqlQuery, saved.HM_SOQL_Query__c, 'SOQL query should match');
+    System.assertEquals(queryConfig, saved.HM_Query_Config__c, 'Query config should match');
+  }
+
+  /**
+   * @description Test saveDataSourceComplete updates existing record
+   */
+  @IsTest
+  static void testSaveDataSourceCompleteUpdate() {
+    HM_Dashboard_Component__c component = [SELECT Id FROM HM_Dashboard_Component__c LIMIT 1];
+    
+    // Create initial record
+    HM_Dashboard_Data_Source__c ds = new HM_Dashboard_Data_Source__c(
+      Name = 'Original Name',
+      HM_Active__c = true,
+      HM_Dashboard_Component__c = component.Id,
+      HM_Order__c = 1,
+      HM_Return_Type__c = 'List',
+      HM_SOQL_Query__c = 'SELECT Id FROM Account'
+    );
+    insert ds;
+
+    String newQueryConfig = '{"objectApiName":"Contact","selectedFields":["Id","Name","Email"]}';
+    String newSoqlQuery = 'SELECT Id, Name, Email FROM Contact';
+
+    Test.startTest();
+    Id savedId = HM_DataSourceBuilderService.saveDataSourceComplete(
+      ds.Id, // existing record
+      'Updated Name',
+      false,
+      component.Id,
+      5,
+      'standard:contact',
+      'Aggregate',
+      newSoqlQuery,
+      newQueryConfig
+    );
+    Test.stopTest();
+
+    System.assertEquals(ds.Id, savedId, 'Should return same record Id');
+
+    // Verify updated data
+    HM_Dashboard_Data_Source__c updated = [
+      SELECT Id, Name, HM_Active__c, HM_Order__c, HM_Row_Icon_Name__c,
+             HM_Return_Type__c, HM_SOQL_Query__c, HM_Query_Config__c
+      FROM HM_Dashboard_Data_Source__c
+      WHERE Id = :savedId
+    ];
+
+    System.assertEquals('Updated Name', updated.Name, 'Name should be updated');
+    System.assertEquals(false, updated.HM_Active__c, 'Active should be updated');
+    System.assertEquals(5, updated.HM_Order__c, 'Order should be updated');
+    System.assertEquals('standard:contact', updated.HM_Row_Icon_Name__c, 'Icon should be updated');
+    System.assertEquals('Aggregate', updated.HM_Return_Type__c, 'Return type should be updated');
+    System.assertEquals(newSoqlQuery, updated.HM_SOQL_Query__c, 'SOQL query should be updated');
+    System.assertEquals(newQueryConfig, updated.HM_Query_Config__c, 'Query config should be updated');
+  }
+
+  /**
+   * @description Test saveDataSourceComplete validation - missing name
+   */
+  @IsTest
+  static void testSaveDataSourceCompleteValidationMissingName() {
+    HM_Dashboard_Component__c component = [SELECT Id FROM HM_Dashboard_Component__c LIMIT 1];
+    Boolean exceptionThrown = false;
+
+    Test.startTest();
+    try {
+      HM_DataSourceBuilderService.saveDataSourceComplete(
+        null,
+        '', // blank name
+        true,
+        component.Id,
+        1,
+        null,
+        'List',
+        'SELECT Id FROM Account',
+        '{}'
+      );
+    } catch (AuraHandledException e) {
+      exceptionThrown = true;
+      System.assert(e.getMessage().contains('Name is required'), 'Should indicate name required');
+    }
+    Test.stopTest();
+
+    System.assert(exceptionThrown, 'Should throw exception for missing name');
+  }
+
+  /**
+   * @description Test saveDataSourceComplete validation - missing component
+   */
+  @IsTest
+  static void testSaveDataSourceCompleteValidationMissingComponent() {
+    Boolean exceptionThrown = false;
+
+    Test.startTest();
+    try {
+      HM_DataSourceBuilderService.saveDataSourceComplete(
+        null,
+        'Test Name',
+        true,
+        null, // missing component
+        1,
+        null,
+        'List',
+        'SELECT Id FROM Account',
+        '{}'
+      );
+    } catch (AuraHandledException e) {
+      exceptionThrown = true;
+      System.assert(e.getMessage().contains('Dashboard Component is required'), 'Should indicate component required');
+    }
+    Test.stopTest();
+
+    System.assert(exceptionThrown, 'Should throw exception for missing component');
+  }
+
+  /**
+   * @description Test saveDataSourceComplete validation - missing return type
+   */
+  @IsTest
+  static void testSaveDataSourceCompleteValidationMissingReturnType() {
+    HM_Dashboard_Component__c component = [SELECT Id FROM HM_Dashboard_Component__c LIMIT 1];
+    Boolean exceptionThrown = false;
+
+    Test.startTest();
+    try {
+      HM_DataSourceBuilderService.saveDataSourceComplete(
+        null,
+        'Test Name',
+        true,
+        component.Id,
+        1,
+        null,
+        '', // missing return type
+        'SELECT Id FROM Account',
+        '{}'
+      );
+    } catch (AuraHandledException e) {
+      exceptionThrown = true;
+      System.assert(e.getMessage().contains('Return Type is required'), 'Should indicate return type required');
+    }
+    Test.stopTest();
+
+    System.assert(exceptionThrown, 'Should throw exception for missing return type');
+  }
+
+  /**
+   * @description Test loadDataSource returns queryConfig and returnType
+   */
+  @IsTest
+  static void testLoadDataSourceWithQueryConfig() {
+    HM_Dashboard_Component__c component = [SELECT Id FROM HM_Dashboard_Component__c LIMIT 1];
+    
+    String queryConfig = '{"objectApiName":"Account","queryType":"List"}';
+    
+    // Create record with all fields
+    HM_Dashboard_Data_Source__c ds = new HM_Dashboard_Data_Source__c(
+      Name = 'Test Load DS',
+      HM_Active__c = true,
+      HM_Dashboard_Component__c = component.Id,
+      HM_Order__c = 2,
+      HM_Row_Icon_Name__c = 'utility:moneybag',
+      HM_Return_Type__c = 'Aggregate',
+      HM_SOQL_Query__c = 'SELECT COUNT() FROM Account',
+      HM_Query_Config__c = queryConfig
+    );
+    insert ds;
+
+    Test.startTest();
+    HM_DataSourceBuilderService.DataSourceInfo info = HM_DataSourceBuilderService.loadDataSource(ds.Id);
+    Test.stopTest();
+
+    System.assertNotEquals(null, info, 'Info should not be null');
+    System.assertEquals(ds.Id, info.recordId, 'Record Id should match');
+    System.assertEquals('Test Load DS', info.name, 'Name should match');
+    System.assertEquals(true, info.active, 'Active should match');
+    System.assertEquals(component.Id, info.dashboardComponentId, 'Component should match');
+    System.assertEquals(2, info.order, 'Order should match');
+    System.assertEquals('utility:moneybag', info.rowIconName, 'Icon should match');
+    System.assertEquals('Aggregate', info.returnType, 'Return type should match');
+    System.assertEquals('SELECT COUNT() FROM Account', info.soqlQuery, 'SOQL should match');
+    System.assertEquals(queryConfig, info.queryConfig, 'Query config should match');
+  }
+
+  /**
+   * @description Test loadDataSource with null recordId throws exception
+   */
+  @IsTest
+  static void testLoadDataSourceNullId() {
+    Boolean exceptionThrown = false;
+
+    Test.startTest();
+    try {
+      HM_DataSourceBuilderService.loadDataSource(null);
+    } catch (AuraHandledException e) {
+      exceptionThrown = true;
+      System.assert(e.getMessage().contains('Record ID is required'), 'Should indicate ID required');
+    }
+    Test.stopTest();
+
+    System.assert(exceptionThrown, 'Should throw exception for null ID');
+  }
+
+  /**
+   * @description Test loadDataSource with invalid recordId throws exception
+   */
+  @IsTest
+  static void testLoadDataSourceInvalidId() {
+    Boolean exceptionThrown = false;
+    // Use a fake ID that doesn't exist
+    Id fakeId = HM_Dashboard_Data_Source__c.SObjectType.getDescribe().getKeyPrefix() + '000000000001';
+
+    Test.startTest();
+    try {
+      HM_DataSourceBuilderService.loadDataSource(fakeId);
+    } catch (AuraHandledException e) {
+      exceptionThrown = true;
+      System.assert(e.getMessage().contains('Record not found'), 'Should indicate record not found');
+    }
+    Test.stopTest();
+
+    System.assert(exceptionThrown, 'Should throw exception for invalid ID');
+  }
 }

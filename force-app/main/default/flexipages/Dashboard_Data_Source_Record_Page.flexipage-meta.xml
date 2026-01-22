@@ -21,6 +21,16 @@
                 <identifier>RecordHM_Active_cField</identifier>
             </fieldInstance>
         </itemInstances>
+        <itemInstances>
+            <fieldInstance>
+                <fieldInstanceProperties>
+                    <name>uiBehavior</name>
+                    <value>none</value>
+                </fieldInstanceProperties>
+                <fieldItem>Record.HM_Order__c</fieldItem>
+                <identifier>RecordHM_Order_cField</identifier>
+            </fieldInstance>
+        </itemInstances>
         <name>Facet-83010b2d-2a9c-4abd-966f-b8146ca6c354</name>
         <type>Facet</type>
     </flexiPageRegions>
@@ -39,20 +49,10 @@
             <fieldInstance>
                 <fieldInstanceProperties>
                     <name>uiBehavior</name>
-                    <value>required</value>
-                </fieldInstanceProperties>
-                <fieldItem>Record.HM_Type__c</fieldItem>
-                <identifier>RecordHM_Type_cField</identifier>
-            </fieldInstance>
-        </itemInstances>
-        <itemInstances>
-            <fieldInstance>
-                <fieldInstanceProperties>
-                    <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Order__c</fieldItem>
-                <identifier>RecordHM_Order_cField</identifier>
+                <fieldItem>Record.HM_Return_Type__c</fieldItem>
+                <identifier>RecordHM_Return_Type_cField</identifier>
             </fieldInstance>
         </itemInstances>
         <name>Facet-e080e70c-0753-41d4-aa46-a9b7a353d714</name>
@@ -89,25 +89,15 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Apex_Class_Name__c</fieldItem>
-                <identifier>RecordHM_Apex_Class_Name_cField</identifier>
+                <fieldItem>Record.HM_Row_Icon_Name__c</fieldItem>
+                <identifier>RecordHM_Row_Icon_Name_cField</identifier>
             </fieldInstance>
         </itemInstances>
-        <name>Facet-0b8b2254-6498-4090-8cb6-00058325bb7a</name>
+        <name>Facet-67c56f7b-66fd-48d8-a1d3-35b395278256</name>
         <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
-        <itemInstances>
-            <fieldInstance>
-                <fieldInstanceProperties>
-                    <name>uiBehavior</name>
-                    <value>none</value>
-                </fieldInstanceProperties>
-                <fieldItem>Record.HM_Apex_Method_Name__c</fieldItem>
-                <identifier>RecordHM_Apex_Method_Name_cField</identifier>
-            </fieldInstance>
-        </itemInstances>
-        <name>Facet-48cd05c4-5982-4c45-bbaf-2c99472c57d9</name>
+        <name>Facet-c154f257-90b5-4899-afa8-671323bb80e2</name>
         <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
@@ -115,23 +105,23 @@
             <componentInstance>
                 <componentInstanceProperties>
                     <name>body</name>
-                    <value>Facet-0b8b2254-6498-4090-8cb6-00058325bb7a</value>
+                    <value>Facet-67c56f7b-66fd-48d8-a1d3-35b395278256</value>
                 </componentInstanceProperties>
                 <componentName>flexipage:column</componentName>
-                <identifier>flexipage_column3</identifier>
+                <identifier>flexipage_column8</identifier>
             </componentInstance>
         </itemInstances>
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
                     <name>body</name>
-                    <value>Facet-48cd05c4-5982-4c45-bbaf-2c99472c57d9</value>
+                    <value>Facet-c154f257-90b5-4899-afa8-671323bb80e2</value>
                 </componentInstanceProperties>
                 <componentName>flexipage:column</componentName>
-                <identifier>flexipage_column4</identifier>
+                <identifier>flexipage_column9</identifier>
             </componentInstance>
         </itemInstances>
-        <name>Facet-8eeb4c73-52e6-4921-bd16-67b5444c5af6</name>
+        <name>Facet-25154dcd-28a6-44ce-bda5-9553e9dfcee1</name>
         <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
@@ -237,7 +227,7 @@
             <componentInstance>
                 <componentInstanceProperties>
                     <name>columns</name>
-                    <value>Facet-8eeb4c73-52e6-4921-bd16-67b5444c5af6</value>
+                    <value>Facet-25154dcd-28a6-44ce-bda5-9553e9dfcee1</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>horizontalAlignment</name>
@@ -245,15 +235,15 @@
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>label</name>
-                    <value>Apex Configuration</value>
+                    <value>List Configuration</value>
                 </componentInstanceProperties>
                 <componentName>flexipage:fieldSection</componentName>
-                <identifier>flexipage_fieldSection2</identifier>
+                <identifier>flexipage_fieldSection5</identifier>
                 <visibilityRule>
                     <criteria>
-                        <leftValue>{!Record.HM_Type__c}</leftValue>
+                        <leftValue>{!Record.HM_Dashboard_Component__r.RecordType.DeveloperName}</leftValue>
                         <operator>EQUAL</operator>
-                        <rightValue>Apex</rightValue>
+                        <rightValue>List</rightValue>
                     </criteria>
                 </visibilityRule>
             </componentInstance>
@@ -270,17 +260,10 @@
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>label</name>
-                    <value>SOQL Coniguration</value>
+                    <value>SOQL Configuration</value>
                 </componentInstanceProperties>
                 <componentName>flexipage:fieldSection</componentName>
                 <identifier>flexipage_fieldSection3</identifier>
-                <visibilityRule>
-                    <criteria>
-                        <leftValue>{!Record.HM_Type__c}</leftValue>
-                        <operator>EQUAL</operator>
-                        <rightValue>SOQL</rightValue>
-                    </criteria>
-                </visibilityRule>
             </componentInstance>
         </itemInstances>
         <itemInstances>
@@ -336,16 +319,30 @@
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
+                    <name>actionNames</name>
+                    <valueList>
+                        <valueListItems>
+                            <value>Edit</value>
+                        </valueListItems>
+                        <valueListItems>
+                            <value>Clone</value>
+                        </valueListItems>
+                        <valueListItems>
+                            <value>Delete</value>
+                        </valueListItems>
+                    </valueList>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
                     <name>collapsed</name>
                     <value>false</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>enableActionsConfiguration</name>
-                    <value>false</value>
+                    <value>true</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>enableActionsInNative</name>
-                    <value>false</value>
+                    <value>true</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>hideChatterActions</name>
