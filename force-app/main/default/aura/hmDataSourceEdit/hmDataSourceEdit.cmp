@@ -1,0 +1,10 @@
+<aura:component implements="lightning:actionOverride,force:hasRecordId" access="global">
+    <aura:attribute name="recordId" type="String" />
+    
+    <lightning:navigation aura:id="navService" />
+    
+    <c:hmDataSourceQueryBuilder 
+        recordId="{!v.recordId}" 
+        onclose="{!c.handleClose}"
+        onsavesuccess="{!c.handleSaveSuccess}" />
+</aura:component>

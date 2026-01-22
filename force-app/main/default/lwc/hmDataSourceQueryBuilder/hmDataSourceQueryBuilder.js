@@ -1,8 +1,6 @@
 import { api, track, wire, LightningElement } from "lwc";
 import { ShowToastEvent } from "lightning/platformShowToastEvent";
 import { getRecord, getFieldValue } from "lightning/uiRecordApi";
-import { loadScript, loadStyle } from "lightning/platformResourceLoader";
-import CODEMIRROR from "@salesforce/resourceUrl/codemirror";
 import COMPONENT_TYPE_FIELD from "@salesforce/schema/HM_Dashboard_Component__c.HM_Type__c";
 import loadDataSource from "@salesforce/apex/HM_DataSourceBuilderService.loadDataSource";
 import saveDataSourceComplete from "@salesforce/apex/HM_DataSourceBuilderService.saveDataSourceComplete";
@@ -177,10 +175,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   // Query limit (null means no limit)
   queryLimit = null;
 
-  // CodeMirror state
-  codeMirrorInitialized = false;
-  codeMirrorEditor = null;
-
   // ==================== PREVIEW RESULTS STATE ====================
   @track queryResults = [];
   @track queryColumns = [];
@@ -193,6 +187,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   isLoading = false;
   isSaving = false;
   error = null;
+
+  // Timeout IDs for cleanup on disconnect
+  _blurTimeoutIds = [];
 
   // ==================== WIRE ADAPTERS ====================
 
@@ -221,6 +218,12 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     if (this.recordId) {
       this.loadExistingData();
     }
+  }
+
+  disconnectedCallback() {
+    // Clear any pending blur timeouts to prevent memory leaks
+    this._blurTimeoutIds.forEach((timeoutId) => clearTimeout(timeoutId));
+    this._blurTimeoutIds = [];
   }
 
   // ==================== FORM HANDLERS ====================
@@ -582,10 +585,11 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   handleAggregateFieldBlur() {
     // Delay to allow click to register
     // eslint-disable-next-line @lwc/lwc/no-async-operation
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       this.isAggregateFieldListOpen = false;
       this.aggregateFieldHighlightedIndex = -1;
     }, 200);
+    this._blurTimeoutIds.push(timeoutId);
   }
 
   /**
@@ -697,10 +701,11 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   handleObjectBlur() {
     // Delay closing to allow click events on dropdown items
     // eslint-disable-next-line @lwc/lwc/no-async-operation
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       this.isObjectListOpen = false;
       this.highlightedIndex = -1;
     }, 200);
+    this._blurTimeoutIds.push(timeoutId);
   }
 
   /**
@@ -1138,9 +1143,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   handleConditionFieldBlur() {
     // Delay to allow click events on dropdown items
     // eslint-disable-next-line @lwc/lwc/no-async-operation
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       this.openFieldListConditionId = null;
     }, 200);
+    this._blurTimeoutIds.push(timeoutId);
   }
 
   /**
@@ -1413,28 +1419,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
    */
   get selectedFieldCount() {
     return this.selectedFieldApiNames.length;
-  }
-
-  // ==================== VALIDATION ====================
-
-  /**
-   * @description Validate form data
-   * @returns {boolean} True if form is valid
-   */
-  validateForm() {
-    // Validate Data Source Name
-    if (!this.formData.name || this.formData.name.trim() === "") {
-      this.showError("Validation Error", "Data Source Name is required");
-      return false;
-    }
-
-    // Validate Dashboard Component
-    if (!this.formData.dashboardComponentId) {
-      this.showError("Validation Error", "Dashboard Component is required");
-      return false;
-    }
-
-    return true;
   }
 
   // ==================== DATA LOADING ====================
@@ -2215,56 +2199,11 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Initialize CodeMirror editor
-   */
-  async initializeCodeMirror() {
-    if (this.codeMirrorInitialized) {
-      return;
-    }
-
-    try {
-      await Promise.all([
-        loadScript(this, CODEMIRROR + "/codemirror.js"),
-        loadStyle(this, CODEMIRROR + "/codemirror.css")
-      ]);
-
-      // Check if CodeMirror loaded successfully (it uses ES modules, may not work directly)
-      // eslint-disable-next-line no-undef
-      if (typeof EditorView !== "undefined") {
-        const container = this.template.querySelector(".codemirror-container");
-        if (container) {
-          // eslint-disable-next-line no-undef
-          this.codeMirrorEditor = new EditorView({
-            doc: this.generatedSoql,
-            // eslint-disable-next-line no-undef
-            extensions: [EditorView.editable.of(false)],
-            parent: container
-          });
-          this.codeMirrorInitialized = true;
-        }
-      }
-    } catch (_error) {
-      // CodeMirror failed to load - fallback to plain text display
-      this.codeMirrorInitialized = false;
-      console.error("Error initializing CodeMirror:", _error);
-    }
-  }
-
-  /**
    * @description Update SOQL preview display
+   * Note: Template uses generatedSoql getter with reactive binding - this method is retained for compatibility
    */
   updateSoqlPreview() {
-    if (this.codeMirrorEditor) {
-      // Update CodeMirror content
-      this.codeMirrorEditor.dispatch({
-        changes: {
-          from: 0,
-          to: this.codeMirrorEditor.state.doc.length,
-          insert: this.generatedSoql
-        }
-      });
-    }
-    // If CodeMirror not available, the template will use the generatedSoql getter directly
+    // No-op: LWC reactive getters automatically update the template
   }
 
   // ==================== CONFIG SERIALIZATION ====================
@@ -2339,8 +2278,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       // Update SOQL preview
       this.updateSoqlPreview();
     } catch (e) {
-      // Config parsing failed - leave state as default
-      console.error("Error deserializing query config:", e);
+      // Config parsing failed - notify user
+      this.showError("Configuration Error", "Failed to load saved query configuration" + e.message);
     }
   }
 

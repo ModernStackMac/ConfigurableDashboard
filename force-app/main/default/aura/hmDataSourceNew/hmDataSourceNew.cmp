@@ -1,0 +1,7 @@
+<aura:component implements="lightning:actionOverride" access="global">
+    <lightning:navigation aura:id="navService" />
+    
+    <c:hmDataSourceQueryBuilder 
+        onclose="{!c.handleClose}"
+        onsavesuccess="{!c.handleSaveSuccess}" />
+</aura:component>
