@@ -4,9 +4,17 @@ import getComponentConfiguration from "@salesforce/apex/HM_DashboardConfigServic
 import executeComponentQuery from "@salesforce/apex/HM_ComponentDataService.executeComponentQuery";
 
 /**
- * @description Clean, simplified configurable list component
- * Displays tabular data from SOQL queries or Apex methods
- * Supports object-specific columns and row icons
+ * @description Configurable list component for displaying tabular data
+ * Displays records from SOQL queries defined in Data Source configurations.
+ * 
+ * Key capabilities:
+ * - Object-specific column visibility based on record type
+ * - Pagination with configurable page size
+ * - Column sorting (ascending/descending)
+ * - Dynamic filters based on object types in data
+ * - Custom badge rendering for date fields (days until/over)
+ * - Row icons from data source configuration
+ * - Dark mode support
  */
 export default class HM_ConfigurableList extends NavigationMixin(
   LightningElement
@@ -518,7 +526,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
          column.badgeType === HM_ConfigurableList.BADGE_TYPES.DAYS_LEFT) && value != null) {
       try {
         badge = this.calculateDaysBadge(value, column.badgeVariant);
-      } catch (error) {
+      } catch {
         // Graceful degradation: Badge calculation is non-critical UI enhancement.
         // If calculation fails (invalid date format, etc.), continue without badge
         // rather than breaking row rendering. Badge will be null and row displays normally.
@@ -625,7 +633,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
         icon: iconName,
         className: `cc-custom-badge cc-badge-${variant}` // Pre-computed class name for template
       };
-    } catch (error) {
+    } catch {
       // If calculation fails, return null (no badge)
       return null;
     }
@@ -788,9 +796,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
         const hasNameColumnWithNoRestriction = this.columns.some(
           col => col.fieldApiName === 'Name' && (!col.objectType || col.objectType.length === 0)
         );
-        const hasCaseNumberColumnWithNoRestriction = this.columns.some(
-          col => col.fieldApiName === 'CaseNumber' && (!col.objectType || col.objectType.length === 0)
-        );
+        // Note: CaseNumber check not needed since smart Name column handles both Name and CaseNumber display
         const hasCreatedDateColumnWithNoRestriction = this.columns.some(
           col => col.fieldApiName === 'CreatedDate' && (!col.objectType || col.objectType.length === 0)
         );
@@ -832,50 +838,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
     return result;
   }
 
-  /**
-   * @description Check if a field exists in the data rows
-   * Checks both the record object and the row object itself
-   * @param {String} fieldApiName - Field API name to check
-   * @return {Boolean} True if field exists in at least one row
-   */
-  fieldExistsInData(fieldApiName) {
-    if (!this.rows || this.rows.length === 0) {
-      return false;
-    }
-
-    // Check first few rows to see if field exists
-    // We check multiple rows because some rows might have null values
-    const rowsToCheck = Math.min(10, this.rows.length);
-    for (let i = 0; i < rowsToCheck; i++) {
-      const row = this.rows[i];
-      if (!row) {
-        continue;
-      }
-
-      // Check in row.record first
-      if (row.record) {
-        const value = this.getFieldValue(row.record, fieldApiName);
-        if (value !== null && value !== undefined && value !== '') {
-          return true;
-        }
-      }
-
-      // Also check directly in row object (in case data is stored there)
-      if (row[fieldApiName] !== null && row[fieldApiName] !== undefined && row[fieldApiName] !== '') {
-        return true;
-      }
-
-      // Check in cells if they exist (for already formatted data)
-      if (row.cells && Array.isArray(row.cells)) {
-        const cell = row.cells.find(c => c && c.key && c.key.includes(fieldApiName));
-        if (cell && (cell.value !== null && cell.value !== undefined && cell.value !== '')) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
 
   /**
    * @description Create a virtual column definition
@@ -967,13 +929,6 @@ export default class HM_ConfigurableList extends NavigationMixin(
   }
 
   /**
-   * @description Get field value from record (supports nested fields)
-   * Handles dot notation for parent relationships (e.g., "Account.Name")
-   * @param {Object} record - Record object to get value from
-   * @param {String} fieldApiName - Field API name, supports dot notation for nested fields
-   * @return {*} Field value or null if not found
-   */
-  /**
    * @description Get field value from record, supporting nested field paths
    * Handles dot notation for relationship fields (e.g., "Account.Name")
    * @param {Object} record - Record object containing field values
@@ -1057,6 +1012,28 @@ export default class HM_ConfigurableList extends NavigationMixin(
           actionName: "view"
         }
       });
+    }
+  }
+
+  /**
+   * @description Handle keyboard navigation for rows
+   * @param {KeyboardEvent} event - Keyboard event
+   */
+  handleRowKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      this.handleRowClick(event);
+    }
+  }
+
+  /**
+   * @description Handle keyboard navigation for column sort
+   * @param {KeyboardEvent} event - Keyboard event
+   */
+  handleColumnSortKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      this.handleColumnSort(event);
     }
   }
 
@@ -1540,8 +1517,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
       // Get visible columns (might include virtual columns)
       const visibleCols = this.visibleColumns;
       column = visibleCols.find(col => col.key === columnKey);
-    } catch (e) {
-      // If visibleColumns getter has issues, fall back to configured columns
+    } catch {
+      // Intentional graceful degradation: visibleColumns getter can fail during
+      // component initialization or filter changes. Fall back to configured columns
+      // rather than breaking the sort operation. This is non-critical for sorting.
+      column = null;
     }
     
     if (!column) {
@@ -1555,9 +1535,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
         if (column.isSmartNameColumn) {
           if (row.objectType === 'Case') {
             return this.getFieldValue(row.record, 'CaseNumber');
-          } else {
-            return this.getFieldValue(row.record, 'Name');
           }
+          return this.getFieldValue(row.record, 'Name');
         }
         // Regular virtual column
         return this.getFieldValue(row.record, column.fieldApiName);
@@ -1662,10 +1641,14 @@ export default class HM_ConfigurableList extends NavigationMixin(
         col.sortAlternativeText = this.sortDirection === HM_ConfigurableList.SORT_DIRECTIONS.ASC 
           ? "Sorted ascending" 
           : "Sorted descending";
+        col.ariaSort = this.sortDirection === HM_ConfigurableList.SORT_DIRECTIONS.ASC 
+          ? "ascending" 
+          : "descending";
       } else {
         col.sortDirection = null;
         col.sortIcon = null;
         col.sortAlternativeText = "";
+        col.ariaSort = col.sortable ? "none" : null;
       }
       col.headerClass = this.computeColumnHeaderClass(col);
       // Title doesn't need to change, but ensure it's set
@@ -1683,10 +1666,14 @@ export default class HM_ConfigurableList extends NavigationMixin(
           col.sortAlternativeText = this.sortDirection === HM_ConfigurableList.SORT_DIRECTIONS.ASC 
             ? "Sorted ascending" 
             : "Sorted descending";
+          col.ariaSort = this.sortDirection === HM_ConfigurableList.SORT_DIRECTIONS.ASC 
+            ? "ascending" 
+            : "descending";
         } else {
           col.sortDirection = null;
           col.sortIcon = null;
           col.sortAlternativeText = "";
+          col.ariaSort = col.sortable ? "none" : null;
         }
         col.headerClass = this.computeColumnHeaderClass(col);
         col.title = col.sortable ? "Click to sort" : "";

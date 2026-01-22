@@ -1,6 +1,13 @@
 /**
  * @description Service layer for dashboard configuration retrieval (metadata)
  * Retrieves dashboard, component group, and component configurations from custom objects
+ * 
+ * Key responsibilities:
+ * - Load complete dashboard configurations including groups and components
+ * - Bulk load related data (data sources, detail maps) to avoid N+1 queries
+ * - Parse and validate dashboard action configurations
+ * - Enforce CRUD/FLS security via Schema checks and Security.stripInaccessible
+ * 
  * @author High Meadows
  * @date 2024
  */
@@ -128,15 +135,8 @@ public with sharing class HM_DashboardConfigService {
 
       result.put('dashboard', dashboardMap);
 
-      List<Map<String, Object>> groups = new List<Map<String, Object>>();
-      for (HM_Dashboard_Component_Group__c componentGroup : componentGroups) {
-        Map<String, Object> groupConfig = getComponentGroupConfiguration(
-          componentGroup.Id
-        );
-        if (groupConfig != null) {
-          groups.add(groupConfig);
-        }
-      }
+      // Bulk load all groups with their components to avoid N+1 queries
+      List<Map<String, Object>> groups = buildGroupConfigurationsBulk(componentGroups);
       result.put('groups', groups);
 
       return result;
@@ -259,10 +259,7 @@ public with sharing class HM_DashboardConfigService {
         SELECT
           Id,
           Name,
-          HM_Type__c,
           HM_SOQL_Query__c,
-          HM_Apex_Class_Name__c,
-          HM_Apex_Method_Name__c,
           HM_Return_Type__c,
           HM_Active__c,
           HM_Order__c,
@@ -323,11 +320,135 @@ public with sharing class HM_DashboardConfigService {
     }
   }
 
+  // ==================== BULK LOADING METHODS ====================
+
+  /**
+   * @description Bulk load component group configurations with their components
+   * Optimizes queries by loading all groups, components, data sources, and detail maps in bulk
+   * Reduces N+1 query pattern to a fixed number of queries regardless of group/component count
+   * @param componentGroups List of component groups to load configurations for
+   * @return List<Map<String, Object>> List of group configuration maps with nested components
+   */
+  private static List<Map<String, Object>> buildGroupConfigurationsBulk(
+    List<HM_Dashboard_Component_Group__c> componentGroups
+  ) {
+    if (componentGroups == null || componentGroups.isEmpty()) {
+      return new List<Map<String, Object>>();
+    }
+
+    // Collect all group IDs
+    Set<Id> groupIds = new Set<Id>();
+    for (HM_Dashboard_Component_Group__c grp : componentGroups) {
+      groupIds.add(grp.Id);
+    }
+
+    // Bulk query all components for all groups
+    List<String> componentQueryFields = buildComponentQueryFields();
+    String componentQuery = 'SELECT ' + String.join(componentQueryFields, ', ') + 
+      ', HM_Dashboard_Component_Group__c' +
+      ' FROM HM_Dashboard_Component__c' +
+      ' WHERE HM_Dashboard_Component_Group__c IN :groupIds AND HM_Active__c = TRUE' +
+      ' ORDER BY HM_Display_Order__c ASC NULLS LAST';
+    List<HM_Dashboard_Component__c> allComponents = Database.query(componentQuery);
+
+    // Collect all component IDs and group components by group ID
+    Set<Id> componentIds = new Set<Id>();
+    Map<Id, List<HM_Dashboard_Component__c>> componentsByGroup = new Map<Id, List<HM_Dashboard_Component__c>>();
+    for (HM_Dashboard_Component__c comp : allComponents) {
+      componentIds.add(comp.Id);
+      Id groupId = comp.HM_Dashboard_Component_Group__c;
+      if (!componentsByGroup.containsKey(groupId)) {
+        componentsByGroup.put(groupId, new List<HM_Dashboard_Component__c>());
+      }
+      componentsByGroup.get(groupId).add(comp);
+    }
+
+    // Bulk query all data sources for all components
+    Map<Id, List<HM_Dashboard_Data_Source__c>> dataSourcesByComponent = new Map<Id, List<HM_Dashboard_Data_Source__c>>();
+    if (!componentIds.isEmpty()) {
+      List<HM_Dashboard_Data_Source__c> allDataSources = [
+        SELECT Id, Name, HM_SOQL_Query__c, HM_Return_Type__c, HM_Active__c, 
+               HM_Order__c, HM_Row_Icon_Name__c, HM_Dashboard_Component__c
+        FROM HM_Dashboard_Data_Source__c
+        WHERE HM_Dashboard_Component__c IN :componentIds AND HM_Active__c = TRUE
+        ORDER BY HM_Order__c ASC NULLS LAST
+      ];
+      for (HM_Dashboard_Data_Source__c ds : allDataSources) {
+        Id compId = ds.HM_Dashboard_Component__c;
+        if (!dataSourcesByComponent.containsKey(compId)) {
+          dataSourcesByComponent.put(compId, new List<HM_Dashboard_Data_Source__c>());
+        }
+        dataSourcesByComponent.get(compId).add(ds);
+      }
+    }
+
+    // Bulk query all detail maps for all components
+    Map<Id, List<HM_Component_Detail_Map__c>> detailMapsByComponent = new Map<Id, List<HM_Component_Detail_Map__c>>();
+    if (!componentIds.isEmpty()) {
+      List<HM_Component_Detail_Map__c> allDetailMaps = [
+        SELECT Id, HM_Field_API_Name__c, HM_Label__c, HM_Map_Type__c, HM_Display_Order__c,
+               HM_Format_Type__c, HM_Data_Source_Name__c, HM_Column_Badge_Type__c,
+               HM_Column_Badge_Variant__c, HM_Object_Type__c, HM_Dashboard_Component__c
+        FROM HM_Component_Detail_Map__c
+        WHERE HM_Dashboard_Component__c IN :componentIds
+        ORDER BY HM_Display_Order__c ASC NULLS LAST
+      ];
+      for (HM_Component_Detail_Map__c dm : allDetailMaps) {
+        Id compId = dm.HM_Dashboard_Component__c;
+        if (!detailMapsByComponent.containsKey(compId)) {
+          detailMapsByComponent.put(compId, new List<HM_Component_Detail_Map__c>());
+        }
+        detailMapsByComponent.get(compId).add(dm);
+      }
+    }
+
+    // Build result structure
+    List<Map<String, Object>> groups = new List<Map<String, Object>>();
+    for (HM_Dashboard_Component_Group__c componentGroup : componentGroups) {
+      Map<String, Object> groupResult = buildComponentGroupMap(componentGroup);
+      
+      // Build component configs from cached data
+      List<Map<String, Object>> componentConfigs = new List<Map<String, Object>>();
+      List<HM_Dashboard_Component__c> groupComponents = componentsByGroup.get(componentGroup.Id);
+      if (groupComponents != null) {
+        for (HM_Dashboard_Component__c component : groupComponents) {
+          Map<String, Object> componentResult = buildComponentMap(component);
+          
+          // Add data sources from cache
+          List<HM_Dashboard_Data_Source__c> dataSources = dataSourcesByComponent.get(component.Id);
+          List<Map<String, Object>> dataSourceMaps = new List<Map<String, Object>>();
+          if (dataSources != null) {
+            for (HM_Dashboard_Data_Source__c dataSource : dataSources) {
+              dataSourceMaps.add(buildDataSourceMap(dataSource));
+            }
+          }
+          componentResult.put('dataSources', dataSourceMaps);
+          
+          // Add detail maps from cache
+          List<HM_Component_Detail_Map__c> detailMaps = detailMapsByComponent.get(component.Id);
+          List<Map<String, Object>> maps = new List<Map<String, Object>>();
+          if (detailMaps != null) {
+            for (HM_Component_Detail_Map__c detailMap : detailMaps) {
+              maps.add(buildDetailMapMap(detailMap));
+            }
+          }
+          componentResult.put('detailMaps', maps);
+          
+          componentConfigs.add(componentResult);
+        }
+      }
+      groupResult.put('components', componentConfigs);
+      groups.add(groupResult);
+    }
+
+    return groups;
+  }
+
   // ==================== HELPER METHODS ====================
 
   /**
    * @description Find dashboard by Id or Name
-   * Supports both 15-character and 18-character Salesforce Ids
+   * Uses Id.valueOf() for robust ID validation instead of length checks
    * @param dashboardIdOrName Dashboard Id or Name to search for
    * @return HM_Dashboard__c Dashboard record if found, null otherwise
    */
@@ -336,8 +457,14 @@ public with sharing class HM_DashboardConfigService {
       return null;
     }
 
-    Boolean isId = dashboardIdOrName.length() == SALESFORCE_ID_LENGTH_15 ||
-                   dashboardIdOrName.length() == SALESFORCE_ID_LENGTH_18;
+    // Use Id.valueOf() for robust ID validation - handles edge cases better than length checks
+    Boolean isId = false;
+    try {
+      Id.valueOf(dashboardIdOrName);
+      isId = true;
+    } catch (StringException e) {
+      isId = false;
+    }
 
     List<String> fields = new List<String>{
       'Id', 'Name', 'HM_Description__c', 'HM_Active__c', 'HM_Display_Order__c',
@@ -456,10 +583,7 @@ public with sharing class HM_DashboardConfigService {
     Map<String, Object> mapData = new Map<String, Object>();
     mapData.put('id', dataSource.Id);
     mapData.put('name', dataSource.Name);
-    mapData.put('type', dataSource.HM_Type__c);
     mapData.put('soqlQuery', dataSource.HM_SOQL_Query__c);
-    mapData.put('apexClassName', dataSource.HM_Apex_Class_Name__c);
-    mapData.put('apexMethodName', dataSource.HM_Apex_Method_Name__c);
     mapData.put('returnType', dataSource.HM_Return_Type__c);
     mapData.put('active', dataSource.HM_Active__c);
     mapData.put('order', dataSource.HM_Order__c);

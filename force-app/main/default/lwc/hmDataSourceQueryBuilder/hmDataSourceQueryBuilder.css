@@ -1,0 +1,784 @@
+/* Data Source Query Builder - Single Page Layout Styles */
+
+/* ==================== Page Container ==================== */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+/* ==================== Page Header ==================== */
+.page-header {
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  flex-shrink: 0;
+}
+
+.hm-page-header-inner {
+  padding: var(--slds-g-spacing-4, 1rem) var(--slds-g-spacing-5, 1.5rem);
+}
+
+.hm-page-subtitle {
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+/* ==================== Main Content ==================== */
+.main-content {
+  flex: 1;
+  padding: var(--slds-g-spacing-4, 1rem) var(--slds-g-spacing-6, 2rem);
+  padding-bottom: var(--slds-g-spacing-6, 2rem);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ==================== Loading Container ==================== */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 25rem;
+  padding: var(--slds-g-spacing-6, 2rem);
+}
+
+/* ==================== Configuration Panel (Left Column) ==================== */
+.config-panel {
+  /* No fixed height - let page scroll naturally */
+}
+
+/* ==================== Config Card (Single Container) ==================== */
+.config-card {
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  position: relative;
+}
+
+/* Loading overlay for when fields are loading */
+.config-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  min-height: 12.5rem;
+}
+
+/* ==================== Accordion Styling ==================== */
+.config-card lightning-accordion {
+  --slds-c-accordion-section-summary-color-background: var(--slds-g-color-neutral-base-100, #ffffff);
+  --slds-c-accordion-section-summary-color-background-hover: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.accordion-content {
+  padding: var(--slds-g-spacing-2, 0.5rem) 0;
+}
+
+.config-section-empty {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  margin: var(--slds-g-spacing-4, 1rem);
+}
+
+/* ==================== Preview Panel (Right Column) ==================== */
+.preview-panel {
+  position: sticky;
+  top: var(--slds-g-spacing-4, 1rem);
+  align-self: flex-start;
+  height: fit-content;
+  max-height: calc(100vh - 10rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--slds-g-spacing-3, 0.75rem);
+}
+
+/* SOQL Preview Card */
+.preview-card {
+  background-color: var(--slds-g-color-neutral-base-10, #1e1e1e);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #3c3c3c);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.preview-card-header {
+  display: flex;
+  align-items: center;
+  padding: var(--slds-g-spacing-2, 0.5rem) var(--slds-g-spacing-4, 1rem);
+  border-bottom: 1px solid var(--slds-g-color-border-base-1, #3c3c3c);
+  background-color: #2d2d2d;
+}
+
+.preview-card-header lightning-icon {
+  --slds-c-icon-color-foreground: #cccccc;
+}
+
+.preview-card-title {
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+  font-weight: var(--slds-g-font-weight-6, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #cccccc;
+}
+
+.copy-button {
+  margin-left: auto;
+  padding-left: var(--slds-g-spacing-3, 0.75rem);
+}
+
+/* Styling hook for bare button icon on dark background */
+.copy-button lightning-button-icon,
+.copy-button {
+  --slds-c-button-icon-color-foreground: #9cdcfe;
+  --slds-c-button-icon-color-foreground-hover: #ffffff;
+}
+
+/* ==================== SOQL Preview ==================== */
+.soql-preview-box {
+  min-height: 9.375rem;
+  max-height: 25rem;
+  overflow-y: auto;
+  background-color: var(--slds-g-color-neutral-base-10, #1e1e1e);
+  border-radius: 0 0 var(--slds-g-radius-border-1, 0.25rem) var(--slds-g-radius-border-1, 0.25rem);
+}
+
+.soql-preview-content {
+  margin: 0;
+  padding: var(--slds-g-spacing-4, 1rem);
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: var(--slds-g-font-scale-base, 0.8125rem);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Syntax highlighting classes */
+.sql-keyword {
+  color: #569cd6;
+  font-weight: var(--slds-g-font-weight-5, 500);
+}
+
+.sql-function {
+  color: #dcdcaa;
+}
+
+.sql-field {
+  color: #9cdcfe;
+}
+
+.sql-string {
+  color: var(--slds-g-color-palette-hot-orange-70, #ce9178);
+}
+
+.sql-number {
+  color: var(--slds-g-color-palette-green-90, #b5cea8);
+}
+
+.sql-operator {
+  color: #d4d4d4;
+}
+
+.sql-comment {
+  color: var(--slds-g-color-palette-green-60, #6a9955);
+  font-style: italic;
+}
+
+.sql-object {
+  color: #4ec9b0;
+}
+
+.sql-literal {
+  color: #c586c0;
+}
+
+.sql-variable {
+  color: #dcdcaa;
+}
+
+.soql-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--slds-g-spacing-6, 2rem);
+  min-height: 9.375rem;
+  color: var(--slds-g-color-neutral-base-50, #6b6b6b);
+}
+
+.empty-icon-dark {
+  --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-50, #6b6b6b);
+}
+
+/* ==================== Results Card (Right Column) ==================== */
+.results-card {
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  overflow: hidden;
+  flex: 1;
+  min-height: 12rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.results-card-header {
+  display: flex;
+  align-items: center;
+  padding: var(--slds-g-spacing-2, 0.5rem) var(--slds-g-spacing-3, 0.75rem);
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  border-bottom: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
+  flex-shrink: 0;
+}
+
+.results-card-header lightning-icon {
+  --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+.results-card-title {
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+  font-weight: var(--slds-g-font-weight-6, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--slds-g-color-neutral-base-30, #3e3e3c);
+}
+
+.results-count-badge {
+  margin-left: var(--slds-g-spacing-2, 0.5rem);
+  padding: 0 var(--slds-g-spacing-2, 0.5rem);
+  font-size: var(--slds-g-font-scale-neg-2, 0.625rem);
+  font-weight: var(--slds-g-font-weight-6, 600);
+  background-color: var(--slds-g-color-brand-base-50, #0176d3);
+  color: #ffffff;
+  border-radius: var(--slds-g-radius-border-4, 1rem);
+  line-height: 1.4;
+}
+
+.results-card-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 8rem;
+}
+
+.results-table-wrapper {
+  overflow-x: auto;
+}
+
+.results-card-footer {
+  padding: var(--slds-g-spacing-1, 0.25rem) var(--slds-g-spacing-3, 0.75rem);
+  border-top: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  font-size: var(--slds-g-font-scale-neg-2, 0.625rem);
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+  flex-shrink: 0;
+}
+
+.results-error {
+  display: flex;
+  align-items: flex-start;
+  padding: var(--slds-g-spacing-3, 0.75rem);
+  background-color: rgba(234, 0, 30, 0.08);
+  color: #c23934;
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+}
+
+.results-error lightning-icon {
+  --slds-c-icon-color-foreground: #c23934;
+  flex-shrink: 0;
+}
+
+.results-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--slds-g-spacing-5, 1.5rem);
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+  text-align: center;
+  height: 100%;
+  min-height: 8rem;
+}
+
+.results-empty-state lightning-icon {
+  --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-60, #aeaeae);
+}
+
+.results-empty-state p {
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+  margin: 0;
+}
+
+.results-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--slds-g-spacing-5, 1.5rem);
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+  height: 100%;
+  min-height: 8rem;
+}
+
+/* ==================== Docked Footer ==================== */
+.docked-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--slds-g-spacing-3, 0.75rem) var(--slds-g-spacing-5, 1.5rem);
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border-top: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  box-shadow: 0 -0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+/* ==================== Icon Preview Box ==================== */
+.icon-preview-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--slds-g-spacing-2, 0.5rem) var(--slds-g-spacing-3, 0.75rem);
+  min-height: 2.5rem;
+  min-width: 6.25rem;
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  margin-top: var(--slds-g-spacing-1, 0.25rem);
+}
+
+/* ==================== Object Combobox ==================== */
+.object-combobox-wrapper {
+  position: relative;
+  z-index: 10;
+}
+
+.object-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 15.625rem;
+  overflow-y: auto;
+  z-index: 9999;
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #c9c9c9);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  box-shadow: 0 0.125rem 0.5rem 0 rgba(0, 0, 0, 0.16);
+  margin-top: 0.0625rem;
+}
+
+.object-label {
+  display: block;
+  font-weight: var(--slds-g-font-weight-5, 500);
+  color: var(--slds-g-color-neutral-base-10, #181818);
+}
+
+.object-api-name {
+  display: block;
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+}
+
+.slds-listbox__option:hover,
+.slds-listbox__option.slds-has-focus {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  cursor: pointer;
+}
+
+/* ==================== Query Type Toggle ==================== */
+.query-type-btn {
+  min-width: 6.25rem;
+}
+
+/* ==================== Field Selection ==================== */
+.field-checkbox-container {
+  max-height: 12.5rem;
+  overflow-y: auto;
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+}
+
+.field-checkbox-item {
+  padding: var(--slds-g-spacing-2, 0.5rem) var(--slds-g-spacing-3, 0.75rem);
+  border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+}
+
+.field-checkbox-item:last-child {
+  border-bottom: none;
+}
+
+.field-checkbox-item:hover {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+/* ==================== Aggregate Field Dropdown ==================== */
+.aggregate-field-wrapper {
+  position: relative;
+  z-index: 9;
+  overflow: visible;
+}
+
+.aggregate-field-wrapper .slds-combobox_container,
+.aggregate-field-wrapper .slds-form-element__control {
+  overflow: visible;
+}
+
+.aggregate-field-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 12.5rem;
+  overflow-y: auto;
+  z-index: 9999;
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #c9c9c9);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  box-shadow: 0 0.125rem 0.5rem 0 rgba(0, 0, 0, 0.16);
+  margin-top: 0.0625rem;
+}
+
+.aggregate-field-dropdown .field-label,
+.field-dropdown .field-label {
+  display: block;
+  font-weight: var(--slds-g-font-weight-5, 500);
+}
+
+.aggregate-field-dropdown .field-api-name,
+.field-dropdown .field-api-name {
+  display: block;
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+  color: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+/* ==================== Quick Filters ==================== */
+.quick-filters-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.owner-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem var(--slds-g-spacing-3, 0.75rem);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #c9c9c9);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  font-size: var(--slds-g-font-scale-base, 0.8125rem);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.owner-filter-btn:hover {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.owner-filter-btn.active {
+  background-color: var(--slds-g-color-brand-base-50, #0176d3);
+  color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border-color: var(--slds-g-color-brand-base-50, #0176d3);
+}
+
+.owner-filter-btn.active:hover {
+  background-color: var(--slds-g-color-brand-base-40, #014486);
+}
+
+/* ==================== Section Divider ==================== */
+.section-divider {
+  height: var(--slds-g-sizing-border-1, 1px);
+  background-color: var(--slds-g-color-border-base-1, #e5e5e5);
+}
+
+/* ==================== Conditions ==================== */
+.conditions-section {
+  min-height: 3.75rem;
+}
+
+.condition-row {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 7rem 1fr 1.5rem;
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0.375rem 0;
+}
+
+/* Compact inputs for condition rows */
+.condition-row lightning-combobox,
+.condition-row lightning-input {
+  --slds-c-input-spacing-horizontal-start: 0.5rem;
+  --slds-c-input-spacing-horizontal-end: 0.5rem;
+}
+
+.condition-row .slds-input,
+.condition-row .slds-combobox__input {
+  padding: var(--slds-g-spacing-1, 0.25rem) var(--slds-g-spacing-2, 0.5rem);
+  font-size: var(--slds-g-font-scale-base, 0.8125rem);
+  height: var(--slds-g-sizing-8, 1.75rem);
+  min-height: var(--slds-g-sizing-8, 1.75rem);
+}
+
+.conjunction-col {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.field-combobox-wrapper {
+  position: relative;
+  min-width: 0;
+}
+
+.operator-col {
+  min-width: 0;
+}
+
+.value-col {
+  min-width: 0;
+}
+
+.remove-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.field-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 12.5rem;
+  overflow-y: auto;
+  z-index: 9999;
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #c9c9c9);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  box-shadow: 0 0.125rem 0.5rem 0 rgba(0, 0, 0, 0.16);
+  margin-top: 0.0625rem;
+}
+
+.where-label {
+  font-weight: var(--slds-g-font-weight-7, 700);
+  color: var(--slds-g-color-neutral-base-30, #444444);
+  font-size: var(--slds-g-font-scale-neg-2, 0.625rem);
+  text-transform: uppercase;
+  text-align: right;
+}
+
+/* AND/OR Toggle Buttons */
+.conjunction-toggle {
+  display: inline-flex;
+  border-radius: 0.1875rem;
+  overflow: hidden;
+  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #c9c9c9);
+  flex-shrink: 0;
+}
+
+.conjunction-btn {
+  padding: 0.1875rem var(--slds-g-spacing-1, 0.25rem);
+  font-size: var(--slds-g-font-scale-neg-2, 0.625rem);
+  font-weight: var(--slds-g-font-weight-7, 700);
+  border: none;
+  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
+  color: var(--slds-g-color-neutral-base-30, #444444);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: var(--slds-g-font-line-height-1, 1);
+  min-width: var(--slds-g-sizing-8, 1.75rem);
+  text-align: center;
+}
+
+.conjunction-btn:first-child {
+  border-right: 1px solid var(--slds-g-color-border-base-1, #c9c9c9);
+}
+
+.conjunction-btn:hover {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+.conjunction-btn-active {
+  background-color: var(--slds-g-color-brand-base-50, #0176d3);
+  color: var(--slds-g-color-neutral-base-100, #ffffff);
+}
+
+.conjunction-btn-active:hover {
+  background-color: var(--slds-g-color-brand-base-40, #014486);
+}
+
+.null-placeholder {
+  display: flex;
+  align-items: center;
+  height: var(--slds-g-sizing-8, 1.75rem);
+  padding: 0 var(--slds-g-spacing-2, 0.5rem);
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
+}
+
+/* Delete button wrapper with hover state using styling hooks */
+.remove-button-wrapper {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  --slds-c-button-icon-color-foreground: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+.remove-button-wrapper:hover {
+  --slds-c-button-icon-color-foreground: var(--slds-g-color-error-base-40, #ea001e);
+}
+
+/* ==================== Empty States ==================== */
+.empty-state {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+  padding: var(--slds-g-spacing-6, 2rem);
+}
+
+.empty-state-small {
+  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+}
+
+.empty-icon {
+  --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-50, #706e6b);
+}
+
+/* ==================== Clear Button Positioning ==================== */
+/* Note: Input icon click handling is managed by container elements */
+.field-combobox-wrapper .slds-button_icon,
+.object-combobox-wrapper .slds-button_icon,
+.aggregate-field-wrapper .slds-button_icon {
+  pointer-events: auto;
+}
+
+/* ==================== Responsive Adjustments ==================== */
+@media (max-width: 1440px) {
+  .main-content {
+    padding: var(--slds-g-spacing-4, 1rem) var(--slds-g-spacing-5, 1.5rem);
+  }
+}
+
+@media (max-width: 1280px) {
+  .main-content {
+    padding: var(--slds-g-spacing-4, 1rem);
+  }
+}
+
+@media (max-width: 1024px) {
+  .hm-main-grid {
+    flex-direction: column;
+  }
+
+  .hm-config-col,
+  .hm-preview-col {
+    width: 100%;
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+
+  .config-panel {
+    margin-bottom: var(--slds-g-spacing-4, 1rem);
+  }
+
+  .preview-panel {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    margin-bottom: var(--slds-g-spacing-4, 1rem);
+  }
+
+  .soql-preview-box {
+    min-height: 7.5rem;
+    max-height: 15.625rem;
+  }
+
+  .results-card {
+    min-height: 15rem;
+  }
+
+  .results-card-content {
+    max-height: 20rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hm-page-header-inner {
+    padding: var(--slds-g-spacing-3, 0.75rem) var(--slds-g-spacing-4, 1rem);
+  }
+
+  .main-content {
+    padding: var(--slds-g-spacing-3, 0.75rem);
+  }
+
+  .docked-footer {
+    padding: var(--slds-g-spacing-3, 0.75rem) var(--slds-g-spacing-4, 1rem);
+  }
+
+  .config-section {
+    padding: var(--slds-g-spacing-3, 0.75rem) var(--slds-g-spacing-4, 1rem);
+  }
+
+  /* Condition row on mobile - switch to 2-row layout */
+  .condition-row {
+    grid-template-columns: 3.5rem 1fr 1.5rem;
+    grid-template-rows: auto auto;
+    row-gap: 0.25rem;
+  }
+
+  .conjunction-col {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .field-combobox-wrapper {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .remove-col {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+
+  .operator-col {
+    grid-column: 1 / 2;
+    grid-row: 2;
+  }
+
+  .value-col {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  .object-dropdown,
+  .field-dropdown {
+    max-height: 11.25rem;
+  }
+
+  .field-checkbox-container {
+    max-height: 9.375rem;
+  }
+
+  .soql-preview-box {
+    min-height: 6.25rem;
+    max-height: 12.5rem;
+  }
+
+  .results-card-content {
+    max-height: 15rem;
+  }
+}

@@ -81,12 +81,7 @@
         <editHeading>true</editHeading>
         <label>Data Configuration</label>
         <layoutColumns/>
-        <layoutColumns>
-            <layoutItems>
-                <behavior>Edit</behavior>
-                <field>HM_Apex_Parameters__c</field>
-            </layoutItems>
-        </layoutColumns>
+        <layoutColumns/>
         <style>TwoColumnsLeftToRight</style>
     </layoutSections>
     <layoutSections>
@@ -129,7 +124,6 @@
     </layoutSections>
     <relatedLists>
         <fields>NAME</fields>
-        <fields>HM_Type__c</fields>
         <fields>HM_Active__c</fields>
         <fields>HM_Order__c</fields>
         <relatedList>HM_Dashboard_Data_Source__c.HM_Dashboard_Component__c</relatedList>

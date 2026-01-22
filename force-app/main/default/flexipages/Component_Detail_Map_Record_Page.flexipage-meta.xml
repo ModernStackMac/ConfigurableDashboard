@@ -71,6 +71,13 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Label__c</fieldItem>
                 <identifier>RecordHM_Label_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Dashboard_Component__r.RecordType.DeveloperName}</leftValue>
+                        <operator>CONTAINS</operator>
+                        <rightValue>List</rightValue>
+                    </criteria>
+                </visibilityRule>
             </fieldInstance>
         </itemInstances>
         <itemInstances>
@@ -81,6 +88,23 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Field_API_Name__c</fieldItem>
                 <identifier>RecordHM_Field_API_Name_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Dashboard_Component__r.RecordType.DeveloperName}</leftValue>
+                        <operator>CONTAINS</operator>
+                        <rightValue>List</rightValue>
+                    </criteria>
+                </visibilityRule>
+            </fieldInstance>
+        </itemInstances>
+        <itemInstances>
+            <fieldInstance>
+                <fieldInstanceProperties>
+                    <name>uiBehavior</name>
+                    <value>none</value>
+                </fieldInstanceProperties>
+                <fieldItem>Record.HM_Data_Source_Name__c</fieldItem>
+                <identifier>RecordHM_Data_Source_Name_cField2</identifier>
             </fieldInstance>
         </itemInstances>
         <name>Facet-ee3e53a0-f8fc-4d05-bd41-341f41f6db54</name>
@@ -423,16 +447,30 @@
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
+                    <name>actionNames</name>
+                    <valueList>
+                        <valueListItems>
+                            <value>Edit</value>
+                        </valueListItems>
+                        <valueListItems>
+                            <value>Clone</value>
+                        </valueListItems>
+                        <valueListItems>
+                            <value>Delete</value>
+                        </valueListItems>
+                    </valueList>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
                     <name>collapsed</name>
                     <value>false</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>enableActionsConfiguration</name>
-                    <value>false</value>
+                    <value>true</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>enableActionsInNative</name>
-                    <value>false</value>
+                    <value>true</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>hideChatterActions</name>

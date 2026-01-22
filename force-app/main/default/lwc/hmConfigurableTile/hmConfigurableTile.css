@@ -19,7 +19,7 @@
   padding: var(--slds-g-spacing-5, 20px);
   box-shadow: var(--slds-g-shadow-1, 0 2px 4px rgba(0, 0, 0, 0.1));
   /* SLDS2: Using 1px as fallback - border width tokens may not be available in all SLDS2 themes */
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(0, 0, 0, 0.06);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -55,9 +55,22 @@
   margin-bottom: var(--slds-g-spacing-4, 16px);
 }
 
+/* Header left section - icon and title inline */
+.cc-kpi-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--slds-g-spacing-3, 12px);
+  min-width: 0; /* Allow text truncation */
+}
+
+/* When label is in header, remove bottom margin */
+.cc-kpi-header-left .cc-kpi-label {
+  margin-bottom: 0;
+}
+
 .cc-kpi-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--slds-g-radius-border-2, 8px);
   display: flex;
   align-items: center;
@@ -65,93 +78,69 @@
   flex-shrink: 0;
 }
 
-/* SLDS2: Using color-mix() for modern browsers with rgba fallback for compatibility */
+/* Icon container backgrounds with colored icons */
 .cc-kpi-icon--brand {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-brand-1, #0176d3) 15%, transparent);
-  /* Fallback for older browsers (IE11, older Safari) */
-  background: rgba(1, 118, 211, 0.15);
+  background: rgba(1, 118, 211, 0.12);
 }
 
 .cc-kpi-icon--brand lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-brand-1, #0176d3);
+  --slds-g-color-on-surface-1: #0176d3;
 }
 
 .cc-dark .cc-kpi-icon--brand {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-brand-3, #1b96ff) 20%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(27, 150, 255, 0.2);
+  background: rgba(27, 150, 255, 0.18);
 }
 
 .cc-dark .cc-kpi-icon--brand lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-brand-3, #1b96ff);
+  --slds-g-color-on-surface-1: #1b96ff;
 }
 
 .cc-kpi-icon--alert {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 15%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(234, 0, 30, 0.15);
+  background: rgba(234, 0, 30, 0.12);
 }
 
 .cc-kpi-icon--alert lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-error-1, #ea001e);
+  --slds-g-color-on-surface-1: #c23934;
 }
 
 .cc-dark .cc-kpi-icon--alert {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(255, 82, 82, 0.2);
+  background: rgba(255, 82, 82, 0.18);
 }
 
 .cc-dark .cc-kpi-icon--alert lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-error-2, #ff5252);
+  --slds-g-color-on-surface-1: #ff5252;
 }
 
 .cc-kpi-icon--success {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 15%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(46, 132, 74, 0.15);
+  background: rgba(46, 132, 74, 0.12);
 }
 
 .cc-kpi-icon--success lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-success-1, #2e844a);
+  --slds-g-color-on-surface-1: #2e844a;
 }
 
 .cc-dark .cc-kpi-icon--success {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 20%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(76, 175, 80, 0.2);
+  background: rgba(76, 175, 80, 0.18);
 }
 
 .cc-dark .cc-kpi-icon--success lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-success-2, #4caf50);
+  --slds-g-color-on-surface-1: #4caf50;
 }
 
 .cc-kpi-icon--warning {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-warning-1, #ffb75d) 15%, transparent);
-  /* Fallback for older browsers */
   background: rgba(255, 183, 93, 0.15);
 }
 
 .cc-kpi-icon--warning lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-warning-1, #ffb75d);
+  --slds-g-color-on-surface-1: #dd7a01;
 }
 
 .cc-dark .cc-kpi-icon--warning {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-warning-2, #ffc107) 20%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(255, 193, 7, 0.2);
+  background: rgba(255, 193, 7, 0.18);
 }
 
 .cc-dark .cc-kpi-icon--warning lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-warning-2, #ffc107);
+  --slds-g-color-on-surface-1: #ffc107;
 }
 
 .cc-kpi-icon--no-background {
@@ -159,66 +148,8 @@
   padding: 0;
   width: auto;
   height: auto;
-  min-width: 32px;
-  min-height: 32px;
-}
-
-.cc-kpi-change {
-  display: flex;
-  align-items: center;
-  gap: var(--slds-g-spacing-1, 4px);
-  font-size: var(--slds-g-font-scale-2, 0.875rem);
-  font-weight: var(--slds-g-font-weight-medium, 500);
-  padding: var(--slds-g-spacing-1, 4px) var(--slds-g-spacing-2, 8px);
-  border-radius: var(--slds-g-radius-border-4, 16px);
-}
-
-.cc-kpi-change--up {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 15%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(46, 132, 74, 0.15);
-  color: var(--slds-g-color-success-1, #2e844a);
-}
-
-.cc-kpi-change--up lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-success-1, #2e844a);
-}
-
-.cc-dark .cc-kpi-change--up {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 20%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(76, 175, 80, 0.2);
-  color: var(--slds-g-color-success-2, #4caf50);
-}
-
-.cc-dark .cc-kpi-change--up lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-success-2, #4caf50);
-}
-
-.cc-kpi-change--down {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 15%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(234, 0, 30, 0.15);
-  color: var(--slds-g-color-error-1, #ea001e);
-}
-
-.cc-kpi-change--down lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-error-1, #ea001e);
-}
-
-.cc-dark .cc-kpi-change--down {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(255, 82, 82, 0.2);
-  color: var(--slds-g-color-error-2, #ff5252);
-}
-
-.cc-dark .cc-kpi-change--down lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-error-2, #ff5252);
+  min-width: var(--slds-g-sizing-8, 28px);
+  min-height: var(--slds-g-sizing-8, 28px);
 }
 
 /* ==================== KPI BADGE ==================== */
@@ -227,12 +158,12 @@
   align-items: center;
   gap: var(--slds-g-spacing-1, 6px);
   font-size: var(--slds-g-font-scale-2, 0.8125rem);
-  font-weight: var(--slds-g-font-weight-semibold, 600);
+  font-weight: var(--slds-g-font-weight-7, 600);
   padding: var(--slds-g-spacing-1, 6px) var(--slds-g-spacing-3, 12px);
   border-radius: var(--slds-g-radius-border-4, 16px);
   line-height: 1.2;
   white-space: nowrap;
-  min-height: 28px;
+  min-height: var(--slds-g-sizing-8, 28px);
 }
 
 /* SLDS2: Responsive design - allow wrapping on mobile devices to prevent overflow */
@@ -244,105 +175,69 @@
 }
 
 .cc-kpi-badge--up {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 12%, transparent);
-  /* Fallback for older browsers */
   background: rgba(46, 132, 74, 0.12);
-  color: var(--slds-g-color-success-1, #2e844a);
-  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
-  border: 1px solid rgba(46, 132, 74, 0.2);
-  /* Modern browsers: use color-mix with SLDS2 token for border color */
-  border-color: color-mix(in srgb, var(--slds-g-color-success-1, #2e844a) 20%, transparent);
+  color: #2e844a;
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(46, 132, 74, 0.25);
 }
 
 .cc-kpi-badge--up lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-success-1, #2e844a);
-  --slds-c-icon-color-foreground-default: var(--slds-g-color-success-1, #2e844a);
+  --slds-g-color-on-surface-1: #2e844a;
+  --slds-c-icon-color-foreground-default: #2e844a;
 }
 
 .cc-dark .cc-kpi-badge--up {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 15%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(76, 175, 80, 0.15);
-  color: var(--slds-g-color-success-2, #4caf50);
-  /* Fallback for older browsers */
-  border-color: rgba(76, 175, 80, 0.3);
-  /* Modern browsers: use color-mix with SLDS2 token */
-  border-color: color-mix(in srgb, var(--slds-g-color-success-2, #4caf50) 30%, transparent);
+  background: rgba(76, 175, 80, 0.18);
+  color: #4caf50;
+  border-color: rgba(76, 175, 80, 0.35);
 }
 
 .cc-dark .cc-kpi-badge--up lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-success-2, #4caf50);
-  --slds-c-icon-color-foreground-default: var(--slds-g-color-success-2, #4caf50);
+  --slds-g-color-on-surface-1: #4caf50;
+  --slds-c-icon-color-foreground-default: #4caf50;
 }
 
 .cc-kpi-badge--down {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 12%, transparent);
-  /* Fallback for older browsers */
   background: rgba(234, 0, 30, 0.12);
-  color: var(--slds-g-color-error-1, #ea001e);
-  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
-  border: 1px solid rgba(234, 0, 30, 0.2);
-  /* Modern browsers: use color-mix with SLDS2 token for border color */
-  border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent);
+  color: #c23934;
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(234, 0, 30, 0.25);
 }
 
 .cc-kpi-badge--down lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-error-1, #ea001e);
-  --slds-c-icon-color-foreground-default: var(--slds-g-color-error-1, #ea001e);
+  --slds-g-color-on-surface-1: #c23934;
+  --slds-c-icon-color-foreground-default: #c23934;
 }
 
 .cc-dark .cc-kpi-badge--down {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 15%, transparent);
-  /* Fallback for older browsers */
-  background: rgba(255, 82, 82, 0.15);
-  color: var(--slds-g-color-error-2, #ff5252);
-  /* Fallback for older browsers */
-  border-color: rgba(255, 82, 82, 0.3);
-  /* Modern browsers: use color-mix with SLDS2 token */
-  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 30%, transparent);
+  background: rgba(255, 82, 82, 0.18);
+  color: #ff5252;
+  border-color: rgba(255, 82, 82, 0.35);
 }
 
 .cc-dark .cc-kpi-badge--down lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-error-2, #ff5252);
-  --slds-c-icon-color-foreground-default: var(--slds-g-color-error-2, #ff5252);
+  --slds-g-color-on-surface-1: #ff5252;
+  --slds-c-icon-color-foreground-default: #ff5252;
 }
 
 .cc-kpi-badge--zero {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-neutral-base-50, #747474) 10%, transparent);
-  /* Fallback for older browsers */
   background: rgba(116, 116, 116, 0.1);
-  color: var(--slds-g-color-neutral-base-50, #747474);
-  /* SLDS2: Using 1px as fallback - border width tokens may not be available */
-  border: 1px solid rgba(116, 116, 116, 0.15);
-  /* Modern browsers: use color-mix with SLDS2 token for border color */
-  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-50, #747474) 15%, transparent);
+  color: #706e6b;
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(116, 116, 116, 0.2);
 }
 
 .cc-kpi-badge--zero lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-neutral-base-50, #747474);
-  --slds-c-icon-color-foreground-default: var(--slds-g-color-neutral-base-50, #747474);
+  --slds-g-color-on-surface-1: #706e6b;
+  --slds-c-icon-color-foreground-default: #706e6b;
 }
 
 .cc-dark .cc-kpi-badge--zero {
-  /* Modern browsers: use color-mix with SLDS2 token */
-  background: color-mix(in srgb, var(--slds-g-color-neutral-base-40, #a0a0a0) 12%, transparent);
-  /* Fallback for older browsers */
   background: rgba(160, 160, 160, 0.12);
-  color: var(--slds-g-color-neutral-base-40, #a0a0a0);
-  /* Fallback for older browsers */
-  border-color: rgba(160, 160, 160, 0.2);
-  /* Modern browsers: use color-mix with SLDS2 token */
-  border-color: color-mix(in srgb, var(--slds-g-color-neutral-base-40, #a0a0a0) 20%, transparent);
+  color: #a0a0a0;
+  border-color: rgba(160, 160, 160, 0.25);
 }
 
 .cc-dark .cc-kpi-badge--zero lightning-icon {
-  --lwc-colorTextIconDefault: var(--slds-g-color-neutral-base-40, #a0a0a0);
-  --slds-c-icon-color-foreground-default: var(--slds-g-color-neutral-base-40, #a0a0a0);
+  --slds-g-color-on-surface-1: #a0a0a0;
+  --slds-c-icon-color-foreground-default: #a0a0a0;
 }
 
 .cc-badge-icon {
@@ -360,7 +255,7 @@
   color: var(--slds-g-color-neutral-base-50, #747474);
   margin: 0 0 var(--slds-g-spacing-2, 8px) 0;
   transition: color 0.3s ease;
-  font-weight: var(--slds-g-font-weight-medium, 500);
+  font-weight: var(--slds-g-font-weight-5, 500);
 }
 
 .cc-dark .cc-kpi-label {
@@ -371,7 +266,7 @@
   font-size: var(--slds-g-font-scale-7, 1.75rem);
   font-weight: var(--slds-g-font-weight-bold, 700);
   color: var(--slds-g-color-neutral-base-10, #181818);
-  margin: 0;
+  margin: var(--slds-g-spacing-2, 8px) 0 0 0;
   transition: color 0.3s ease;
 }
 
@@ -380,7 +275,7 @@
 }
 
 .cc-kpi-subtitle-spacer {
-  margin-top: auto;
+  margin-top: var(--slds-g-spacing-3, 12px);
   min-height: 1.2em;
 }
 
@@ -392,7 +287,7 @@
 }
 
 .cc-dark .cc-kpi-subtitle {
-  color: var(--slds-g-color-neutral-base-45, #808080);
+  color: var(--slds-g-color-neutral-base-50, #808080);
 }
 
 .cc-error-message {
@@ -403,5 +298,5 @@
 }
 
 .cc-dark .cc-error-message {
-  color: var(--slds-g-color-error-2, #ff5252);
+  color: var(--slds-g-color-error-base-40, #ff5252);
 }

@@ -1,27 +1,22 @@
 /**
- * @description Generic service for executing component data retrieval (SOQL/Apex execution)
- * Handles both SOQL queries and dynamic Apex method invocation for dashboard components
+ * @description Service for executing SOQL queries for dashboard components
  * 
- * Components use Data Source records (HM_Dashboard_Data_Source__c) to define how data is retrieved.
+ * Components use Data Source records (HM_Dashboard_Data_Source__c) to define SOQL queries.
  * Multiple Data Sources per Component are supported and processed in order.
+ * Supports both standard record queries and aggregate queries.
  * 
- * For Apex method invocation, classes must implement the Callable interface.
- * Admins configure Data Sources on Dashboard Component records.
- * 
- * Example: Create a class that implements Callable:
- * public class MyDataProvider implements Callable {
- *   public Object call(String action, Map<String, Object> args) {
- *     // Handle method calls
- *   }
- * }
+ * Key responsibilities:
+ * - Execute SOQL queries defined in Data Source records
+ * - Replace merge fields ({!UserId}, etc.) and Apex bindings in queries
+ * - Process both LIST and AGGREGATE return types
+ * - Enforce CRUD/FLS via Security.stripInaccessible for SObject queries
+ * - Combine multiple data sources for List components
  * 
  * @author High Meadows
  * @date 2024
  */
 public with sharing class HM_ComponentDataService {
   // ==================== CONSTANTS ====================
-  private static final String DATA_SOURCE_TYPE_APEX = 'Apex';
-  private static final String DATA_SOURCE_TYPE_SOQL = 'SOQL';
   
   private static final String RETURN_TYPE_AGGREGATE = 'Aggregate';
   private static final String RETURN_TYPE_LIST = 'List';
@@ -61,27 +56,18 @@ public with sharing class HM_ComponentDataService {
   private static final String ERROR_COMPONENT_ID_REQUIRED = 'Component ID is required';
   private static final String ERROR_INSUFFICIENT_PERMISSIONS_COMPONENT = 'Insufficient permissions to access Dashboard Component';
   private static final String ERROR_INSUFFICIENT_PERMISSIONS_DATA_SOURCE = 'Insufficient permissions to access Dashboard Data Source';
-  private static final String ERROR_INVALID_DATA_SOURCE_TYPE = 'Data Source {0}: Invalid Type. Must be "SOQL" or "Apex"';
-  private static final String ERROR_APEX_CLASS_NAME_REQUIRED = 'Data Source {0}: Apex Class Name is required when Type is Apex';
-  private static final String ERROR_APEX_METHOD_NAME_REQUIRED = 'Data Source {0}: Apex Method Name is required when Type is Apex';
-  private static final String ERROR_APEX_CLASS_NOT_FOUND = 'Data Source {0}: Apex class not found: {1}';
-  private static final String ERROR_SOQL_QUERY_REQUIRED = 'Data Source {0}: SOQL Query is required when Type is SOQL';
+  private static final String ERROR_SOQL_QUERY_REQUIRED = 'Data Source {0}: SOQL Query is required';
   private static final String ERROR_SOQL_MUST_START_WITH_SELECT = 'Data Source {0}: Invalid SOQL query syntax: Query must start with SELECT';
   private static final String ERROR_SOQL_DML_NOT_ALLOWED = 'Data Source {0}: Invalid SOQL query syntax: DML operations are not allowed';
   private static final String ERROR_SOQL_DUPLICATE_FROM = 'Invalid SOQL query syntax: Query contains {0} FROM clauses. Only one FROM clause is allowed. Example: "SELECT Id FROM Account ORDER BY Name"';
   private static final String ERROR_SOQL_MISSING_FROM = 'Invalid SOQL query syntax: Query must contain a FROM clause';
-  private static final String ERROR_APEX_CLASS_NAME_REQUIRED_PUBLIC = 'Apex class name is required';
-  private static final String ERROR_APEX_METHOD_NAME_REQUIRED_PUBLIC = 'Apex method name is required';
-  private static final String ERROR_CLASS_NOT_FOUND = 'Class not found: {0}';
   private static final String ERROR_EXECUTING_COMPONENT_QUERY = 'Error executing component query: {0}';
-  private static final String ERROR_EXECUTING_APEX_METHOD = 'Error executing Apex method: {0}';
   private static final String ERROR_INVALID_SOQL_SYNTAX = 'Invalid SOQL query syntax: {0}. Original Query: {1}. {2}Please check your query for syntax errors such as mismatched parentheses, missing commas, or invalid field references.';
   private static final String ERROR_EXECUTING_SOQL = 'Error executing SOQL query: {0}. Original Query: {1}';
-  private static final String ERROR_CLASS_TYPE_NULL = 'Class type is null';
-  private static final String ERROR_CALLABLE_INTERFACE_REQUIRED = 'Class must implement Callable interface: {0}. Error: {1}';
-  private static final String ERROR_INVOKING_METHOD = 'Error invoking method dynamically: {0}';
   private static final String ERROR_RETURN_TYPE_INCOMPATIBLE = 'Return type {0} is not compatible with component type {1}';
   private static final String ERROR_RETURN_TYPE_REQUIRED = 'Return type is required for data source';
+  private static final String ERROR_OBJECT_NOT_FOUND = 'Object not found: {0}';
+  private static final String ERROR_INSUFFICIENT_OBJECT_ACCESS = 'Insufficient permissions to access {0}';
   
   /**
    * @description Execute component query (SOQL or Apex) based on Data Source configuration
@@ -145,10 +131,7 @@ public with sharing class HM_ComponentDataService {
         SELECT
           Id,
           Name,
-          HM_Type__c,
           HM_SOQL_Query__c,
-          HM_Apex_Class_Name__c,
-          HM_Apex_Method_Name__c,
           HM_Return_Type__c,
           HM_Active__c,
           HM_Order__c,
@@ -165,41 +148,32 @@ public with sharing class HM_ComponentDataService {
       }
 
       // Query Component Detail Maps with Map Type "Subtitle" and "Tile Badge" for tile components
+      // Combined into single query for performance optimization
       HM_Component_Detail_Map__c subtitleDetailMap = null;
       HM_Component_Detail_Map__c badgeDetailMap = null;
       if (component.HM_Type__c == COMPONENT_TYPE_TILE) {
         // Check object accessibility for Component Detail Maps
         if (Schema.sObjectType.HM_Component_Detail_Map__c.isAccessible()) {
-          // Query subtitle detail map
-          List<HM_Component_Detail_Map__c> subtitleMaps = [
+          // Single query for both subtitle and badge detail maps
+          List<HM_Component_Detail_Map__c> tileDetailMaps = [
             SELECT
               Id,
               HM_Data_Source_Name__c,
               HM_Field_API_Name__c,
-              HM_Format_Type__c
+              HM_Format_Type__c,
+              HM_Map_Type__c
             FROM HM_Component_Detail_Map__c
             WHERE HM_Dashboard_Component__c = :componentId
-              AND HM_Map_Type__c = 'Subtitle'
-            LIMIT 1
+              AND HM_Map_Type__c IN ('Subtitle', 'Tile Badge')
           ];
-          if (!subtitleMaps.isEmpty()) {
-            subtitleDetailMap = subtitleMaps[0];
-          }
           
-          // Query badge detail map
-          List<HM_Component_Detail_Map__c> badgeMaps = [
-            SELECT
-              Id,
-              HM_Data_Source_Name__c,
-              HM_Field_API_Name__c,
-              HM_Format_Type__c
-            FROM HM_Component_Detail_Map__c
-            WHERE HM_Dashboard_Component__c = :componentId
-              AND HM_Map_Type__c = 'Tile Badge'
-            LIMIT 1
-          ];
-          if (!badgeMaps.isEmpty()) {
-            badgeDetailMap = badgeMaps[0];
+          // Process results into separate maps
+          for (HM_Component_Detail_Map__c detailMap : tileDetailMaps) {
+            if (detailMap.HM_Map_Type__c == 'Subtitle' && subtitleDetailMap == null) {
+              subtitleDetailMap = detailMap;
+            } else if (detailMap.HM_Map_Type__c == 'Tile Badge' && badgeDetailMap == null) {
+              badgeDetailMap = detailMap;
+            }
           }
         }
       }
@@ -279,7 +253,7 @@ public with sharing class HM_ComponentDataService {
   /**
    * @description Process a single Data Source and return its results
    * @param dataSource Data Source record to process
-   * @param context Context parameters for merge fields and Apex methods
+   * @param context Context parameters for merge fields
    * @param componentType Component type (Tile, List, etc.) for validation
    * @return Map<String, Object> with shape, aggregateValue, rows, etc.
    */
@@ -288,13 +262,6 @@ public with sharing class HM_ComponentDataService {
     Map<String, Object> context,
     String componentType
   ) {
-    // Guard clause: validate data source type
-    if (dataSource.HM_Type__c != DATA_SOURCE_TYPE_APEX && dataSource.HM_Type__c != DATA_SOURCE_TYPE_SOQL) {
-      throw new AuraHandledException(
-        String.format(ERROR_INVALID_DATA_SOURCE_TYPE, new List<String>{ String.valueOf(dataSource.Id) })
-      );
-    }
-
     // Validate return type is set
     if (String.isBlank(dataSource.HM_Return_Type__c)) {
       throw new AuraHandledException(ERROR_RETURN_TYPE_REQUIRED);
@@ -303,70 +270,8 @@ public with sharing class HM_ComponentDataService {
     // Validate return type is compatible with component type
     validateReturnType(dataSource.HM_Return_Type__c, componentType);
 
-    // Process Apex type
-    if (dataSource.HM_Type__c == DATA_SOURCE_TYPE_APEX) {
-      return processApexDataSource(dataSource, context, componentType);
-    }
-
-    // Process SOQL type
+    // Process SOQL query
     return processSOQLDataSource(dataSource, context, componentType);
-  }
-
-  /**
-   * @description Process Apex data source
-   * @param dataSource Data Source record
-   * @param context Context parameters
-   * @param componentType Component type for validation
-   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
-   */
-  private static Map<String, Object> processApexDataSource(
-    HM_Dashboard_Data_Source__c dataSource,
-    Map<String, Object> context,
-    String componentType
-  ) {
-    // Validate Apex configuration
-    if (String.isBlank(dataSource.HM_Apex_Class_Name__c)) {
-      throw new AuraHandledException(
-        String.format(ERROR_APEX_CLASS_NAME_REQUIRED, new List<String>{ String.valueOf(dataSource.Id) })
-      );
-    }
-    if (String.isBlank(dataSource.HM_Apex_Method_Name__c)) {
-      throw new AuraHandledException(
-        String.format(ERROR_APEX_METHOD_NAME_REQUIRED, new List<String>{ String.valueOf(dataSource.Id) })
-      );
-    }
-
-    // Validate Apex class exists
-    Type classType = Type.forName(dataSource.HM_Apex_Class_Name__c);
-    if (classType == null) {
-      throw new AuraHandledException(
-        String.format(ERROR_APEX_CLASS_NOT_FOUND, new List<String>{ 
-          String.valueOf(dataSource.Id), 
-          dataSource.HM_Apex_Class_Name__c 
-        })
-      );
-    }
-
-    // Execute Apex method
-    Map<String, Object> response = executeApexMethod(
-      dataSource.HM_Apex_Class_Name__c,
-      dataSource.HM_Apex_Method_Name__c,
-      context != null ? context : new Map<String, Object>(),
-      dataSource.HM_Return_Type__c
-    );
-    
-    // Enhance response with standard fields if showAllRecordsFilter is enabled
-    if (context != null && context.containsKey('showAllRecordsFilter')) {
-      Boolean showAllRecordsFilter = (Boolean) context.get('showAllRecordsFilter');
-      if (showAllRecordsFilter == true && response != null && response.get('shape') == SHAPE_LIST) {
-        response = enhanceApexResponseWithStandardFields(response);
-      }
-    }
-    
-    // Add data source icon to rows if present
-    addDataSourceIconToRows(response, dataSource);
-    
-    return response;
   }
 
   /**
@@ -411,6 +316,9 @@ public with sharing class HM_ComponentDataService {
     // Validate basic SOQL syntax
     validateSOQLSyntax(normalizedQuery);
 
+    // Validate object-level access (CRUD check)
+    validateObjectAccess(normalizedQuery);
+
     // Enhance query with standard fields if showAllRecordsFilter is enabled
     String enhancedQuery = normalizedQuery;
     if (context != null && context.containsKey('showAllRecordsFilter')) {
@@ -427,6 +335,20 @@ public with sharing class HM_ComponentDataService {
     addDataSourceIconToRows(response, dataSource);
     
     return response;
+  }
+
+  /**
+   * @description Check if query is a simple COUNT() query (no field argument)
+   * @param query SOQL query string
+   * @return True if query uses COUNT() without field argument
+   */
+  private static Boolean isCountQuery(String query) {
+    if (String.isBlank(query)) {
+      return false;
+    }
+    // Match SELECT COUNT() - note: COUNT(fieldName) should NOT match
+    String normalized = query.toUpperCase().replaceAll('\\s+', ' ').trim();
+    return normalized.startsWith('SELECT COUNT()');
   }
 
   /**
@@ -459,6 +381,12 @@ public with sharing class HM_ComponentDataService {
       // Replace merge fields
       processedQuery = replaceMergeFields(queryToProcess, context);
 
+      // Check if this is a COUNT() query (requires countQuery instead of query)
+      if (isCountQuery(processedQuery)) {
+        Integer countResult = Database.countQuery(processedQuery);
+        return buildAggregateResponse(countResult);
+      }
+
       // Execute query
       List<SObject> records = Database.query(processedQuery);
       
@@ -470,7 +398,10 @@ public with sharing class HM_ComponentDataService {
           AggregateResult ar = (AggregateResult) records[0];
           Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
           
-          // Try "totalWon" alias first, then first key
+          // Aggregate alias resolution strategy:
+          // 1. 'totalWon' - Legacy alias used in some dashboard configurations for SUM(Amount)
+          // 2. First available key - Fallback for queries without explicit aliases (expr0, expr1, etc.)
+          // Note: Salesforce generates default aliases like 'expr0' for unnamed aggregate expressions
           Object value = fields.containsKey('totalWon') 
             ? fields.get('totalWon') 
             : fields.values()[0];
@@ -549,322 +480,73 @@ public with sharing class HM_ComponentDataService {
   }
 
 
-  /**
-   * @description Execute Apex method dynamically
-   * @param className Name of the Apex class
-   * @param methodName Name of the method to call
-   * @param params Parameters to pass to the method
-   * @param returnType Expected return type (Aggregate, List)
-   * @return Map<String, Object> with shape, aggregateValue, rows, etc.
-   */
-  public static Map<String, Object> executeApexMethod(
-    String className,
-    String methodName,
-    Map<String, Object> params,
-    String returnType
-  ) {
-    // Input validation
-    if (String.isBlank(className)) {
-      throw new AuraHandledException(ERROR_APEX_CLASS_NAME_REQUIRED_PUBLIC);
-    }
-    if (String.isBlank(methodName)) {
-      throw new AuraHandledException(ERROR_APEX_METHOD_NAME_REQUIRED_PUBLIC);
-    }
-    if (params == null) {
-      params = new Map<String, Object>();
-    }
-
-    try {
-      // Extract method name from full signature if needed
-      // Handles patterns like "public static List<X> methodName()" → "methodName"
-      String extractedMethodName = extractMethodName(methodName);
-
-      // Get Type for the class (already validated in executeComponentQuery)
-      Type classType = Type.forName(className);
-      if (classType == null) {
-        throw new AuraHandledException(
-          String.format(ERROR_CLASS_NOT_FOUND, new List<String>{ className })
-        );
-      }
-
-      // Call the method using Callable interface
-      // All classes must implement Callable interface for dynamic invocation
-      Object result = callMethodDynamically(classType, extractedMethodName, params);
-
-      // Process result based on specified return type
-      return processResultByReturnType(result, returnType);
-    } catch (Exception ex) {
-      throw new AuraHandledException(
-        String.format(ERROR_EXECUTING_APEX_METHOD, new List<String>{ ex.getMessage() })
-      );
-    }
-  }
-
   // ==================== HELPER METHODS ====================
 
   /**
-   * @description Extract method name from full method signature
-   * Handles patterns like "public static List<X> methodName()" → "methodName"
-   * If methodName is already just a method name, returns it as-is
-   * @param methodSignature Full method signature or just method name
-   * @return String Extracted method name
+   * @description Validate object-level access for the queried object
+   * Extracts the object name from the SOQL query and checks if user has read access
+   * @param normalizedQuery Normalized SOQL query string
+   * @throws AuraHandledException if object is not found or user lacks access
    */
-  private static String extractMethodName(String methodSignature) {
-    if (String.isBlank(methodSignature)) {
-      return methodSignature;
+  private static void validateObjectAccess(String normalizedQuery) {
+    String objectName = extractObjectNameFromQuery(normalizedQuery);
+    if (String.isBlank(objectName)) {
+      // Could not determine object - let query execution handle any errors
+      return;
     }
 
-    // If it doesn't contain spaces or parentheses, assume it's already just the method name
-    if (!methodSignature.contains(' ') && !methodSignature.contains('(')) {
-      return methodSignature;
-    }
-
-    // Pattern: "public static ReturnType methodName()" or "ReturnType methodName()"
-    // Find the last word before the opening parenthesis
-    String trimmed = methodSignature.trim();
-    
-    // Find the last space before the opening parenthesis
-    Integer parenIndex = trimmed.indexOf('(');
-    if (parenIndex > 0) {
-      String beforeParen = trimmed.substring(0, parenIndex).trim();
-      // Get the last word (method name)
-      List<String> parts = beforeParen.split('\\s+');
-      if (!parts.isEmpty()) {
-        return parts[parts.size() - 1];
-      }
-    }
-    
-    // Fallback: if no parenthesis, try to get last word
-    List<String> parts = trimmed.split('\\s+');
-    if (!parts.isEmpty()) {
-      return parts[parts.size() - 1];
-    }
-
-    // If all else fails, return original
-    return methodSignature;
-  }
-
-  /**
-   * @description Enhance Apex response rows with standard fields if they're missing
-   * Queries records to get missing standard fields (Id, Name, CreatedDate, LastModifiedDate)
-   * Used when showAllRecordsFilter is enabled to ensure common columns are available
-   * @param response Response Map from Apex method with 'rows' key
-   * @return Map<String, Object> Enhanced response with standard fields added to rows
-   */
-  private static Map<String, Object> enhanceApexResponseWithStandardFields(Map<String, Object> response) {
-    if (response == null || response.get('rows') == null) {
-      return response;
-    }
-
-    List<Map<String, Object>> rows = (List<Map<String, Object>>) response.get('rows');
-    if (rows == null || rows.isEmpty()) {
-      return response;
-    }
-
-    // Standard fields to ensure are present
-    Set<String> standardFields = new Set<String>{ 'Id', 'Name', 'CreatedDate', 'LastModifiedDate' };
-    
-    // Group rows by object type for efficient querying
-    Map<String, List<Map<String, Object>>> rowsByObjectType = new Map<String, List<Map<String, Object>>>();
-    Map<String, Set<String>> missingFieldsByType = new Map<String, Set<String>>();
-    
-    for (Map<String, Object> row : rows) {
-      String objectType = extractObjectTypeFromRow(row);
-      if (String.isBlank(objectType)) {
-        continue; // Skip rows where we can't determine object type
-      }
-      
-      Set<String> missingFields = findMissingStandardFields(row, standardFields);
-      if (missingFields.isEmpty()) {
-        continue; // Skip rows that already have all standard fields
-      }
-      
-      // Initialize maps for this object type if needed
-      if (!rowsByObjectType.containsKey(objectType)) {
-        rowsByObjectType.put(objectType, new List<Map<String, Object>>());
-        missingFieldsByType.put(objectType, new Set<String>());
-      }
-      rowsByObjectType.get(objectType).add(row);
-      missingFieldsByType.get(objectType).addAll(missingFields);
-    }
-    
-    // Query missing fields for each object type
-    for (String objectType : rowsByObjectType.keySet()) {
-      enhanceRowsForObjectType(
-        objectType,
-        rowsByObjectType.get(objectType),
-        missingFieldsByType.get(objectType)
+    // Validate object exists and is accessible
+    Schema.SObjectType sObjType = Schema.getGlobalDescribe().get(objectName);
+    if (sObjType == null) {
+      throw new AuraHandledException(
+        String.format(ERROR_OBJECT_NOT_FOUND, new List<String>{ objectName })
       );
     }
-    
-    return response;
+    if (!sObjType.getDescribe().isAccessible()) {
+      throw new AuraHandledException(
+        String.format(ERROR_INSUFFICIENT_OBJECT_ACCESS, new List<String>{ objectName })
+      );
+    }
+    // Field-level security is enforced via Security.stripInaccessible() during query execution
   }
 
   /**
-   * @description Extract object type from row data
-   * @param row Row map containing attributes, recordType, or Id
-   * @return String Object type name or null if cannot be determined
+   * @description Extract the object API name from a SOQL query
+   * Handles standard queries like "SELECT Id FROM Account WHERE..."
+   * @param normalizedQuery Normalized SOQL query string
+   * @return String Object API name, or null if cannot be determined
    */
-  private static String extractObjectTypeFromRow(Map<String, Object> row) {
-    // Try attributes.type first (from Apex)
-    if (row.containsKey('attributes') && row.get('attributes') instanceof Map<String, Object>) {
-      Map<String, Object> attrs = (Map<String, Object>) row.get('attributes');
-      String objectType = (String) attrs.get('type');
-      if (String.isNotBlank(objectType)) {
-        return objectType;
-      }
+  private static String extractObjectNameFromQuery(String normalizedQuery) {
+    if (String.isBlank(normalizedQuery)) {
+      return null;
     }
-    
-    // Try recordType field
-    if (row.containsKey('recordType')) {
-      String objectType = (String) row.get('recordType');
-      if (String.isNotBlank(objectType)) {
-        return objectType;
-      }
-    }
-    
-    // Try to infer from Id prefix
-    if (row.containsKey('Id')) {
-      String recordId = (String) row.get('Id');
-      if (String.isNotBlank(recordId) && recordId.length() >= 3) {
-        String prefix = recordId.substring(0, 3);
-        return inferObjectTypeFromPrefix(prefix);
-      }
-    }
-    
-    return null;
-  }
 
-  /**
-   * @description Find missing standard fields in a row
-   * @param row Row map to check
-   * @param standardFields Set of standard field names to check for
-   * @return Set<String> Set of missing field names
-   */
-  private static Set<String> findMissingStandardFields(Map<String, Object> row, Set<String> standardFields) {
-    Set<String> missingFields = new Set<String>();
-    for (String field : standardFields) {
-      if (!row.containsKey(field) || row.get(field) == null) {
-        missingFields.add(field);
+    String queryUpper = normalizedQuery.toUpperCase();
+    Integer fromIndex = queryUpper.indexOf(' FROM ');
+    if (fromIndex < 0) {
+      return null;
+    }
+
+    // Extract everything after FROM
+    String afterFrom = normalizedQuery.substring(fromIndex + 6).trim();
+    
+    // Object name is the first token (ends at space, WHERE, ORDER, LIMIT, GROUP, etc.)
+    Integer endIndex = afterFrom.length();
+    for (String delimiter : new List<String>{' ', '\t', '\n'}) {
+      Integer delimIndex = afterFrom.indexOf(delimiter);
+      if (delimIndex > 0 && delimIndex < endIndex) {
+        endIndex = delimIndex;
       }
     }
-    return missingFields;
-  }
-
-  /**
-   * @description Enhance rows for a specific object type by querying missing standard fields
-   * @param objectType Object API name
-   * @param rowsToEnhance List of row maps to enhance
-   * @param missingFields Set of field names to query
-   */
-  private static void enhanceRowsForObjectType(
-    String objectType,
-    List<Map<String, Object>> rowsToEnhance,
-    Set<String> missingFields
-  ) {
-    if (rowsToEnhance.isEmpty() || missingFields.isEmpty()) {
-      return;
-    }
     
-    // Collect Ids
-    Set<Id> recordIds = collectRecordIds(rowsToEnhance);
-    if (recordIds.isEmpty()) {
-      return;
-    }
-    
-    // Validate objectType against Schema to prevent SOQL injection
-    if (!isValidObjectType(objectType)) {
-      return; // Skip invalid object types
-    }
-    
-    // Build and execute query
-    List<String> fieldsToQuery = new List<String>(missingFields);
-    String soqlQuery = 'SELECT ' + String.join(fieldsToQuery, ', ') + 
-      ' FROM ' + objectType + 
-      ' WHERE Id IN :recordIds';
-    
-    try {
-      List<SObject> records = Database.query(soqlQuery);
-      Map<Id, SObject> recordMap = new Map<Id, SObject>(records);
-      
-      // Enhance rows with queried fields
-      for (Map<String, Object> row : rowsToEnhance) {
-        Id rowId = (Id) row.get('Id');
-        if (recordMap.containsKey(rowId)) {
-          SObject record = recordMap.get(rowId);
-          for (String field : missingFields) {
-            if (record.get(field) != null) {
-              row.put(field, record.get(field));
-            }
-          }
-        }
-      }
-    } catch (Exception ex) {
-      // Continue gracefully if object type is invalid or fields don't exist
-      // Error is silently handled to prevent breaking the response
-    }
-  }
-
-  /**
-   * @description Collect valid record Ids from rows
-   * @param rows List of row maps
-   * @return Set<Id> Set of valid record Ids
-   */
-  private static Set<Id> collectRecordIds(List<Map<String, Object>> rows) {
-    Set<Id> recordIds = new Set<Id>();
-    for (Map<String, Object> row : rows) {
-      if (row.containsKey('Id') && row.get('Id') != null) {
-        try {
-          recordIds.add((Id) row.get('Id'));
-        } catch (Exception ex) {
-          // Skip invalid Ids
-        }
-      }
-    }
-    return recordIds;
-  }
-
-  /**
-   * @description Validate object type against Schema to prevent SOQL injection
-   * @param objectType Object API name to validate
-   * @return Boolean True if object type exists in Schema, false otherwise
-   */
-  private static Boolean isValidObjectType(String objectType) {
-    if (String.isBlank(objectType)) {
-      return false;
-    }
-    
-    try {
-      Schema.SObjectType sObjType = Schema.getGlobalDescribe().get(objectType);
-      return sObjType != null;
-    } catch (Exception ex) {
-      return false;
-    }
-  }
-
-  /**
-   * @description Infer object type from Id prefix (simplified)
-   * @param prefix First 3 characters of Salesforce Id
-   * @return String Object type name or null if unknown
-   */
-  private static String inferObjectTypeFromPrefix(String prefix) {
-    // Common standard object prefixes
-    Map<String, String> prefixMap = new Map<String, String>{
-      '001' => 'Account',
-      '003' => 'Contact',
-      '006' => 'Opportunity',
-      '00Q' => 'Lead',
-      '500' => 'Case',
-      '00T' => 'Task',
-      '00U' => 'Event'
-    };
-    
-    return prefixMap.get(prefix);
+    String objectName = afterFrom.substring(0, endIndex).trim();
+    return String.isNotBlank(objectName) ? objectName : null;
   }
 
   /**
    * @description Enhance SOQL query with standard fields if they're missing
-   * Automatically injects Id, Name, CreatedDate, LastModifiedDate if not already present
+   * Automatically injects Id, Name/CaseNumber, CreatedDate, LastModifiedDate if not already present
+   * Uses Schema.describe to check which fields actually exist on the object
    * Used when showAllRecordsFilter is enabled to ensure common columns are available
    * @param query Normalized SOQL query string
    * @return String Enhanced query with standard fields added if missing
@@ -874,10 +556,6 @@ public with sharing class HM_ComponentDataService {
       return query;
     }
 
-    // Standard fields to ensure are present (exist on all standard objects)
-    // Note: Id is almost always present, but we check for all to be safe
-    Set<String> standardFields = new Set<String>{ 'Id', 'Name', 'CreatedDate', 'LastModifiedDate' };
-    
     // Parse SELECT clause (everything between SELECT and FROM)
     String queryUpper = query.toUpperCase();
     Integer selectIndex = queryUpper.indexOf('SELECT');
@@ -894,6 +572,40 @@ public with sharing class HM_ComponentDataService {
     if (selectClauseOriginal.contains('(') || selectClauseOriginal.contains(')')) {
       // Likely contains functions or subqueries - return as-is to avoid breaking
       return query;
+    }
+    
+    // Extract object name to check available fields via Schema.describe
+    String objectName = extractObjectNameFromQuery(query);
+    if (String.isBlank(objectName)) {
+      return query;
+    }
+    
+    // Get object describe to check which fields actually exist
+    Schema.SObjectType objType = Schema.getGlobalDescribe().get(objectName);
+    if (objType == null) {
+      return query;
+    }
+    Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
+    
+    // Build list of standard fields to inject (only if they exist on the object)
+    Set<String> fieldsToInject = new Set<String>();
+    
+    // Always try to add Id, CreatedDate, LastModifiedDate if they exist
+    if (fieldMap.containsKey('id')) {
+      fieldsToInject.add('Id');
+    }
+    if (fieldMap.containsKey('createddate')) {
+      fieldsToInject.add('CreatedDate');
+    }
+    if (fieldMap.containsKey('lastmodifieddate')) {
+      fieldsToInject.add('LastModifiedDate');
+    }
+    
+    // For Name field: check if exists, otherwise try CaseNumber (for Case object)
+    if (fieldMap.containsKey('name')) {
+      fieldsToInject.add('Name');
+    } else if (fieldMap.containsKey('casenumber')) {
+      fieldsToInject.add('CaseNumber');
     }
     
     // Extract SELECT clause and rest of query
@@ -931,10 +643,10 @@ public with sharing class HM_ComponentDataService {
       }
     }
     
-    // Add missing standard fields (only if not already present)
-    for (String standardField : standardFields) {
-      if (!existingFields.contains(standardField.toUpperCase())) {
-        fieldList.add(standardField);
+    // Add missing standard fields (only if not already present and exist on object)
+    for (String fieldToInject : fieldsToInject) {
+      if (!existingFields.contains(fieldToInject.toUpperCase())) {
+        fieldList.add(fieldToInject);
       }
     }
     
@@ -1106,400 +818,6 @@ public with sharing class HM_ComponentDataService {
   }
 
 
-  /**
-   * @description Call method dynamically using Callable interface pattern
-   * All classes must implement Callable interface to be invoked dynamically
-   * @param classType Type of the class to instantiate
-   * @param methodName Method name to call (passed as 'action' to Callable.call())
-   * @param params Parameters to pass to the method
-   * @return Object Result from the Callable.call() method
-   */
-  private static Object callMethodDynamically(
-    Type classType,
-    String methodName,
-    Map<String, Object> params
-  ) {
-    if (classType == null) {
-      throw new AuraHandledException(ERROR_CLASS_TYPE_NULL);
-    }
-
-    try {
-      // Instantiate the class and cast to Callable
-      // This will throw TypeException if class doesn't implement Callable
-      Callable callableInstance = (Callable) classType.newInstance();
-      
-      // Call the method via Callable interface
-      // The methodName becomes the 'action' parameter
-      return callableInstance.call(methodName, params);
-      
-    } catch (TypeException ex) {
-      // Class doesn't implement Callable interface
-      throw new AuraHandledException(
-        String.format(ERROR_CALLABLE_INTERFACE_REQUIRED, new List<String>{ 
-          classType.getName(), 
-          ex.getMessage() 
-        })
-      );
-    } catch (Exception ex) {
-      // Other errors (instantiation, method call, etc.)
-      String errorMsg = String.format(ERROR_INVOKING_METHOD, new List<String>{ ex.getMessage() });
-      if (ex.getCause() != null) {
-        errorMsg += ' (Cause: ' + ex.getCause().getMessage() + ')';
-      }
-      throw new AuraHandledException(errorMsg);
-    }
-  }
-
-
-  /**
-   * @description Convert method result to List<Map<String, Object>>
-   * Handles various return types: List<Map>, List<Object>, List<WrapperRecord>, Map<String, List>, SObject, null
-   * @param result Result object from Apex method call
-   * @return List<Map<String, Object>> Converted result list, empty list if result is null or unsupported type
-   */
-  private static List<Map<String, Object>> convertToResultList(Object result) {
-    if (result == null) {
-      return new List<Map<String, Object>>();
-    }
-
-    if (result instanceof List<Map<String, Object>>) {
-      return (List<Map<String, Object>>) result;
-    }
-
-    if (result instanceof List<Object>) {
-      return convertObjectListToResultList((List<Object>) result);
-    }
-
-    if (result instanceof Map<String, Object>) {
-      return flattenMapOfLists((Map<String, Object>) result);
-    }
-
-    if (result instanceof SObject) {
-      return new List<Map<String, Object>>{
-        convertSObjectToMap((SObject) result)
-      };
-    }
-
-    return new List<Map<String, Object>>();
-  }
-
-  /**
-   * @description Convert List<Object> to List<Map<String, Object>> handling Maps, SObjects, and wrappers
-   * @param objectList List of objects to convert
-   * @return List<Map<String, Object>> Converted list
-   */
-  private static List<Map<String, Object>> convertObjectListToResultList(List<Object> objectList) {
-    if (objectList == null || objectList.isEmpty()) {
-      return new List<Map<String, Object>>();
-    }
-
-    Object firstItem = objectList[0];
-    
-    // Check if all items are Maps
-    if (areAllMaps(objectList)) {
-      return convertMapList((List<Object>) objectList);
-    }
-
-    // Check if all items are SObjects
-    if (areAllSObjects(objectList)) {
-      String objectType = String.valueOf(((SObject) firstItem).getSObjectType());
-      return convertSObjectListToMapList((List<SObject>) objectList, objectType);
-    }
-
-    // Treat as wrapper classes
-    String objectType = extractObjectTypeFromWrapper(firstItem);
-    return convertWrapperListToMapList(objectList, objectType);
-  }
-
-  /**
-   * @description Check if all items in list are Map<String, Object>
-   * @param objectList List to check
-   * @return Boolean True if all items are Maps
-   */
-  private static Boolean areAllMaps(List<Object> objectList) {
-    for (Object item : objectList) {
-      if (!(item instanceof Map<String, Object>)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * @description Check if all items in list are SObjects
-   * @param objectList List to check
-   * @return Boolean True if all items are SObjects
-   */
-  private static Boolean areAllSObjects(List<Object> objectList) {
-    for (Object item : objectList) {
-      if (!(item instanceof SObject)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * @description Convert List<Object> of Maps to List<Map<String, Object>>
-   * @param mapList List of Map objects
-   * @return List<Map<String, Object>> Converted list
-   */
-  private static List<Map<String, Object>> convertMapList(List<Object> mapList) {
-    List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-    for (Object item : mapList) {
-      resultList.add((Map<String, Object>) item);
-    }
-    return resultList;
-  }
-
-  /**
-   * @description Extract object type name from wrapper class string representation
-   * Gracefully handles extraction failures by returning default value
-   * @param wrapperItem Wrapper object to extract type from
-   * @return String Object type name, defaults to 'Custom' if extraction fails
-   */
-  private static String extractObjectTypeFromWrapper(Object wrapperItem) {
-    if (wrapperItem == null) {
-      return 'Custom';
-    }
-    
-    try {
-      String itemString = String.valueOf(wrapperItem);
-      String className = itemString.split(':')[0].trim();
-      return String.isNotBlank(className) ? className : 'Custom';
-    } catch (Exception ex) {
-      return 'Custom';
-    }
-  }
-
-  /**
-   * @description Flatten a Map<String, List<SObject>> or Map<String, List<Map<String, Object>>> into a single list
-   * Used when Apex methods return data organized by object type
-   * @param resultMap Map containing lists of records (keys are object type names)
-   * @return List<Map<String, Object>> Flattened list of records with object type metadata,
-   *         or single record list if map doesn't contain lists
-   */
-  private static List<Map<String, Object>> flattenMapOfLists(Map<String, Object> resultMap) {
-    List<Map<String, Object>> flattenedList = new List<Map<String, Object>>();
-    Boolean hasLists = false;
-    
-    for (String key : resultMap.keySet()) {
-      Object value = resultMap.get(key);
-      
-      if (value == null) {
-        continue;
-      }
-      
-      // Handle List<SObject> or List<Object> or List<Map<String, Object>>
-      if (value instanceof List<SObject>) {
-        List<SObject> sobjectList = (List<SObject>) value;
-        if (!sobjectList.isEmpty()) {
-          hasLists = true;
-          flattenedList.addAll(convertSObjectListToMapList(sobjectList, key));
-        }
-      } else if (value instanceof List<Object>) {
-        List<Object> valueList = (List<Object>) value;
-        if (!valueList.isEmpty()) {
-          hasLists = true;
-          flattenedList.addAll(convertObjectListToMapList(valueList, key));
-        }
-      }
-      // Skip non-list values - they will be handled as single record if no lists found
-    }
-    
-    // If we flattened the map, return the list; otherwise treat as single record
-    if (hasLists && !flattenedList.isEmpty()) {
-      return flattenedList;
-    } else if (hasLists && flattenedList.isEmpty()) {
-      // Map had lists but they were empty or couldn't be processed
-      return new List<Map<String, Object>>();
-    } else {
-      // Single Map record (not a map of lists)
-      return new List<Map<String, Object>>{ resultMap };
-    }
-  }
-
-  /**
-   * @description Convert a List<SObject> to List<Map<String, Object>> with object type metadata
-   * @param sobjectList List of SObjects to convert
-   * @param objectType Object type name to add to each record
-   * @return List<Map<String, Object>> Converted list with object type metadata
-   */
-  private static List<Map<String, Object>> convertSObjectListToMapList(List<SObject> sobjectList, String objectType) {
-    List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-    for (SObject sobj : sobjectList) {
-      Map<String, Object> recordMap = convertSObjectToMap(sobj);
-      recordMap.put('attributes', new Map<String, Object>{
-        'type' => objectType
-      });
-      recordMap.put('recordType', objectType);
-      resultList.add(recordMap);
-    }
-    return resultList;
-  }
-
-  /**
-   * @description Convert a List<Object> to List<Map<String, Object>> with object type metadata
-   * @param objectList List of Objects (SObject or Map) to convert
-   * @param objectType Object type name to add to each record
-   * @return List<Map<String, Object>> Converted list with object type metadata
-   */
-  private static List<Map<String, Object>> convertObjectListToMapList(List<Object> objectList, String objectType) {
-    List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-    for (Object item : objectList) {
-      Map<String, Object> recordMap;
-      
-      if (item instanceof SObject) {
-        // Convert SObject to Map and add object type
-        recordMap = convertSObjectToMap((SObject) item);
-        recordMap.put('attributes', new Map<String, Object>{
-          'type' => objectType
-        });
-        recordMap.put('recordType', objectType);
-        resultList.add(recordMap);
-      } else if (item instanceof Map<String, Object>) {
-        // Already a Map, just add object type
-        recordMap = (Map<String, Object>) item;
-        recordMap.put('attributes', new Map<String, Object>{
-          'type' => objectType
-        });
-        recordMap.put('recordType', objectType);
-        resultList.add(recordMap);
-      }
-      // Skip unsupported types (non-SObject, non-Map items) - only SObject and Map are supported
-    }
-    return resultList;
-  }
-
-  /**
-   * @description Convert a List of wrapper objects to List<Map<String, Object>> with object type metadata
-   * Uses JSON serialization to convert wrapper classes (with @AuraEnabled properties) to Maps
-   * @param wrapperList List of wrapper objects to convert
-   * @param objectType Object type name to add to each record (defaults to "Custom" if not provided)
-   * @return List<Map<String, Object>> Converted list with object type metadata
-   */
-  private static List<Map<String, Object>> convertWrapperListToMapList(List<Object> wrapperList, String objectType) {
-    if (wrapperList == null || wrapperList.isEmpty()) {
-      return new List<Map<String, Object>>();
-    }
-
-    String finalObjectType = String.isNotBlank(objectType) ? objectType : 'Custom';
-
-    try {
-      String jsonString = JSON.serialize(wrapperList);
-      List<Object> deserializedObjects = (List<Object>) JSON.deserializeUntyped(jsonString);
-
-      List<Map<String, Object>> resultList = new List<Map<String, Object>>();
-      Integer index = 0;
-      
-      for (Object obj : deserializedObjects) {
-        Map<String, Object> recordMap = convertObjectToMap(obj);
-        if (recordMap == null || recordMap.isEmpty()) {
-          continue;
-        }
-        
-        if (!hasValidData(recordMap)) {
-          continue;
-        }
-
-        ensureIdField(recordMap, index);
-        addObjectTypeMetadata(recordMap, finalObjectType);
-        
-        resultList.add(recordMap);
-        index++;
-      }
-      
-      return resultList;
-    } catch (JSONException ex) {
-      return new List<Map<String, Object>>();
-    } catch (Exception ex) {
-      return new List<Map<String, Object>>();
-    }
-  }
-
-  /**
-   * @description Convert an Object to Map<String, Object> using JSON serialization
-   * @param obj Object to convert (may already be a Map)
-   * @return Map<String, Object> Converted map, or null if conversion fails
-   */
-  private static Map<String, Object> convertObjectToMap(Object obj) {
-    if (obj instanceof Map<String, Object>) {
-      return (Map<String, Object>) obj;
-    }
-    
-    try {
-      String objJson = JSON.serialize(obj);
-      return (Map<String, Object>) JSON.deserializeUntyped(objJson);
-    } catch (Exception ex) {
-      return null;
-    }
-  }
-
-  /**
-   * @description Check if record map has at least one valid (non-null, non-empty) value
-   * @param recordMap Map to validate
-   * @return Boolean True if record has valid data, false otherwise
-   */
-  private static Boolean hasValidData(Map<String, Object> recordMap) {
-    if (recordMap == null || recordMap.isEmpty()) {
-      return false;
-    }
-    
-    for (Object value : recordMap.values()) {
-      if (value == null) {
-        continue;
-      }
-      
-      if (value instanceof String) {
-        if (String.isNotBlank((String) value)) {
-          return true;
-        }
-      } else {
-        // Numbers, Ids, Booleans, etc. are valid if not null
-        return true;
-      }
-    }
-    
-    return false;
-  }
-
-  /**
-   * @description Ensure record map has an Id field, finding it dynamically or creating synthetic one
-   * @param recordMap Map to add Id field to
-   * @param index Index for synthetic ID generation if needed
-   */
-  private static void ensureIdField(Map<String, Object> recordMap, Integer index) {
-    if (recordMap.containsKey('Id')) {
-      return;
-    }
-    
-    // Search for ID fields dynamically (accountId, contactId, etc.)
-    for (String key : recordMap.keySet()) {
-      String keyLower = key.toLowerCase();
-      if (((keyLower.endsWith('id') && keyLower.length() > 2) || keyLower.equals('id'))) {
-        Object idValue = recordMap.get(key);
-        if (idValue != null) {
-          recordMap.put('Id', idValue);
-          return;
-        }
-      }
-    }
-    
-    // Create synthetic ID if none found
-    recordMap.put('Id', 'wrapper-' + index);
-  }
-
-  /**
-   * @description Add object type metadata to record map
-   * @param recordMap Map to add metadata to
-   * @param objectType Object type name
-   */
-  private static void addObjectTypeMetadata(Map<String, Object> recordMap, String objectType) {
-    recordMap.put('attributes', new Map<String, Object>{ 'type' => objectType });
-    recordMap.put('recordType', objectType);
-    recordMap.put('objectType', objectType);
-  }
-
   // ==================== RESPONSE BUILDING METHODS ====================
 
   /**
@@ -1535,13 +853,15 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Build aggregate response from AggregateResult
+   * Extracts value using standard alias resolution strategy
    * @param ar AggregateResult to extract value from
    * @return Map<String, Object> Response with AGGREGATE shape
    */
   private static Map<String, Object> buildAggregateResponseFromAggregate(AggregateResult ar) {
     Map<String, Object> fields = ar.getPopulatedFieldsAsMap();
     
-    // Try "totalWon" alias first, then first key
+    // Aggregate alias resolution (same strategy as executeSOQLQuery):
+    // 'totalWon' for legacy compatibility, otherwise first available value
     Object value = fields.containsKey('totalWon') 
       ? fields.get('totalWon') 
       : fields.values()[0];
@@ -1640,60 +960,6 @@ public with sharing class HM_ComponentDataService {
       return 'DATETIME';
     }
     return 'STRING';
-  }
-
-  /**
-   * @description Process result by return type
-   * @param result Result object from Apex method
-   * @param returnType Expected return type (Aggregate, List)
-   * @return Map<String, Object> Response with appropriate shape
-   */
-  private static Map<String, Object> processResultByReturnType(Object result, String returnType) {
-    if (returnType == RETURN_TYPE_AGGREGATE) {
-      // Extract aggregate value from various types
-      if (result instanceof Decimal || result instanceof Integer || 
-          result instanceof String || result instanceof Boolean ||
-          result instanceof Date || result instanceof Datetime) {
-        return buildAggregateResponse(result);
-      }
-      
-      if (result instanceof AggregateResult) {
-        return buildAggregateResponseFromAggregate((AggregateResult) result);
-      }
-      
-      // Check if result is a list with AggregateResult elements (Apex doesn't support instanceof with generics)
-      if (result instanceof List<Object>) {
-        List<Object> objList = (List<Object>) result;
-        if (!objList.isEmpty() && objList[0] instanceof AggregateResult) {
-          List<AggregateResult> arList = new List<AggregateResult>();
-          for (Object obj : objList) {
-            arList.add((AggregateResult) obj);
-          }
-          return buildAggregateResponseFromAggregate(arList[0]);
-        }
-      }
-      
-      throw new AuraHandledException('Result type does not match Aggregate return type');
-    } else if (returnType == RETURN_TYPE_LIST) {
-      // Convert to LIST (handles List<SObject>, List<Wrapper>, AggregateResult, etc.)
-      // First, check if result is a Map<String, List<SObject>> pattern and reject it
-      if (result instanceof Map<String, Object>) {
-        Map<String, Object> resultMap = (Map<String, Object>) result;
-        // Check if it contains lists (deprecated Multi-Object pattern) - short-circuit on first match
-        for (Object value : resultMap.values()) {
-          if (value instanceof List<Object> || value instanceof List<SObject>) {
-            throw new AuraHandledException(
-              'Multi-Object return type (Map<String, List<SObject>>) is no longer supported. ' +
-              'Please define multiple HM_Dashboard_Data_Source__c records instead (one per object or dataset).'
-            );
-          }
-        }
-      }
-      List<Map<String, Object>> rows = convertToResultList(result);
-      return buildListResponse(rows);
-    } else {
-      throw new AuraHandledException('Invalid return type: ' + returnType);
-    }
   }
 
   /**
@@ -1980,6 +1246,10 @@ public with sharing class HM_ComponentDataService {
       return extractNestedFieldValue(firstRow, fieldApiName);
     }
     
+    // Fallback value extraction for aggregate/unnamed results:
+    // 1. 'expr0' - Default Salesforce alias for first unnamed aggregate expression
+    // 2. 'totalWon' - Legacy alias used in some dashboard configurations
+    // 3. First non-Id key - Last resort fallback for any other field
     if (firstRow.containsKey('expr0')) {
       return firstRow.get('expr0');
     }
@@ -1988,6 +1258,7 @@ public with sharing class HM_ComponentDataService {
       return firstRow.get('totalWon');
     }
     
+    // Last resort: return first non-Id field value
     for (String key : firstRow.keySet()) {
       if (key != 'Id') {
         return firstRow.get(key);

@@ -60,28 +60,11 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
     if (data) {
       this.groupConfig = data;
       this.error = null;
-      // Apply dynamic CSS custom property for components per row
-      this.applyComponentsPerRowStyle();
     } else if (error) {
       this.error = error;
     }
     this.isLoading = false;
   }
-
-  /**
-   * @description Apply CSS custom property for components per row
-   * Sets --components-per-row CSS variable on the layout container
-   */
-  applyComponentsPerRowStyle() {
-    // Use setTimeout to ensure DOM is ready
-    setTimeout(() => {
-      const layoutElement = this.template.querySelector(`.${this.layoutClass}`);
-      if (layoutElement && this.componentsPerRow) {
-        layoutElement.style.setProperty('--components-per-row', this.componentsPerRow);
-      }
-    }, 0);
-  }
-
 
   /**
    * @description Get container class with dark mode support
@@ -214,15 +197,5 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
    */
   get errorMessage() {
     return this.extractErrorMessage(this.error);
-  }
-
-  /**
-   * @description Lifecycle hook called after component renders
-   * Applies components per row styling after render
-   */
-  renderedCallback() {
-    if (this.groupConfig && this.componentsPerRow) {
-      this.applyComponentsPerRowStyle();
-    }
   }
 }

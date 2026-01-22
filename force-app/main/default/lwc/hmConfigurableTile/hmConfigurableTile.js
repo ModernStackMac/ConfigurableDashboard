@@ -4,7 +4,15 @@ import executeComponentQuery from "@salesforce/apex/HM_ComponentDataService.exec
 
 /**
  * @description Configurable tile component for displaying KPI metrics
- * Accepts componentId and retrieves configuration and data dynamically
+ * Accepts componentId and retrieves configuration and data dynamically.
+ * 
+ * Key capabilities:
+ * - Display aggregate values (COUNT, SUM, AVG, etc.) or first row from LIST queries
+ * - Configurable icon with background color styling
+ * - Dynamic subtitle with merge field replacement ({value})
+ * - Badge display for trend indicators (up/down/neutral)
+ * - Multiple data sources for separate value, subtitle, and badge data
+ * - Dark mode support
  */
 export default class HM_ConfigurableTile extends LightningElement {
   // ==================== CONSTANTS ====================
@@ -298,13 +306,9 @@ export default class HM_ConfigurableTile extends LightningElement {
       return "";
     }
 
-    // Validate data source if specified (graceful degradation if not found)
-    if (map.dataSourceName && dataSources.length > 0) {
-      const matchedDataSource = dataSources.find(ds => ds.name === map.dataSourceName);
-      if (!matchedDataSource || (dataSources[0] && matchedDataSource.name !== dataSources[0].name)) {
-        // Use first data source as fallback
-      }
-    }
+    // Data source validation is handled by the backend - detail map references
+    // a specific data source by name, but we process whatever data was returned.
+    // This allows graceful degradation when data sources are reconfigured.
 
     const fieldValue = this.getFieldValue(data, map.fieldApiName);
     return this.formatValue(fieldValue, map.formatType);
@@ -325,13 +329,7 @@ export default class HM_ConfigurableTile extends LightningElement {
       return { badge: null };
     }
 
-    // Validate data source if specified (graceful degradation if not found)
-    if (map.dataSourceName && dataSources.length > 0) {
-      const matchedDataSource = dataSources.find(ds => ds.name === map.dataSourceName);
-      if (!matchedDataSource || (dataSources[0] && matchedDataSource.name !== dataSources[0].name)) {
-        // Use first data source as fallback
-      }
-    }
+    // Data source validation is handled by the backend - we process whatever data was returned
 
     // Get raw value - prefer badgeValue from backend if provided (different data source), otherwise extract from data
     let rawValue = null;
@@ -444,20 +442,22 @@ export default class HM_ConfigurableTile extends LightningElement {
     
     if (num > 0) {
       return { direction: 'up', numericValue: num };
-    } else if (num < 0) {
-      return { direction: 'down', numericValue: num };
-    } else {
-      return { direction: 'zero', numericValue: 0 };
     }
+    if (num < 0) {
+      return { direction: 'down', numericValue: num };
+    }
+    return { direction: 'zero', numericValue: 0 };
   }
 
   /**
    * @description Get icon class based on icon background color configuration
    * Uses component's iconBackgroundColor picklist value to determine styling
-   * @param {String} iconName - Icon name (for backwards compatibility, not used for class selection)
-   * @return {String} CSS class for icon
+   * @param {String} iconName - Unused parameter retained for API stability. Icon class is
+   *                            determined solely by iconBackgroundColor, not the icon name.
+   *                            Callers pass iconName by convention but it's not processed.
+   * @return {String} CSS class for icon container styling
    */
-  getIconClass(iconName) {
+  getIconClass(iconName) {  // eslint-disable-line no-unused-vars
     const bgColor = this.componentConfig?.iconBackgroundColor;
     
     // If no background color or "None", return no-background class

@@ -94,16 +94,16 @@
   background: var(--slds-g-color-neutral-base-100, #ffffff);
   border-radius: var(--slds-g-radius-border-2, 8px);
   /* SLDS2: Using 1px as fallback - border width tokens may not be available */
-  border: 1px solid rgba(234, 0, 30, 0.2); /* Fallback */
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(234, 0, 30, 0.2); /* Fallback */
   border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent); /* Modern */
 }
 
 .cc-dark .hm-group-error {
-  color: var(--slds-g-color-error-2, #ff5252);
+  color: var(--slds-g-color-error-base-40, #ff5252);
   background: var(--slds-g-color-neutral-base-10, #1e1e1e);
   /* SLDS2: Using color-mix() for dark mode error border */
-  border: 1px solid rgba(255, 82, 82, 0.2); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent); /* Modern */
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(255, 82, 82, 0.2); /* Fallback */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-base-40, #ff5252) 20%, transparent); /* Modern */
 }
 
 .hm-group-empty {

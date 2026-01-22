@@ -1,0 +1,741 @@
+<template>
+  <div class="page-container">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="slds-page-header hm-page-header-inner">
+        <div class="slds-page-header__row">
+          <div class="slds-page-header__col-title">
+            <div class="slds-media">
+              <div class="slds-media__figure">
+                <lightning-icon icon-name="standard:datashares" size="medium"></lightning-icon>
+              </div>
+              <div class="slds-media__body">
+                <div class="slds-page-header__name">
+                  <div class="slds-page-header__name-title">
+                    <h1>
+                      <span class="slds-page-header__title slds-truncate" title={pageTitle}>{pageTitle}</span>
+                    </h1>
+                  </div>
+                </div>
+                <p class="slds-page-header__name-meta hm-page-subtitle">{pageSubtitle}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <template if:true={isLoading}>
+      <div class="loading-container">
+        <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
+      </div>
+    </template>
+
+    <!-- Main Content Area -->
+    <template if:false={isLoading}>
+      <div class="main-content">
+        <div class="slds-grid slds-gutters hm-main-grid">
+          <!-- ==================== LEFT COLUMN: Configuration Panel ==================== -->
+          <div class="slds-col slds-size_8-of-12 config-panel hm-config-col">
+            <div class="config-card">
+              <!-- Loading overlay when fields are loading -->
+              <template if:true={isLoadingFields}>
+                <div class="config-loading-overlay">
+                  <lightning-spinner size="medium" alternative-text="Loading fields..."></lightning-spinner>
+                  <p class="slds-m-top_small slds-text-color_weak">Loading fields...</p>
+                </div>
+              </template>
+              <lightning-accordion allow-multiple-sections-open active-section-name={activeSections}>
+                
+                <!-- Basic Info Section -->
+                <lightning-accordion-section name="settings" label="Data Source Settings">
+                  <div class="accordion-content">
+                    <div class="slds-grid slds-gutters slds-wrap">
+                      <!-- Row 1: Data Source Name and Active -->
+                      <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <lightning-input
+                          label="Data Source Name"
+                          value={formData.name}
+                          onchange={handleNameChange}
+                          required>
+                        </lightning-input>
+                      </div>
+                      <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <div class="slds-form-element">
+                          <label class="slds-form-element__label">Active</label>
+                          <div class="slds-form-element__control slds-m-top_xx-small">
+                            <lightning-input
+                              type="toggle"
+                              checked={formData.active}
+                              onchange={handleActiveChange}
+                              message-toggle-active="Active"
+                              message-toggle-inactive="Inactive"
+                              variant="label-hidden">
+                            </lightning-input>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Row 2: Dashboard Component and Order -->
+                      <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <lightning-record-picker
+                          label="Dashboard Component"
+                          object-api-name="HM_Dashboard_Component__c"
+                          value={formData.dashboardComponentId}
+                          onchange={handleDashboardComponentChange}
+                          required>
+                        </lightning-record-picker>
+                      </div>
+                      <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <lightning-input
+                          type="number"
+                          label="Order"
+                          value={formData.order}
+                          onchange={handleOrderChange}
+                          required>
+                        </lightning-input>
+                      </div>
+
+                      <!-- Row 3: Row Icon Name (conditional) -->
+                      <template if:true={showRowIconInput}>
+                        <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                          <lightning-input
+                            label="Row Icon Name"
+                            field-level-help="Icon displayed on each row. Format: utility:iconName, standard:iconName, etc."
+                            value={formData.rowIconName}
+                            onchange={handleRowIconNameChange}
+                            onblur={handleRowIconNameBlur}
+                            placeholder="utility:icon_name">
+                          </lightning-input>
+                          <template if:true={iconNameError}>
+                            <div class="slds-form-element__help slds-text-color_error">{iconNameError}</div>
+                          </template>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                          <div class="slds-form-element">
+                            <label class="slds-form-element__label">Icon Preview</label>
+                            <div class="icon-preview-box">
+                              <template if:true={showIconPreview}>
+                                <lightning-icon icon-name={formData.rowIconName} size="medium"></lightning-icon>
+                              </template>
+                              <template if:true={showIconPlaceholder}>
+                                <span class="slds-text-color_weak">Enter valid icon name</span>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </lightning-accordion-section>
+
+                <!-- Query Setup Section -->
+                <lightning-accordion-section name="query" label="Query Setup">
+                  <div class="accordion-content">
+                    <div class="slds-grid slds-gutters slds-wrap">
+                      <!-- Object Selection -->
+                      <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <div class="slds-form-element object-combobox-wrapper">
+                          <label class="slds-form-element__label">
+                            <abbr class="slds-required" title="required">*</abbr>
+                            Object
+                          </label>
+                          <div class="slds-form-element__control">
+                            <div class="slds-combobox_container">
+                              <div class={comboboxClasses} role="combobox" aria-expanded={isObjectListOpen} aria-haspopup="listbox">
+                                <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                                  <input
+                                    type="text"
+                                    class="slds-input slds-combobox__input"
+                                    role="textbox"
+                                    placeholder="Search objects..."
+                                    value={objectSearchTerm}
+                                    oninput={handleObjectSearchInput}
+                                    onfocus={handleObjectFocus}
+                                    onblur={handleObjectBlur}
+                                    onkeydown={handleObjectKeydown}
+                                    aria-controls="object-listbox"
+                                    aria-autocomplete="list"
+                                    autocomplete="off" />
+                                  <template if:true={page2Data.selectedObjectApiName}>
+                                    <button
+                                      class="slds-button slds-button_icon slds-input__icon slds-input__icon_right"
+                                      onclick={handleObjectClear}
+                                      type="button"
+                                      title="Clear selection">
+                                      <lightning-icon icon-name="utility:close" size="x-small" alternative-text="Clear"></lightning-icon>
+                                    </button>
+                                  </template>
+                                  <template if:false={page2Data.selectedObjectApiName}>
+                                    <span class="slds-icon_container slds-input__icon slds-input__icon_right">
+                                      <lightning-icon icon-name="utility:search" size="x-small" alternative-text="Search"></lightning-icon>
+                                    </span>
+                                  </template>
+                                </div>
+                                <template if:true={isObjectListOpen}>
+                                  <div id="object-listbox" class="object-dropdown" role="listbox">
+                                    <template if:true={isLoadingObjects}>
+                                      <div class="slds-p-around_medium slds-align_absolute-center">
+                                        <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
+                                      </div>
+                                    </template>
+                                    <template if:false={isLoadingObjects}>
+                                      <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                        <template for:each={filteredObjects} for:item="obj">
+                                          <li key={obj.apiName} role="presentation" class="slds-listbox__item">
+                                            <div
+                                              class={obj.itemClass}
+                                              data-value={obj.apiName}
+                                              onclick={handleObjectSelect}
+                                              onmousedown={handleObjectSelect}
+                                              role="option">
+                                              <span class="slds-media__body">
+                                                <span class="slds-truncate object-label">{obj.label}</span>
+                                                <span class="slds-truncate object-api-name">{obj.apiName}</span>
+                                              </span>
+                                            </div>
+                                          </li>
+                                        </template>
+                                      </ul>
+                                      <template if:true={showNoResults}>
+                                        <div class="slds-p-around_small slds-text-align_center slds-text-color_weak">
+                                          No objects found matching "{objectSearchTerm}"
+                                        </div>
+                                      </template>
+                                    </template>
+                                  </div>
+                                </template>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Query Type Toggle -->
+                      <div class="slds-col slds-size_1-of-2 slds-p-bottom_small">
+                        <div class="slds-form-element">
+                          <label class="slds-form-element__label">
+                            <abbr class="slds-required" title="required">*</abbr>
+                            Query Type
+                          </label>
+                          <div class="slds-form-element__control slds-m-top_xx-small">
+                            <div class="slds-button-group" role="group">
+                              <button
+                                type="button"
+                                class={listButtonClass}
+                                data-value="List"
+                                onclick={handleQueryTypeChange}>
+                                List
+                              </button>
+                              <button
+                                type="button"
+                                class={aggregateButtonClass}
+                                data-value="Aggregate"
+                                onclick={handleQueryTypeChange}>
+                                Aggregate
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </lightning-accordion-section>
+
+            <!-- Fields Section (conditional on object selection) -->
+            <template if:true={page2Data.selectedObjectApiName}>
+              <!-- Field Selection (List mode) -->
+              <template if:true={showFieldSelection}>
+                <lightning-accordion-section name="fields" label={fieldsAccordionLabel}>
+                  <div class="accordion-content">
+                    <template if:true={isLoadingFields}>
+                      <div class="slds-p-around_large slds-align_absolute-center">
+                        <lightning-spinner size="small" alternative-text="Loading fields..."></lightning-spinner>
+                      </div>
+                    </template>
+                    <template if:false={isLoadingFields}>
+                      <lightning-input
+                        type="search"
+                        placeholder="Search fields..."
+                        value={fieldSearchTerm}
+                        onchange={handleFieldSearchChange}
+                        variant="label-hidden"
+                        class="slds-m-bottom_x-small">
+                      </lightning-input>
+                      <div class="field-checkbox-container">
+                        <template if:true={hasFilteredFields}>
+                          <template for:each={filteredFieldOptions} for:item="field">
+                            <div key={field.apiName} class="field-checkbox-item">
+                              <lightning-input
+                                type="checkbox"
+                                label={field.displayLabel}
+                                data-api-name={field.apiName}
+                                checked={field.isSelected}
+                                onchange={handleFieldCheckboxChange}>
+                              </lightning-input>
+                            </div>
+                          </template>
+                        </template>
+                        <template if:false={hasFilteredFields}>
+                          <div class="slds-p-around_medium slds-text-align_center slds-text-color_weak">
+                            No fields match "{fieldSearchTerm}"
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </lightning-accordion-section>
+              </template>
+
+              <!-- Aggregate Section (Aggregate mode) -->
+              <template if:true={showAggregateSection}>
+                <lightning-accordion-section name="aggregate" label="Aggregate Configuration">
+                  <div class="accordion-content">
+                    <lightning-combobox
+                      label="Aggregate Function"
+                      placeholder="Select function..."
+                      options={aggregateFunctionOptions}
+                      value={aggregateFunction}
+                      onchange={handleAggregateFunctionChange}
+                      required
+                      class="slds-m-bottom_small">
+                    </lightning-combobox>
+                    <template if:true={showAggregateFieldSelector}>
+                      <div class="slds-form-element aggregate-field-wrapper">
+                        <label class="slds-form-element__label">
+                          <template if:true={selectedFunctionRequiresField}>
+                            <abbr class="slds-required" title="required">*</abbr>
+                          </template>
+                          {aggregateFieldLabel}
+                        </label>
+                        <div class="slds-form-element__control">
+                          <div class="slds-combobox_container">
+                            <div class={aggregateFieldComboboxClasses} role="combobox" aria-expanded={isAggregateFieldListOpen} aria-haspopup="listbox">
+                              <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                                <input
+                                  type="text"
+                                  class="slds-input slds-combobox__input"
+                                  role="textbox"
+                                  placeholder="Search fields..."
+                                  value={aggregateFieldSearchTerm}
+                                  oninput={handleAggregateFieldSearchInput}
+                                  onfocus={handleAggregateFieldFocus}
+                                  onblur={handleAggregateFieldBlur}
+                                  onkeydown={handleAggregateFieldKeydown}
+                                  autocomplete="off" />
+                                <template if:true={aggregateFieldApiName}>
+                                  <button
+                                    class="slds-button slds-button_icon slds-input__icon slds-input__icon_right"
+                                    onclick={handleAggregateFieldClear}
+                                    type="button"
+                                    title="Clear selection">
+                                    <lightning-icon icon-name="utility:close" size="x-small" alternative-text="Clear"></lightning-icon>
+                                  </button>
+                                </template>
+                                <template if:false={aggregateFieldApiName}>
+                                  <span class="slds-icon_container slds-input__icon slds-input__icon_right">
+                                    <lightning-icon icon-name="utility:search" size="x-small" alternative-text="Search"></lightning-icon>
+                                  </span>
+                                </template>
+                              </div>
+                              <template if:true={isAggregateFieldListOpen}>
+                                <div class="aggregate-field-dropdown" role="listbox">
+                                  <template if:true={isLoadingFields}>
+                                    <div class="slds-p-around_medium slds-align_absolute-center">
+                                      <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
+                                    </div>
+                                  </template>
+                                  <template if:false={isLoadingFields}>
+                                    <template if:true={hasFilteredAggregateFields}>
+                                      <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                        <template for:each={filteredAggregateFields} for:item="field">
+                                          <li key={field.apiName} role="presentation" class="slds-listbox__item">
+                                            <div
+                                              class={field.itemClass}
+                                              data-value={field.apiName}
+                                              onclick={handleAggregateFieldSelect}
+                                              onmousedown={handleAggregateFieldSelect}
+                                              role="option">
+                                              <span class="slds-media__body">
+                                                <span class="slds-truncate field-label">{field.label}</span>
+                                                <span class="slds-truncate field-api-name">{field.apiName}</span>
+                                              </span>
+                                            </div>
+                                          </li>
+                                        </template>
+                                      </ul>
+                                    </template>
+                                    <template if:false={hasFilteredAggregateFields}>
+                                      <div class="slds-p-around_small slds-text-align_center slds-text-color_weak">
+                                        No fields available
+                                      </div>
+                                    </template>
+                                  </template>
+                                </div>
+                              </template>
+                            </div>
+                          </div>
+                        </div>
+                        <template if:false={selectedFunctionRequiresField}>
+                          <div class="slds-form-element__help slds-text-color_weak">
+                            COUNT() will count all rows if no field is selected
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </lightning-accordion-section>
+              </template>
+
+              <!-- Filters Section -->
+              <lightning-accordion-section name="filters" label={filtersAccordionLabel}>
+                <lightning-button
+                  slot="actions"
+                  label="Add Condition"
+                  icon-name="utility:add"
+                  onclick={handleAddCondition}
+                  variant="neutral">
+                </lightning-button>
+                <div class="accordion-content">
+                  <!-- Quick Filters -->
+                  <template if:true={hasOwnerField}>
+                    <div class="slds-m-bottom_small">
+                      <span class="slds-text-title_caps slds-m-bottom_xx-small">Quick Filters</span>
+                      <div class="quick-filters-row slds-m-top_xx-small">
+                        <button
+                          class={ownedByMeButtonClass}
+                          data-filter="me"
+                          onclick={handleOwnerFilterToggle}
+                          type="button">
+                          <lightning-icon icon-name="utility:user" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                          Owned By Me
+                        </button>
+                        <button
+                          class={ownedByQueueButtonClass}
+                          data-filter="queue"
+                          onclick={handleOwnerFilterToggle}
+                          type="button">
+                          <lightning-icon icon-name="utility:groups" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                          Owned By Queue
+                        </button>
+                      </div>
+                    </div>
+                    <div class="slds-m-vertical_small section-divider"></div>
+                  </template>
+
+                  <!-- WHERE Conditions -->
+                  <div class="conditions-section">
+                    <template if:true={hasConditions}>
+                      <template for:each={conditionsWithMeta} for:item="cond">
+                        <div key={cond.id} class="condition-row">
+                          <div class="conjunction-col">
+                            <template if:true={cond.showConjunction}>
+                              <div class="conjunction-toggle" role="group">
+                                <button
+                                  type="button"
+                                  class={cond.andButtonClass}
+                                  data-id={cond.id}
+                                  data-value="AND"
+                                  onclick={handleConditionConjunctionChange}>AND</button>
+                                <button
+                                  type="button"
+                                  class={cond.orButtonClass}
+                                  data-id={cond.id}
+                                  data-value="OR"
+                                  onclick={handleConditionConjunctionChange}>OR</button>
+                              </div>
+                            </template>
+                            <template if:false={cond.showConjunction}>
+                              <span class="where-label">WHERE</span>
+                            </template>
+                          </div>
+                          <div class="field-combobox-wrapper">
+                            <div class="slds-combobox_container">
+                              <div class="slds-combobox slds-dropdown-trigger slds-dropdown-trigger_click" role="combobox">
+                                <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_right" role="none">
+                                  <input
+                                    type="text"
+                                    class="slds-input slds-combobox__input"
+                                    placeholder="Search fields..."
+                                    value={cond.fieldSearchTerm}
+                                    data-id={cond.id}
+                                    oninput={handleConditionFieldSearchInput}
+                                    onfocus={handleConditionFieldFocus}
+                                    onblur={handleConditionFieldBlur}
+                                    autocomplete="off" />
+                                  <span class="slds-icon_container slds-input__icon slds-input__icon_right">
+                                    <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
+                                  </span>
+                                </div>
+                                <template if:true={cond.isFieldListOpen}>
+                                  <div class="field-dropdown" role="listbox">
+                                    <ul class="slds-listbox slds-listbox_vertical" role="presentation">
+                                      <template for:each={cond.filteredFieldOptions} for:item="field">
+                                        <li key={field.apiName} role="presentation" class="slds-listbox__item">
+                                          <div
+                                            class="slds-media slds-listbox__option slds-listbox__option_entity"
+                                            data-id={cond.id}
+                                            data-field={field.apiName}
+                                            onmousedown={handleConditionFieldSelect}
+                                            role="option">
+                                            <span class="slds-media__body">
+                                              <span class="slds-truncate field-label">{field.label}</span>
+                                              <span class="slds-truncate field-api-name">{field.apiName}</span>
+                                            </span>
+                                          </div>
+                                        </li>
+                                      </template>
+                                      <template if:true={cond.noFieldsMatch}>
+                                        <li class="slds-p-around_small slds-text-align_center slds-text-color_weak">No fields match</li>
+                                      </template>
+                                    </ul>
+                                  </div>
+                                </template>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="operator-col">
+                            <lightning-combobox
+                              placeholder="Operator..."
+                              value={cond.operator}
+                              options={cond.operatorOptions}
+                              data-id={cond.id}
+                              onchange={handleConditionOperatorChange}
+                              variant="label-hidden"
+                              disabled={cond.isOperatorDisabled}>
+                            </lightning-combobox>
+                          </div>
+                          <div class="value-col">
+                            <template if:true={cond.showValueInput}>
+                              <template if:true={cond.isPicklistField}>
+                                <lightning-combobox
+                                  placeholder="Select..."
+                                  value={cond.value}
+                                  options={cond.picklistOptions}
+                                  data-id={cond.id}
+                                  onchange={handleConditionValueChange}
+                                  variant="label-hidden"
+                                  disabled={cond.isValueDisabled}>
+                                </lightning-combobox>
+                              </template>
+                              <template if:true={cond.isBooleanField}>
+                                <lightning-combobox
+                                  placeholder="Select..."
+                                  value={cond.value}
+                                  options={booleanOptions}
+                                  data-id={cond.id}
+                                  onchange={handleConditionValueChange}
+                                  variant="label-hidden"
+                                  disabled={cond.isValueDisabled}>
+                                </lightning-combobox>
+                              </template>
+                              <template if:true={cond.showNDaysInput}>
+                                <lightning-input
+                                  type="number"
+                                  value={cond.value}
+                                  data-id={cond.id}
+                                  onchange={handleConditionValueChange}
+                                  variant="label-hidden"
+                                  min="1"
+                                  placeholder="Days..."
+                                  disabled={cond.isValueDisabled}>
+                                </lightning-input>
+                              </template>
+                              <template if:true={cond.showDefaultInput}>
+                                <lightning-input
+                                  type={cond.valueInputType}
+                                  value={cond.value}
+                                  data-id={cond.id}
+                                  onchange={handleConditionValueChange}
+                                  variant="label-hidden"
+                                  placeholder="Value..."
+                                  disabled={cond.isValueDisabled}>
+                                </lightning-input>
+                              </template>
+                            </template>
+                            <template if:false={cond.showValueInput}>
+                              <template if:false={cond.showNDaysInput}>
+                                <div class="null-placeholder">
+                                  <span class="slds-text-color_weak">No value needed</span>
+                                </div>
+                              </template>
+                            </template>
+                          </div>
+                          <div class="remove-col">
+                            <div class="remove-button-wrapper" data-id={cond.id} onclick={handleRemoveCondition}>
+                              <lightning-button-icon
+                                icon-name="utility:delete"
+                                variant="bare"
+                                alternative-text="Remove">
+                              </lightning-button-icon>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </template>
+                    <template if:false={hasConditions}>
+                      <div class="empty-state-small slds-p-around_medium slds-text-align_center">
+                        <lightning-icon icon-name="utility:filterList" size="small" class="slds-m-bottom_x-small empty-icon"></lightning-icon>
+                        <p class="slds-text-body_small slds-text-color_weak">No conditions added</p>
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- Query Limit -->
+                  <div class="slds-m-top_small section-divider"></div>
+                  <div class="slds-m-top_small">
+                    <div class="slds-grid slds-gutters">
+                      <div class="slds-col slds-size_1-of-3">
+                        <lightning-input
+                          type="number"
+                          label="Query Limit"
+                          value={queryLimit}
+                          onchange={handleQueryLimitChange}
+                          min="1"
+                          max="50000"
+                          placeholder="No limit">
+                        </lightning-input>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </lightning-accordion-section>
+
+            </template>
+            <!-- End: conditional sections for when object is selected -->
+
+              </lightning-accordion>
+
+            <!-- Placeholder when no object selected -->
+            <template if:false={page2Data.selectedObjectApiName}>
+              <div class="config-section-empty">
+                <div class="slds-p-around_large slds-text-align_center">
+                  <lightning-icon icon-name="utility:database" size="large" class="slds-m-bottom_small empty-icon"></lightning-icon>
+                  <p class="slds-text-heading_small slds-text-color_weak">Select an object to configure fields and filters</p>
+                </div>
+              </div>
+            </template>
+
+            </div><!-- end config-card -->
+          </div>
+
+          <!-- ==================== RIGHT COLUMN: SOQL Preview & Results ==================== -->
+          <div class="slds-col slds-size_4-of-12 preview-panel hm-preview-col">
+            <!-- SOQL Preview Card -->
+            <div class="preview-card">
+              <div class="preview-card-header">
+                <lightning-icon icon-name="utility:preview" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                <span class="preview-card-title">SOQL Preview</span>
+                <template if:true={generatedSoql}>
+                  <lightning-button-icon
+                    icon-name="utility:copy"
+                    variant="bare"
+                    alternative-text="Copy SOQL"
+                    title="Copy SOQL to clipboard"
+                    onclick={handleCopySoql}
+                    class="copy-button">
+                  </lightning-button-icon>
+                </template>
+              </div>
+              <div class="soql-preview-box">
+                <template if:true={generatedSoql}>
+                  <div class="soql-preview-content">
+                    <template for:each={soqlTokens} for:item="token">
+                      <span key={token.id} class={token.className}>{token.value}</span>
+                    </template>
+                  </div>
+                </template>
+                <template if:false={generatedSoql}>
+                  <div class="soql-empty-state">
+                    <lightning-icon icon-name="utility:info" size="small" class="slds-m-bottom_x-small empty-icon-dark"></lightning-icon>
+                    <p>Configure object and fields to generate SOQL</p>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Preview Results Card -->
+            <div class="results-card">
+              <div class="results-card-header">
+                <lightning-icon icon-name="utility:table" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                <span class="results-card-title">Preview Results</span>
+                <template if:true={hasQueryResults}>
+                  <span class="results-count-badge">{queryTotalCount}</span>
+                </template>
+                <template if:true={isQueryLoading}>
+                  <lightning-spinner alternative-text="Loading..." size="x-small" class="slds-m-left_x-small"></lightning-spinner>
+                </template>
+              </div>
+              <div class="results-card-content">
+                <template if:true={queryError}>
+                  <div class="results-error">
+                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                    <span>{queryError}</span>
+                  </div>
+                </template>
+                <template if:false={queryError}>
+                  <template if:true={hasQueryResults}>
+                    <div class="results-table-wrapper">
+                      <lightning-datatable
+                        key-field="Id"
+                        data={queryResults}
+                        columns={queryColumns}
+                        hide-checkbox-column
+                        show-row-number-column>
+                      </lightning-datatable>
+                    </div>
+                    <div class="results-card-footer">
+                      <span>Showing {queryResultsCount} of {queryTotalCount}</span>
+                    </div>
+                  </template>
+                  <template if:false={hasQueryResults}>
+                    <template if:false={isQueryLoading}>
+                      <div class="results-empty-state">
+                        <lightning-icon icon-name="utility:preview" size="small" class="slds-m-bottom_xx-small"></lightning-icon>
+                        <p>Configure query to see results</p>
+                      </div>
+                    </template>
+                    <template if:true={isQueryLoading}>
+                      <div class="results-loading-state">
+                        <p>Loading preview...</p>
+                      </div>
+                    </template>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Display -->
+        <template if:true={error}>
+          <div class="slds-m-top_medium">
+            <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+              <span class="slds-assistive-text">error</span>
+              <lightning-icon icon-name="utility:error" size="small" class="slds-m-right_x-small" variant="inverse"></lightning-icon>
+              <h2>{error}</h2>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Docked Footer -->
+    <div class="docked-footer">
+      <lightning-button
+        label="Cancel"
+        onclick={handleCancel}
+        variant="neutral"
+        disabled={isSaving}>
+      </lightning-button>
+      <lightning-button
+        label="Save"
+        onclick={handleSave}
+        variant="brand"
+        disabled={isSaveDisabled}
+        class="slds-m-left_small">
+      </lightning-button>
+    </div>
+  </div>
+</template>

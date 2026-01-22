@@ -27,9 +27,14 @@
   margin-bottom: var(--slds-g-spacing-6, 24px);
 }
 
+.cc-welcome-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .cc-welcome-heading {
   font-size: var(--slds-g-font-scale-5, 1.5rem);
-  font-weight: var(--slds-g-font-weight-semibold, 600);
+  font-weight: var(--slds-g-font-weight-7, 600);
   color: var(--slds-g-color-neutral-base-10, #181818);
   margin: 0 0 var(--slds-g-spacing-1, 4px) 0;
   transition: color 0.3s ease;
@@ -71,7 +76,7 @@
 
 .cc-actions-menu--open {
   /* SLDS2: Active state uses brand color for icon and dropdown caret */
-  --slds-c-button-text-color: var(--slds-g-color-brand-1, #0176d3);
+  --slds-c-button-text-color: var(--slds-g-color-brand-base-50, #0176d3);
 }
 
 /* Actions Menu Button - Dark Mode */
@@ -84,7 +89,7 @@
 :host(.cc-dark) .cc-actions-menu--open,
 .cc-dark .cc-actions-menu--open {
   /* SLDS2: Active state in dark mode uses brand color */
-  --slds-c-button-text-color: var(--slds-g-color-brand-2, #1b96ff);
+  --slds-c-button-text-color: var(--slds-g-color-brand-base-60, #1b96ff);
 }
 
 /* Menu Dropdown Styling - Global styles for popover (rendered outside shadow DOM) */
@@ -129,16 +134,16 @@
   background: var(--slds-g-color-neutral-base-100, #ffffff);
   border-radius: var(--slds-g-radius-border-2, 8px);
   /* SLDS2: Using 1px as fallback - border width tokens may not be available */
-  border: 1px solid rgba(234, 0, 30, 0.2); /* Fallback */
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(234, 0, 30, 0.2); /* Fallback */
   border-color: color-mix(in srgb, var(--slds-g-color-error-1, #ea001e) 20%, transparent); /* Modern */
 }
 
 .cc-dark .cc-error-message {
-  color: var(--slds-g-color-error-2, #ff5252);
+  color: var(--slds-g-color-error-base-40, #ff5252);
   background: var(--slds-g-color-neutral-base-10, #1e1e1e);
   /* SLDS2: Using color-mix() for dark mode error border */
-  border: 1px solid rgba(255, 82, 82, 0.2); /* Fallback */
-  border-color: color-mix(in srgb, var(--slds-g-color-error-2, #ff5252) 20%, transparent); /* Modern */
+  border: var(--slds-g-sizing-border-1, 1px) solid rgba(255, 82, 82, 0.2); /* Fallback */
+  border-color: color-mix(in srgb, var(--slds-g-color-error-base-40, #ff5252) 20%, transparent); /* Modern */
 }
 
 .cc-empty-dashboard {
