@@ -31,6 +31,12 @@
                 <default>false</default>
                 <label>Subtitle</label>
             </value>
+            <value>
+                <fullName>Tile Subtitle</fullName>
+                <default>false</default>
+                <isActive>false</isActive>
+                <label>Tile Subtitle</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

@@ -21,6 +21,12 @@
                 <default>false</default>
                 <label>List</label>
             </value>
+            <value>
+                <fullName>Multi-Object</fullName>
+                <default>false</default>
+                <isActive>false</isActive>
+                <label>Multi-Object</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

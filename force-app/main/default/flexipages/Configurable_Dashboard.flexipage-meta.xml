@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexiPage xmlns="http://soap.sforce.com/2006/04/metadata">
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>dashboardId</name>
+                    <value>a0gD7000005YrPmIAK</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>dashboardName</name>
+                </componentInstanceProperties>
+                <componentName>hmConfigurableDashboard</componentName>
+                <identifier>c_hmConfigurableDashboard</identifier>
+            </componentInstance>
+        </itemInstances>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>componentId</name>
+                    <value>a0eD70000065AVnIAM</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>isDarkMode</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentName>hmConfigurableList</componentName>
+                <identifier>c_hmConfigurableList</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>main</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <masterLabel>Configurable Dashboard</masterLabel>
+    <template>
+        <name>flexipage:defaultAppHomeTemplate</name>
+    </template>
+    <type>AppPage</type>
+</FlexiPage>

@@ -124,7 +124,6 @@
     </layoutSections>
     <relatedLists>
         <fields>NAME</fields>
-        <fields>HM_Type__c</fields>
         <fields>HM_Active__c</fields>
         <fields>HM_Order__c</fields>
         <relatedList>HM_Dashboard_Data_Source__c.HM_Dashboard_Component__c</relatedList>
