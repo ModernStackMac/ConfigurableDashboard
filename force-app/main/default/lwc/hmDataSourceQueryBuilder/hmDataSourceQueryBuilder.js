@@ -198,6 +198,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   // ==================== COMMON STATE ====================
   isLoading = false;
   isSaving = false;
+  
+  // Accordion section state - tracked to preserve user's manual open/close actions
+  // All sections open by default (sections not yet rendered are ignored by the accordion)
+  @track openSections = ["settings", "query", "fields", "aggregate", "filters"];
   error = null;
 
   // Timeout IDs for cleanup on disconnect
@@ -245,6 +249,17 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       clearTimeout(this._autoRefreshTimeoutId);
       this._autoRefreshTimeoutId = null;
     }
+  }
+
+  // ==================== ACCORDION HANDLERS ====================
+
+  /**
+   * @description Handle accordion section toggle events
+   * Preserves user's manual open/close actions by storing state in tracked property
+   * @param {Event} event - Section toggle event with detail.openSections
+   */
+  handleSectionToggle(event) {
+    this.openSections = event.detail.openSections;
   }
 
   // ==================== FORM HANDLERS ====================
@@ -464,7 +479,39 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
 
       // Load fields for selected object
       this.loadFieldsForObject(obj.apiName);
+
+      // Expand new sections that become available, preserving user's existing section state
+      this.expandNewSectionsForObject();
     }
+  }
+
+  /**
+   * @description Expand accordion sections when object is selected
+   * Uses setTimeout to ensure DOM has rendered the new sections before opening them
+   */
+  expandNewSectionsForObject() {
+    // Use setTimeout to defer until after LWC's rendering cycle completes
+    // This ensures the accordion sections exist in DOM before we try to open them
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    setTimeout(() => {
+      const sectionsToOpen = [...this.openSections];
+      
+      // Add the appropriate mode section (fields for List, aggregate for Aggregate)
+      if (this.isListMode && !sectionsToOpen.includes("fields")) {
+        sectionsToOpen.push("fields");
+      }
+      if (!this.isListMode && !sectionsToOpen.includes("aggregate")) {
+        sectionsToOpen.push("aggregate");
+      }
+      
+      // Always add filters section if not already open
+      if (!sectionsToOpen.includes("filters")) {
+        sectionsToOpen.push("filters");
+      }
+      
+      // Force accordion to recognize new sections by setting a new array reference
+      this.openSections = sectionsToOpen;
+    }, 0);
   }
 
   /**
@@ -513,7 +560,28 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       this.selectedFieldApiNames = [];
     }
 
+    // Swap accordion sections: remove old mode section, add new mode section
+    this.swapModeSection(newType);
+
     this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Swap accordion section when query type changes
+   * Removes the old mode section (fields/aggregate) and adds the new one
+   * @param {String} newType - The new query type ('List' or 'Aggregate')
+   */
+  swapModeSection(newType) {
+    // Remove both mode-specific sections, then add the appropriate one
+    const newSections = this.openSections.filter(s => s !== "fields" && s !== "aggregate");
+    
+    if (newType === "List") {
+      newSections.push("fields");
+    } else {
+      newSections.push("aggregate");
+    }
+    
+    this.openSections = newSections;
   }
 
   /**
@@ -1513,23 +1581,6 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `Configure query for "${this.formData.name}"`;
     }
     return "Configure query parameters and save";
-  }
-
-  /**
-   * @description Get active accordion sections (all open by default)
-   * @returns {Array} Array of section names to open
-   */
-  get activeSections() {
-    const sections = ["settings", "query"];
-    if (this.page2Data.selectedObjectApiName) {
-      if (this.isListMode) {
-        sections.push("fields");
-      } else {
-        sections.push("aggregate");
-      }
-      sections.push("filters");
-    }
-    return sections;
   }
 
   /**
