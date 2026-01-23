@@ -23,10 +23,10 @@
                   size="small"
                 ></lightning-icon>
               </div>
-              <p class="cc-kpi-label">{title}</p>
+              <p class="cc-kpi-label {titleClass}" title={title}>{title}</p>
             </div>
             <template if:true={tileData.badge}>
-              <div class={tileData.badge.class}>
+              <div class={tileData.badge.class} title={tileData.badge.text}>
                 <template if:true={tileData.badge.icon}>
                   <lightning-icon
                     icon-name={tileData.badge.icon}
@@ -43,7 +43,7 @@
           <!-- Subtitle: Additional context at bottom with proper spacing -->
           <div class="cc-kpi-subtitle-spacer">
             <template if:true={subtitle}>
-              <p class="cc-kpi-subtitle">{subtitle}</p>
+              <p class="cc-kpi-subtitle" title={subtitle}>{subtitle}</p>
             </template>
           </div>
         </template>

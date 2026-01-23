@@ -20,11 +20,11 @@
             </template>
           </div>
           <template if:true={showFilters}>
-            <div class="cc-filter-group">
+            <div class={filterGroupClass}>
               <template for:each={filters} for:item="filter">
                 <button
                   key={filter.value}
-                  class={filter.class}
+                  class={filter.computedClass}
                   onclick={handleFilterClick}
                   data-filter={filter.value}
                 >
@@ -67,7 +67,7 @@
                 tabindex="0"
                 aria-sort={column.ariaSort}
               >
-                <span class="cc-col-label">{column.label}</span>
+                <span class="cc-col-label slds-truncate">{column.label}</span>
                 <template if:true={column.sortIcon}>
                   <lightning-icon
                     icon-name={column.sortIcon}
@@ -109,11 +109,11 @@
 
                   <!-- Row Cells -->
                   <template for:each={row.visibleCells} for:item="cell">
-                    <div key={cell.key} class="cc-col-data">
+                    <div key={cell.key} class={columnDataClass}>
                       <template if:true={cell.applicable}>
                         <div class="cc-cell-content">
                           <template if:false={cell.hasBadgeType}>
-                            <span class="cc-cell-value">{cell.value}</span>
+                            <span class="cc-cell-value" title={cell.title}>{cell.value}</span>
                           </template>
                           <template if:true={cell.hasBadgeType}>
                             <template if:true={cell.badge}>
@@ -129,7 +129,7 @@
                               </div>
                             </template>
                             <template if:false={cell.badge}>
-                              <span class="cc-cell-value">{cell.value}</span>
+                              <span class="cc-cell-value" title={cell.title}>{cell.value}</span>
                             </template>
                           </template>
                         </div>

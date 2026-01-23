@@ -20,11 +20,12 @@
         <template if:true={hasComponents}>
           <div class={layoutClass} style={layoutStyle}>
             <template for:each={components} for:item="component">
-              <div key={component.id} class="hm-group-item">
+              <div key={component.id} class={component.itemClass}>
                 <template if:true={component.isTile}>
                   <c-hm-configurable-tile
                     component-id={component.id}
                     is-dark-mode={isDarkMode}
+                    container-size={containerSize}
                   >
                   </c-hm-configurable-tile>
                 </template>
@@ -32,6 +33,7 @@
                   <c-hm-configurable-list
                     component-id={component.id}
                     is-dark-mode={isDarkMode}
+                    container-size={containerSize}
                   >
                   </c-hm-configurable-list>
                 </template>
