@@ -601,11 +601,13 @@ public with sharing class HM_ComponentDataService {
       fieldsToInject.add('LastModifiedDate');
     }
     
-    // For Name field: check if exists, otherwise try CaseNumber (for Case object)
+    // For primary label field: try Name, otherwise CaseNumber (Case), otherwise Subject (Task/Event)
     if (fieldMap.containsKey('name')) {
       fieldsToInject.add('Name');
     } else if (fieldMap.containsKey('casenumber')) {
       fieldsToInject.add('CaseNumber');
+    } else if (fieldMap.containsKey('subject')) {
+      fieldsToInject.add('Subject');
     }
     
     // Extract SELECT clause and rest of query
@@ -795,6 +797,14 @@ public with sharing class HM_ComponentDataService {
   private static Map<String, Object> convertSObjectToMap(SObject record) {
     Map<String, Object> result = new Map<String, Object>();
     Map<String, Object> fields = record.getPopulatedFieldsAsMap();
+
+    // Include object API name so LWC can apply HM_Object_Type__c filtering reliably
+    // (avoids Id-prefix hardcoding and works for standard + custom objects).
+    try {
+      result.put('objectType', record.getSObjectType().getDescribe().getName());
+    } catch (Exception ex) {
+      // Graceful degradation: if describe fails for any reason, omit objectType
+    }
 
     for (String fieldName : fields.keySet()) {
       Object value = fields.get(fieldName);

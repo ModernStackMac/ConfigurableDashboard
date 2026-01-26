@@ -78,11 +78,17 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       { label: "is null", value: "is_null" },
       { label: "is not null", value: "is_not_null" },
       { label: "= TODAY", value: "date_today" },
+      { label: "> TODAY", value: "date_gt_today" },
+      // { label: ">= TODAY", value: "date_gte_today" },
+      { label: "< TODAY", value: "date_lt_today" },
+      // { label: "<= TODAY", value: "date_lte_today" },
       { label: "= THIS_WEEK", value: "date_this_week" },
       { label: "= THIS_MONTH", value: "date_this_month" },
       { label: "= THIS_YEAR", value: "date_this_year" },
       { label: "= LAST_N_DAYS:n", value: "date_last_n_days" },
-      { label: "= NEXT_N_DAYS:n", value: "date_next_n_days" }
+      { label: "> LAST_N_DAYS:n", value: "date_gt_last_n_days" },
+      { label: "= NEXT_N_DAYS:n", value: "date_next_n_days" },
+      { label: "< NEXT_N_DAYS:n", value: "date_lt_next_n_days" }
     ],
     BOOLEAN: [
       { label: "equals", value: "equals" },
@@ -1309,9 +1315,12 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       
       // Determine value input type and visibility
       const nullOperators = ["is_null", "is_not_null"];
-      const dateLiteralOperators = ["date_today", "date_this_week", "date_this_month", "date_this_year"];
+      const dateLiteralOperators = [
+        "date_today", "date_gt_today", "date_gte_today", "date_lt_today", "date_lte_today",
+        "date_this_week", "date_this_month", "date_this_year"
+      ];
       const showValueInput = !nullOperators.includes(condition.operator) && !dateLiteralOperators.includes(condition.operator);
-      const showNDaysInput = condition.operator === "date_last_n_days" || condition.operator === "date_next_n_days";
+      const showNDaysInput = ["date_last_n_days", "date_gt_last_n_days", "date_next_n_days", "date_lt_next_n_days"].includes(condition.operator);
       const isPicklistField = condition.fieldType === "PICKLIST" || condition.fieldType === "MULTIPICKLIST";
       const isBooleanField = condition.fieldType === "BOOLEAN";
       const isNumberField = ["INTEGER", "DOUBLE", "CURRENCY", "PERCENT"].includes(condition.fieldType);
@@ -1825,10 +1834,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     // If conditions exist, validate each one
     const nullOperators = ["is_null", "is_not_null"];
     const dateLiteralOperators = [
-      "date_today",
-      "date_this_week",
-      "date_this_month",
-      "date_this_year"
+      "date_today", "date_gt_today", "date_gte_today", "date_lt_today", "date_lte_today",
+      "date_this_week", "date_this_month", "date_this_year"
     ];
     return this.whereConditions.every((condition) => {
       // Must have field and operator
@@ -2112,7 +2119,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `${field} != null`;
     }
 
-    // Handle date literals
+    // Handle date literals with equals operator
     if (condition.operator === "date_today") {
       return `${field} = TODAY`;
     }
@@ -2130,6 +2137,26 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
     if (condition.operator === "date_next_n_days") {
       return `${field} = NEXT_N_DAYS:${condition.value}`;
+    }
+
+    // Handle date literals with comparison operators (>, >=, <, <=)
+    if (condition.operator === "date_gt_today") {
+      return `${field} > TODAY`;
+    }
+    if (condition.operator === "date_gte_today") {
+      return `${field} >= TODAY`;
+    }
+    if (condition.operator === "date_lt_today") {
+      return `${field} < TODAY`;
+    }
+    if (condition.operator === "date_lte_today") {
+      return `${field} <= TODAY`;
+    }
+    if (condition.operator === "date_gt_last_n_days") {
+      return `${field} > LAST_N_DAYS:${condition.value}`;
+    }
+    if (condition.operator === "date_lt_next_n_days") {
+      return `${field} < NEXT_N_DAYS:${condition.value}`;
     }
 
     // Handle LIKE operators - escape single quotes to prevent SOQL injection
@@ -2162,10 +2189,30 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `${field} ${operator} ${condition.value}`;
     }
 
+    // Handle Date and DateTime types (no quotes for date literals)
+    // SOQL requires: ClosedDate = 2025-01-26 (NOT '2025-01-26')
+    const dateTypes = ["DATE", "DATETIME"];
+    if (dateTypes.includes(condition.fieldType)) {
+      const dateValue = condition.value;
+      // Validate date format (YYYY-MM-DD or YYYY-MM-DDThh:mm:ssZ)
+      if (this.isValidDateFormat(dateValue)) {
+        return `${field} ${operator} ${dateValue}`;
+      }
+      // If invalid format, still output without quotes but let SOQL validation catch it
+      return `${field} ${operator} ${dateValue}`;
+    }
+
     // Handle INCLUDES/EXCLUDES for multipicklist - escape value
     if (condition.operator === "includes" || condition.operator === "excludes") {
       const escapedValue = this.escapeSoqlValue(condition.value);
       return `${field} ${operator} ('${escapedValue}')`;
+    }
+
+    // Fallback: detect date values by format pattern (safety net for when fieldType is not set correctly)
+    // This prevents quoting date values that should be unquoted in SOQL
+    const dateFormatPattern = /^\d{4}-\d{2}-\d{2}/;
+    if (condition.value && dateFormatPattern.test(condition.value)) {
+      return `${field} ${operator} ${condition.value}`;
     }
 
     // Default: string value with quotes - escape to prevent SOQL injection
@@ -2445,6 +2492,36 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
     // Escape backslashes first, then single quotes
     return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  }
+
+  /**
+   * @description Validate that a value is a valid SOQL date/datetime format
+   * Supports: YYYY-MM-DD (Date) and YYYY-MM-DDThh:mm:ssZ (DateTime)
+   * Also supports relative date literals like TODAY, YESTERDAY, etc.
+   * @param {string} value - Value to validate
+   * @returns {boolean} True if value is a valid date format for SOQL
+   */
+  isValidDateFormat(value) {
+    if (!value || typeof value !== "string") {
+      return false;
+    }
+    const trimmed = value.trim();
+    // Check for SOQL date literals (TODAY, YESTERDAY, LAST_N_DAYS:n, etc.)
+    const dateLiteralPattern = /^(TODAY|YESTERDAY|TOMORROW|LAST_WEEK|THIS_WEEK|NEXT_WEEK|LAST_MONTH|THIS_MONTH|NEXT_MONTH|LAST_90_DAYS|NEXT_90_DAYS|LAST_N_DAYS:\d+|NEXT_N_DAYS:\d+|THIS_QUARTER|LAST_QUARTER|NEXT_QUARTER|THIS_YEAR|LAST_YEAR|NEXT_YEAR|THIS_FISCAL_QUARTER|LAST_FISCAL_QUARTER|NEXT_FISCAL_QUARTER|THIS_FISCAL_YEAR|LAST_FISCAL_YEAR|NEXT_FISCAL_YEAR)$/i;
+    if (dateLiteralPattern.test(trimmed)) {
+      return true;
+    }
+    // Check for ISO date format: YYYY-MM-DD
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (datePattern.test(trimmed)) {
+      return true;
+    }
+    // Check for ISO datetime format: YYYY-MM-DDThh:mm:ss.sssZ or YYYY-MM-DDThh:mm:ssZ
+    const datetimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+    if (datetimePattern.test(trimmed)) {
+      return true;
+    }
+    return false;
   }
 
   /**

@@ -63,18 +63,15 @@ export default class HM_ConfigurableList extends NavigationMixin(
     NONE: "None"
   };
 
-  static OBJECT_PREFIXES = {
-    ACCOUNT: "001",
-    CONTACT: "003",
-    OPPORTUNITY: "006",
-    CASE: "500"
+  // Badge formatting: tiered time unit thresholds
+  static BADGE_CONFIG = {
+    DAYS_IN_WEEK: 7,              // Days threshold to switch to weeks
+    DAYS_IN_MONTH: 30,            // Days threshold to switch to months
+    DAYS_IN_YEAR: 365,            // Days threshold to switch to years
+    TODAY_TEXT: "Today"           // Text for today's date
   };
 
   static OBJECT_TYPES = {
-    ACCOUNT: "Account",
-    CONTACT: "Contact",
-    OPPORTUNITY: "Opportunity",
-    CASE: "Case",
     UNKNOWN: "Unknown"
   };
 
@@ -496,12 +493,14 @@ export default class HM_ConfigurableList extends NavigationMixin(
       };
     }
 
-    // Get field value - handle smart Name column that shows Name or CaseNumber based on object type
+    // Get field value - handle smart primary label column (Name/CaseNumber/Subject) based on object type
     let value;
     if (column.isSmartNameColumn && column.isVirtual) {
-      // For smart Name column: use CaseNumber for Case, Name for others
+      // For smart Name column: use CaseNumber for Case, Subject for Task/Event, Name for others
       if (objectType === 'Case') {
         value = this.getFieldValue(record, 'CaseNumber');
+      } else if (objectType === 'Task' || objectType === 'Event') {
+        value = this.getFieldValue(record, 'Subject');
       } else {
         value = this.getFieldValue(record, 'Name');
       }
@@ -555,127 +554,186 @@ export default class HM_ConfigurableList extends NavigationMixin(
 
   /**
    * @description Calculate days badge for date fields
+   * Centralizes badge formatting with threshold-based text for large day values.
+   * Guards against null dates, invalid dates, and timezone edge cases.
    * @param {Object} dateValue - Date or DateTime value from record
    * @param {String} overrideVariant - Optional override variant from configuration
    * @return {Object} Badge object with text and variant, or null if invalid
    */
   calculateDaysBadge(dateValue, overrideVariant = null) {
-    if (!dateValue) {
+    // Guard: null or undefined dates
+    if (dateValue === null || dateValue === undefined) {
       return null;
     }
 
     try {
-      // Handle Date and DateTime values
-      let date;
-      if (dateValue instanceof Date) {
-        date = dateValue;
-      } else if (typeof dateValue === "string") {
-        // Parse date string from Salesforce
-        // Salesforce dates can be in format: "2025-11-14" or "2025-11-14T00:00:00.000Z"
-        // Try parsing directly first
-        date = new Date(dateValue);
-        
-        // If that fails, try parsing as YYYY-MM-DD format
-        if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
-          const dateOnly = dateValue.substring(0, 10);
-          date = new Date(dateOnly + "T00:00:00");
-        }
-      } else if (typeof dateValue === "number") {
-        // Handle timestamp
-        date = new Date(dateValue);
-      } else {
+      const parsedDate = this.parseDateValue(dateValue);
+      if (!parsedDate) {
         return null;
       }
 
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return null;
-      }
-
-      // Calculate days difference from today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to midnight for accurate day calculation
-      const targetDate = new Date(date);
-      targetDate.setHours(0, 0, 0, 0);
-
-      const diffTime = targetDate - today;
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-      // Format badge text
-      let badgeText;
-      let variant;
+      const diffDays = this.calculateDaysDifference(parsedDate);
+      const baseVariant = this.extractVariantFromPicklist(overrideVariant);
       
-      // Extract base variant name from picklist value (e.g., "Warning (Orange)" -> "warning")
-      let baseVariant = null;
-      if (overrideVariant && overrideVariant !== "Auto") {
-        // Handle picklist values like "Warning (Orange)", "Success (Green)", "Error (Red)"
-        const variantMatch = overrideVariant.match(/^(Success|Warning|Error)/i);
-        if (variantMatch) {
-          baseVariant = variantMatch[1].toLowerCase();
-        } else {
-          baseVariant = overrideVariant.toLowerCase();
-        }
-      }
-      
-      let iconName;
-      if (diffDays > 0) {
-        badgeText = `${diffDays}d Left`;
-        // Use override variant if provided, otherwise calculate based on days
-        variant = baseVariant || (diffDays <= 3 ? "warning" : "success");
-        iconName = "utility:clock";
-      } else if (diffDays < 0) {
-        badgeText = `${Math.abs(diffDays)}d Over`;
-        variant = baseVariant || "error";
-        iconName = "utility:warning";
-      } else {
-        badgeText = "Today";
-        variant = baseVariant || "warning";
-        iconName = "utility:clock";
-      }
-
-      return {
-        text: badgeText,
-        variant: variant,
-        icon: iconName,
-        className: `cc-custom-badge cc-badge-${variant}` // Pre-computed class name for template
-      };
+      return this.formatDaysBadge(diffDays, baseVariant);
     } catch {
-      // If calculation fails, return null (no badge)
+      // Graceful degradation: return null if any calculation fails
       return null;
     }
   }
 
   /**
+   * @description Parse date value from various formats (Date object, string, timestamp)
+   * @param {Object|String|Number} dateValue - Date value in any supported format
+   * @return {Date|null} Parsed Date object or null if invalid
+   */
+  parseDateValue(dateValue) {
+    let date;
+    
+    if (dateValue instanceof Date) {
+      date = dateValue;
+    } else if (typeof dateValue === "string") {
+      // Parse date string from Salesforce
+      // Formats: "2025-11-14" or "2025-11-14T00:00:00.000Z"
+      date = new Date(dateValue);
+      
+      // Fallback: try parsing as YYYY-MM-DD format with explicit time
+      if (isNaN(date.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+        const dateOnly = dateValue.substring(0, 10);
+        date = new Date(dateOnly + "T00:00:00");
+      }
+    } else if (typeof dateValue === "number") {
+      // Handle timestamp
+      date = new Date(dateValue);
+    } else {
+      return null;
+    }
+
+    // Guard: invalid date
+    if (isNaN(date.getTime())) {
+      return null;
+    }
+
+    return date;
+  }
+
+  /**
+   * @description Calculate days difference from today, handling timezone edge cases
+   * @param {Date} targetDate - Target date to compare against today
+   * @return {Number} Days difference (positive = future, negative = past, 0 = today)
+   */
+  calculateDaysDifference(targetDate) {
+    const today = new Date();
+    // Reset time to midnight for accurate day calculation (timezone-safe)
+    today.setHours(0, 0, 0, 0);
+    
+    const target = new Date(targetDate);
+    target.setHours(0, 0, 0, 0);
+
+    const diffTime = target - today;
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  }
+
+  /**
+   * @description Extract base variant name from picklist value
+   * @param {String} overrideVariant - Picklist value like "Warning (Orange)"
+   * @return {String|null} Normalized variant name or null if auto/none
+   */
+  extractVariantFromPicklist(overrideVariant) {
+    if (!overrideVariant || overrideVariant === "Auto") {
+      return null;
+    }
+    // Handle picklist values like "Warning (Orange)", "Success (Green)", "Error (Red)"
+    const variantMatch = overrideVariant.match(/^(Success|Warning|Error)/i);
+    if (variantMatch) {
+      return variantMatch[1].toLowerCase();
+    }
+    return overrideVariant.toLowerCase();
+  }
+
+  /**
+   * @description Format badge based on days difference with tiered time units
+   * Converts to weeks/months/years for better readability of large values
+   * @param {Number} diffDays - Days difference (positive = future, negative = past)
+   * @param {String|null} baseVariant - Override variant or null for auto
+   * @return {Object} Badge object with text, variant, icon, and className
+   */
+  formatDaysBadge(diffDays, baseVariant) {
+    const { TODAY_TEXT } = HM_ConfigurableList.BADGE_CONFIG;
+    
+    let badgeText;
+    let variant;
+    let iconName;
+
+    if (diffDays === 0) {
+      // Today
+      badgeText = TODAY_TEXT;
+      variant = baseVariant || "warning";
+      iconName = "utility:clock";
+    } else if (diffDays > 0) {
+      // Future date
+      const timeText = this.formatTimeUnit(diffDays);
+      badgeText = `${timeText} left`;
+      variant = baseVariant || (diffDays <= 3 ? "warning" : "success");
+      iconName = "utility:clock";
+    } else {
+      // Past date (overdue)
+      const absDays = Math.abs(diffDays);
+      const timeText = this.formatTimeUnit(absDays);
+      badgeText = `${timeText} overdue`;
+      variant = baseVariant || "error";
+      iconName = "utility:warning";
+    }
+
+    return {
+      text: badgeText,
+      variant: variant,
+      icon: iconName,
+      className: `cc-custom-badge cc-badge-${variant}`
+    };
+  }
+
+  /**
+   * @description Convert days to appropriate time unit (days/weeks/months/years)
+   * @param {Number} days - Absolute number of days
+   * @return {String} Formatted time string (e.g., "3d", "2w", "1mo", "1yr")
+   */
+  formatTimeUnit(days) {
+    const { DAYS_IN_WEEK, DAYS_IN_MONTH, DAYS_IN_YEAR } = HM_ConfigurableList.BADGE_CONFIG;
+    
+    if (days >= DAYS_IN_YEAR) {
+      const years = Math.floor(days / DAYS_IN_YEAR);
+      return `${years}yr`;
+    }
+    if (days >= DAYS_IN_MONTH) {
+      const months = Math.floor(days / DAYS_IN_MONTH);
+      return `${months}mo`;
+    }
+    if (days >= DAYS_IN_WEEK) {
+      const weeks = Math.floor(days / DAYS_IN_WEEK);
+      return `${weeks}w`;
+    }
+    return `${days}d`;
+  }
+
+  /**
    * @description Get object type from record
-   * Attempts multiple strategies: attributes.type, recordType field, objectType field, or Id prefix
+   * Uses backend-provided typing when available (objectType / attributes.type).
    * @param {Object} record - Record object to extract type from
-   * @return {String} Object type name (Account, Contact, Opportunity, Case, or Unknown)
+   * @return {String} Object API name (e.g., Task, Event, Account, MyObject__c) or Unknown
    */
   getObjectType(record) {
-    // Try attributes.type first (from Apex)
-    if (record.attributes?.type) {
-      return record.attributes.type;
-    }
-    // Try recordType field
-    if (record.recordType) {
-      return record.recordType;
-    }
-    // Try objectType field (set by wrapper conversion)
+    // Prefer explicit object typing provided by the backend (works for all objects)
     if (record.objectType) {
       return record.objectType;
     }
-    // Try to infer from Id prefix
-    if (record.Id) {
-      const prefix = record.Id.substring(0, 3);
-      const prefixMap = {
-        [HM_ConfigurableList.OBJECT_PREFIXES.ACCOUNT]: HM_ConfigurableList.OBJECT_TYPES.ACCOUNT,
-        [HM_ConfigurableList.OBJECT_PREFIXES.CONTACT]: HM_ConfigurableList.OBJECT_TYPES.CONTACT,
-        [HM_ConfigurableList.OBJECT_PREFIXES.OPPORTUNITY]: HM_ConfigurableList.OBJECT_TYPES.OPPORTUNITY,
-        [HM_ConfigurableList.OBJECT_PREFIXES.CASE]: HM_ConfigurableList.OBJECT_TYPES.CASE
-      };
-      if (prefixMap[prefix]) {
-        return prefixMap[prefix];
-      }
+    // Backward compatibility: some responses may include Aura-style attributes
+    if (record.attributes?.type) {
+      return record.attributes.type;
+    }
+    // Legacy fallback (if a wrapper provided a type-like field)
+    if (record.recordType) {
+      return record.recordType;
     }
     return HM_ConfigurableList.OBJECT_TYPES.UNKNOWN;
   }
@@ -736,6 +794,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
         const tempColumn = { ...column };
         if (row.objectType === 'Case') {
           tempColumn.fieldApiName = 'CaseNumber';
+        } else if (row.objectType === 'Task' || row.objectType === 'Event') {
+          tempColumn.fieldApiName = 'Subject';
         } else {
           tempColumn.fieldApiName = 'Name';
         }
@@ -799,24 +859,34 @@ export default class HM_ConfigurableList extends NavigationMixin(
         // Get unique object types in the data
         const objectTypes = this.getUniqueObjectTypes();
         const hasCase = objectTypes.includes('Case');
+        const hasTask = objectTypes.includes('Task');
+        const hasEvent = objectTypes.includes('Event');
         const hasAccount = objectTypes.includes('Account');
         const hasOpportunity = objectTypes.includes('Opportunity');
         const hasAccountOrOpp = hasAccount || hasOpportunity;
+        const hasTaskOrEvent = hasTask || hasEvent;
 
         // Check if these columns already exist in configured columns WITH empty objectType (already visible in "All" tab)
         const hasNameColumnWithNoRestriction = this.columns.some(
           col => col.fieldApiName === 'Name' && (!col.objectType || col.objectType.length === 0)
+        );
+        const hasSubjectColumnWithNoRestriction = this.columns.some(
+          col => col.fieldApiName === 'Subject' && (!col.objectType || col.objectType.length === 0)
         );
         // Note: CaseNumber check not needed since smart Name column handles both Name and CaseNumber display
         const hasCreatedDateColumnWithNoRestriction = this.columns.some(
           col => col.fieldApiName === 'CreatedDate' && (!col.objectType || col.objectType.length === 0)
         );
 
-        // Add Name column if we have Account/Opportunity OR Case records
-        // This single column will display Name for Account/Opportunity and CaseNumber for Case
-        if ((hasAccountOrOpp || hasCase) && !hasNameColumnWithNoRestriction) {
+        // Add primary label column if we have Account/Opportunity OR Case OR Task/Event records.
+        // This single virtual column will display:
+        // - Name for Account/Opportunity (and other Name-bearing objects)
+        // - CaseNumber for Case
+        // - Subject for Task/Event
+        const hasPrimaryColumnWithNoRestriction = hasNameColumnWithNoRestriction || hasSubjectColumnWithNoRestriction;
+        if ((hasAccountOrOpp || hasCase || hasTaskOrEvent) && !hasPrimaryColumnWithNoRestriction) {
           const nameColumn = this.createVirtualColumn('Name', 'Name', HM_ConfigurableList.FORMAT_TYPES.TEXT);
-          // Mark it as a smart column that handles both Name and CaseNumber
+          // Mark it as a smart column that handles Name/CaseNumber/Subject depending on objectType
           nameColumn.isSmartNameColumn = true;
           visibleCols.unshift(nameColumn); // Add at the beginning
         }
