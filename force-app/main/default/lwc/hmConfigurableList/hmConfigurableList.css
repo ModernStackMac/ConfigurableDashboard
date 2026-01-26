@@ -3,10 +3,13 @@
 :host {
   display: block;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .cc-container {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -19,6 +22,7 @@
   /* SLDS2: Using 1px as fallback - border width tokens may not be available in all SLDS2 themes */
   border: var(--slds-g-sizing-border-1, 1px) solid rgba(0, 0, 0, 0.06);
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -269,6 +273,10 @@
   flex: 1;
   min-width: 0;
   color: inherit;
+  /* Truncation for long text with ellipsis */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cc-dark .cc-cell-value {

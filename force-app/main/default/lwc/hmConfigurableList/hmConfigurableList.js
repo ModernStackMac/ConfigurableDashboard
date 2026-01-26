@@ -81,6 +81,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
   // ==================== PUBLIC PROPERTIES ====================
   @api componentId;
   @api isDarkMode = false;
+  @api containerSize = 'lg'; // Default to large for backward compatibility
 
   // Component state
   componentConfig = null;
@@ -490,7 +491,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
         key: column.key, // Detail map ID
         value: null,
         rawValue: null,
-        applicable: false
+        applicable: false,
+        title: ''
       };
     }
 
@@ -537,13 +539,17 @@ export default class HM_ConfigurableList extends NavigationMixin(
     // If badge type is configured, hide the field value and show only badge
     const hasBadgeType = column.badgeType != null && column.badgeType !== HM_ConfigurableList.BADGE_TYPES.NONE;
     
+    // Store full value for hover tooltip (like Aura label)
+    const fullValue = formattedValue || (value != null ? String(value) : '');
+    
     return {
       key: column.key, // Detail map ID - ensures unique key even if same fieldApiName used for different objects
       value: formattedValue,
       rawValue: value,
       applicable: true,
       badge: badge,
-      hasBadgeType: hasBadgeType // Flag to hide value when badge type is configured
+      hasBadgeType: hasBadgeType, // Flag to hide value when badge type is configured
+      title: fullValue // Full value for hover tooltip
     };
   }
 
@@ -717,7 +723,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
         key: column?.key || '',
         value: null,
         rawValue: null,
-        applicable: false
+        applicable: false,
+        title: ''
       };
     }
 
@@ -743,7 +750,8 @@ export default class HM_ConfigurableList extends NavigationMixin(
         key: column.key,
         value: null,
         rawValue: null,
-        applicable: false
+        applicable: false,
+        title: ''
       };
     }
 
@@ -751,11 +759,13 @@ export default class HM_ConfigurableList extends NavigationMixin(
     const cell = row.cells.find((c) => c && c.key === column.key);
     
     // Return the cell if found, otherwise create a placeholder
+    // Ensure placeholder has title property for consistency
     return cell || {
       key: column.key, // Detail map ID
       value: null,
       rawValue: null,
-      applicable: false
+      applicable: false,
+      title: ''
     };
   }
 
@@ -766,10 +776,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
    *   - Automatically includes Name and CreatedDate if they exist in data
    * When a specific object type is selected, shows only columns that apply to that type
    * Results are cached to avoid recalculation on every access
+   * Updates header classes based on containerSize when columns are returned
    */
   get visibleColumns() {
-    // Check cache - invalidate if filter, columns, rows, or config changed
-    const cacheKey = `${this.activeFilter}_${this.columns.length}_${this.rows.length}_${this.componentConfig?.showAllRecordsFilter}`;
+    // Check cache - invalidate if filter, columns, rows, config, or containerSize changed
+    const cacheKey = `${this.activeFilter}_${this.columns.length}_${this.rows.length}_${this.componentConfig?.showAllRecordsFilter}_${this.containerSize}`;
     if (this._cachedVisibleColumns && this._cachedVisibleColumnsFilter === cacheKey) {
       return this._cachedVisibleColumns;
     }
@@ -831,6 +842,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
         this.columnAppliesToObject(column, this.activeFilter)
       );
     }
+
+    // Update header classes for all visible columns based on current containerSize
+    result.forEach((column) => {
+      column.headerClass = this.computeColumnHeaderClass(column);
+    });
 
     // Cache result
     this._cachedVisibleColumns = result;
@@ -1108,14 +1124,16 @@ export default class HM_ConfigurableList extends NavigationMixin(
     if (showAllTab) {
       const totalCount = this.rows.length;
       const isActive = this.activeFilter === null || this.activeFilter === "all";
+      const baseClass = isActive
+        ? HM_ConfigurableList.CSS_CLASSES.FILTER_ACTIVE
+        : HM_ConfigurableList.CSS_CLASSES.FILTER_INACTIVE;
       this.filters.push({
         value: "all",
         label: "All",
         count: totalCount,
         active: isActive,
-        class: isActive
-          ? HM_ConfigurableList.CSS_CLASSES.FILTER_ACTIVE
-          : HM_ConfigurableList.CSS_CLASSES.FILTER_INACTIVE
+        class: baseClass,
+        computedClass: this.getFilterButtonComputedClass(baseClass)
       });
       
       // Set "All" as default if no filter is active
@@ -1135,16 +1153,31 @@ export default class HM_ConfigurableList extends NavigationMixin(
     // Add filters for each object type
     sortedObjectTypes.forEach((objectType) => {
       const isActive = this.activeFilter === objectType;
+      const baseClass = isActive
+        ? HM_ConfigurableList.CSS_CLASSES.FILTER_ACTIVE
+        : HM_ConfigurableList.CSS_CLASSES.FILTER_INACTIVE;
       this.filters.push({
         value: objectType,
         label: objectType,
         count: typeCounts[objectType],
         active: isActive,
-        class: isActive
-          ? HM_ConfigurableList.CSS_CLASSES.FILTER_ACTIVE
-          : HM_ConfigurableList.CSS_CLASSES.FILTER_INACTIVE
+        class: baseClass,
+        computedClass: this.getFilterButtonComputedClass(baseClass)
       });
     });
+  }
+
+  /**
+   * @description Get computed class for filter button including responsive sizing
+   * @param {String} baseClass - Base filter button class (active or inactive)
+   * @return {String} Combined class string with responsive sizing
+   */
+  getFilterButtonComputedClass(baseClass) {
+    const responsiveClass = this.filterButtonClass;
+    if (responsiveClass) {
+      return `${baseClass} ${responsiveClass}`;
+    }
+    return baseClass;
   }
 
   /**
@@ -1196,9 +1229,11 @@ export default class HM_ConfigurableList extends NavigationMixin(
     this.filters.forEach((filter) => {
       const isActive = filter.value === this.activeFilter;
       filter.active = isActive;
-      filter.class = isActive
+      const baseClass = isActive
         ? HM_ConfigurableList.CSS_CLASSES.FILTER_ACTIVE
         : HM_ConfigurableList.CSS_CLASSES.FILTER_INACTIVE;
+      filter.class = baseClass;
+      filter.computedClass = this.getFilterButtonComputedClass(baseClass);
     });
 
     // Reset to first page when filter changes
@@ -1608,7 +1643,7 @@ export default class HM_ConfigurableList extends NavigationMixin(
   }
 
   /**
-   * @description Compute CSS class for column header based on sort state
+   * @description Compute CSS class for column header based on sort state and container size
    * @param {Object} column - Column definition object
    * @return {String} CSS class string for header
    */
@@ -1620,14 +1655,23 @@ export default class HM_ConfigurableList extends NavigationMixin(
     if (column.sortDirection) {
       classes += " " + HM_ConfigurableList.CSS_CLASSES.COL_SORTED;
     }
+    // Add truncation for small containers
+    if (this.containerSize === 'xs' || this.containerSize === 'sm') {
+      classes += " slds-truncate";
+    }
     return classes;
   }
 
   /**
    * @description Update column sort state and classes
    * Updates both configured columns and virtual columns (from visibleColumns)
+   * Recomputes header classes to include responsive truncation based on containerSize
    */
   updateColumnSortState() {
+    // Invalidate cache to force recomputation of visibleColumns with updated classes
+    this._cachedVisibleColumns = null;
+    this._cachedVisibleColumnsFilter = null;
+    
     // Compute visibleColumns once before loops to avoid multiple getter calls
     const visibleCols = this.visibleColumns;
 
@@ -1688,5 +1732,49 @@ export default class HM_ConfigurableList extends NavigationMixin(
     return this.isDarkMode 
       ? HM_ConfigurableList.CSS_CLASSES.CONTAINER_DARK 
       : HM_ConfigurableList.CSS_CLASSES.CONTAINER;
+  }
+
+  /**
+   * @description Get filter group class with SLDS2 responsive wrapping
+   * Applies SLDS2 grid classes to allow filter tabs to wrap on small containers
+   * @return {String} CSS class string for filter group
+   */
+  get filterGroupClass() {
+    const baseClass = 'cc-filter-group';
+    // On small containers, add SLDS2 classes to allow wrapping
+    if (this.containerSize === 'xs' || this.containerSize === 'sm') {
+      return `${baseClass} slds-grid slds-wrap`;
+    }
+    return baseClass;
+  }
+
+  /**
+   * @description Get filter button class with responsive sizing
+   * Applies SLDS2 size classes to filter buttons on small containers
+   * @return {String} CSS class string for filter buttons
+   */
+  get filterButtonClass() {
+    // On small containers, make buttons take appropriate width to allow wrapping
+    if (this.containerSize === 'xs') {
+      return 'slds-size_1-of-1';
+    } else if (this.containerSize === 'sm') {
+      return 'slds-size_1-of-2';
+    }
+    // On medium and large containers, buttons use flex: 1 (handled by CSS)
+    return '';
+  }
+
+
+  /**
+   * @description Get column data class with truncation for small containers
+   * @return {String} CSS class string for column data cells
+   */
+  get columnDataClass() {
+    const baseClass = HM_ConfigurableList.CSS_CLASSES.COL_DATA;
+    // On small containers, add truncation
+    if (this.containerSize === 'xs' || this.containerSize === 'sm') {
+      return `${baseClass} slds-truncate`;
+    }
+    return baseClass;
   }
 }

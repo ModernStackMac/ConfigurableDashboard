@@ -46,7 +46,7 @@
                   <p class="slds-m-top_small slds-text-color_weak">Loading fields...</p>
                 </div>
               </template>
-              <lightning-accordion allow-multiple-sections-open active-section-name={activeSections}>
+              <lightning-accordion allow-multiple-sections-open active-section-name={openSections} onsectiontoggle={handleSectionToggle}>
                 
                 <!-- Basic Info Section -->
                 <lightning-accordion-section name="settings" label="Data Source Settings">

@@ -61,6 +61,8 @@
   align-items: center;
   gap: var(--slds-g-spacing-3, 12px);
   min-width: 0; /* Allow text truncation */
+  flex: 1 1 auto; /* Allow section to shrink and grow */
+  overflow: hidden; /* Ensure truncation works */
 }
 
 /* When label is in header, remove bottom margin */
@@ -256,6 +258,9 @@
   margin: 0 0 var(--slds-g-spacing-2, 8px) 0;
   transition: color 0.3s ease;
   font-weight: var(--slds-g-font-weight-5, 500);
+  /* Ensure truncation works - min-width: 0 allows flex child to shrink */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .cc-dark .cc-kpi-label {

@@ -43,6 +43,7 @@ export default class HM_ConfigurableTile extends LightningElement {
   // ==================== PUBLIC PROPERTIES ====================
   @api componentId;
   @api isDarkMode = false;
+  @api containerSize = 'lg'; // Default to large for backward compatibility
 
   // Component configuration
   componentConfig = null;
@@ -172,7 +173,6 @@ export default class HM_ConfigurableTile extends LightningElement {
   processAggregateData(aggregateValue, aggregateType, subtitleValue, badgeValue) {
     const detailMaps = this.componentConfig.detailMaps || [];
     const mapIndex = this.buildDetailMapIndex(detailMaps);
-    const dataSources = this.componentConfig.dataSources || [];
     
     // Extract tile properties from detail maps
     const valueMap = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_VALUE);
@@ -194,10 +194,10 @@ export default class HM_ConfigurableTile extends LightningElement {
     if (badgeMap) {
       // If badgeValue is provided, badge comes from different data source
       if (badgeValue != null) {
-        badgeData = this.extractTileBadge(mapIndex, null, dataSources, badgeValue);
+        badgeData = this.extractTileBadge(mapIndex, null, badgeValue);
       } else {
         // Badge from same data source - extract from aggregate value
-        badgeData = this.extractTileBadge(mapIndex, { value: aggregateValue }, dataSources, null);
+        badgeData = this.extractTileBadge(mapIndex, { value: aggregateValue }, null);
       }
     }
     
@@ -256,10 +256,9 @@ export default class HM_ConfigurableTile extends LightningElement {
   processTileData(data, subtitleValue, badgeValue) {
     const detailMaps = this.componentConfig.detailMaps || [];
     const mapIndex = this.buildDetailMapIndex(detailMaps);
-    const dataSources = this.componentConfig.dataSources || [];
 
     // Extract values from detail maps using indexed lookup
-    const value = this.extractTileValue(mapIndex, data, dataSources);
+    const value = this.extractTileValue(mapIndex, data);
     
     // Extract badge - use badgeValue if provided (different data source), otherwise extract from data
     const badgeMap = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_BADGE);
@@ -268,10 +267,10 @@ export default class HM_ConfigurableTile extends LightningElement {
     if (badgeMap) {
       // If badgeValue is provided, badge comes from different data source
       if (badgeValue != null) {
-        badgeData = this.extractTileBadge(mapIndex, null, dataSources, badgeValue);
+        badgeData = this.extractTileBadge(mapIndex, null, badgeValue);
       } else {
         // Badge from same data source - extract from data object
-        badgeData = this.extractTileBadge(mapIndex, data, dataSources, null);
+        badgeData = this.extractTileBadge(mapIndex, data, null);
       }
     }
     
@@ -297,10 +296,9 @@ export default class HM_ConfigurableTile extends LightningElement {
    * @description Extract tile value from detail maps using indexed lookup
    * @param {Map} mapIndex - Indexed map of detail maps by map type
    * @param {Object} data - Data object containing field values
-   * @param {Array} dataSources - Array of data sources for validation
    * @return {String} Formatted tile value
    */
-  extractTileValue(mapIndex, data, dataSources) {
+  extractTileValue(mapIndex, data) {
     const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_VALUE);
     if (!map) {
       return "";
@@ -319,11 +317,10 @@ export default class HM_ConfigurableTile extends LightningElement {
    * @description Extract tile badge from detail maps using indexed lookup
    * @param {Map} mapIndex - Indexed map of detail maps by map type
    * @param {Object} data - Data object containing field values
-   * @param {Array} dataSources - Array of data sources for validation
    * @param {String} badgeValue - Optional formatted badge value from backend (when from different data source)
    * @return {Object} Badge object with text, class, and icon, or null
    */
-  extractTileBadge(mapIndex, data, dataSources, badgeValue) {
+  extractTileBadge(mapIndex, data, badgeValue) {
     const map = mapIndex.get(HM_ConfigurableTile.MAP_TYPES.TILE_BADGE);
     if (!map) {
       return { badge: null };
@@ -767,6 +764,15 @@ export default class HM_ConfigurableTile extends LightningElement {
    */
   get tileClass() {
     return "cc-kpi-card";
+  }
+
+  /**
+   * @description Get title class with truncation
+   * Applies truncation on all container sizes to prevent wrapping and maintain consistent card heights
+   * @return {String} CSS class string for title (always slds-truncate)
+   */
+  get titleClass() {
+    return 'slds-truncate';
   }
 
 }

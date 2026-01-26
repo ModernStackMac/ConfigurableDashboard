@@ -37,9 +37,14 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
   isLoading = true;
   error = null;
 
+  // Container size tracking
+  containerSize = 'lg'; // Default to large for backward compatibility
+  resizeObserver = null;
+  resizeDebounceTimeout = null;
+
   /**
    * @description Lifecycle hook called when component is inserted into DOM
-   * Validates componentGroupId is provided
+   * Validates componentGroupId is provided and sets up ResizeObserver
    */
   connectedCallback() {
     if (!this.componentGroupId) {
@@ -48,6 +53,68 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
           "Component Group ID is required. Please provide a componentGroupId attribute."
       };
       this.isLoading = false;
+    }
+    // Set up ResizeObserver after component is rendered
+    // eslint-disable-next-line @lwc/lwc/no-async-operation
+    setTimeout(() => {
+      this.setupResizeObserver();
+    }, 0);
+  }
+
+  /**
+   * @description Set up ResizeObserver to track container width
+   * Measures the container element and updates containerSize based on breakpoints
+   */
+  setupResizeObserver() {
+    const container = this.template.querySelector('.hm-group-container');
+    if (!container) {
+      return;
+    }
+
+    // Initial measurement
+    this.updateContainerSize(container);
+
+    // Set up observer with debouncing
+    this.resizeObserver = new ResizeObserver((entries) => {
+      if (this.resizeDebounceTimeout) {
+        clearTimeout(this.resizeDebounceTimeout);
+      }
+      // eslint-disable-next-line @lwc/lwc/no-async-operation
+      this.resizeDebounceTimeout = setTimeout(() => {
+        if (entries && entries.length > 0) {
+          this.updateContainerSize(entries[0].target);
+        }
+      }, 150);
+    });
+
+    this.resizeObserver.observe(container);
+  }
+
+  /**
+   * @description Update containerSize based on container width
+   * Breakpoints: xs < 480px, sm 480-768px, md 768-1024px, lg >= 1024px
+   * @param {HTMLElement} container - Container element to measure
+   */
+  updateContainerSize(container) {
+    if (!container) {
+      return;
+    }
+
+    const width = container.offsetWidth || container.clientWidth;
+    let newSize = 'lg';
+
+    if (width < 480) {
+      newSize = 'xs';
+    } else if (width < 768) {
+      newSize = 'sm';
+    } else if (width < 1024) {
+      newSize = 'md';
+    } else {
+      newSize = 'lg';
+    }
+
+    if (this.containerSize !== newSize) {
+      this.containerSize = newSize;
     }
   }
 
@@ -88,44 +155,106 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
   }
 
   /**
-   * @description Get layout class based on layout type
+   * @description Get layout class based on layout type and container size
    * Maps layout type (Horizontal, Vertical, Grid) to corresponding CSS class
+   * Adds SLDS2 responsive grid classes based on containerSize
    * @return {String} CSS class string for layout
    */
   get layoutClass() {
     if (!this.groupConfig) {
-      return HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_HORIZONTAL;
+      return this.getResponsiveLayoutClass(HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_HORIZONTAL);
     }
 
     const layoutType = this.groupConfig.layoutType || HM_ConfigurableComponentGroup.DEFAULT_LAYOUT;
     const layoutTypeLower = layoutType.toLowerCase();
     
+    let baseClass;
     // Map layout type to CSS class
     if (layoutTypeLower === HM_ConfigurableComponentGroup.LAYOUT_TYPES.VERTICAL.toLowerCase()) {
-      return HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_VERTICAL;
+      baseClass = HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_VERTICAL;
     } else if (layoutTypeLower === HM_ConfigurableComponentGroup.LAYOUT_TYPES.GRID.toLowerCase()) {
-      return HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_GRID;
+      baseClass = HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_GRID;
+    } else {
+      // Default to horizontal
+      baseClass = HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_HORIZONTAL;
     }
     
-    // Default to horizontal
-    return HM_ConfigurableComponentGroup.CSS_CLASSES.LAYOUT_HORIZONTAL;
+    return this.getResponsiveLayoutClass(baseClass);
   }
 
   /**
-   * @description Get dynamic style string for layout based on components per row
-   * @return {String} CSS style string with --components-per-row custom property
+   * @description Get responsive layout class with SLDS2 utilities
+   * Returns base layout class - CSS Grid is handled by CSS file
+   * @param {String} baseClass - Base layout class (horizontal, vertical, or grid)
+   * @return {String} CSS class string
+   */
+  getResponsiveLayoutClass(baseClass) {
+    // Return base class - CSS Grid is handled by CSS file via display: grid
+    return baseClass;
+  }
+
+  /**
+   * @description Get responsive item class based on containerSize
+   * Returns empty string - sizing is handled by CSS Grid, not SLDS2 size classes
+   * SLDS2 size classes conflict with CSS Grid, so we rely on grid-template-columns
+   * @return {String} Empty string (sizing handled by CSS)
+   */
+  get itemClass() {
+    // Return empty - CSS Grid handles sizing via grid-template-columns
+    return '';
+  }
+
+
+  /**
+   * @description Get number of columns for grid layout based on containerSize
+   * Used to compute grid-template-columns dynamically
+   * @return {Number} Number of columns for the grid
+   */
+  get gridColumns() {
+    const componentsPerRow = this.componentsPerRow || 4; // Default to 4 if not set
+    
+    if (this.containerSize === 'xs' || this.containerSize === 'sm') {
+      // Force single column on extra small and small containers
+      return 1;
+    }
+    if (this.containerSize === 'md') {
+      // Limit to 2 columns max on medium containers
+      return 2;
+    }
+    // Large containers: use configured componentsPerRow
+    if (componentsPerRow === 1) {
+      return 1;
+    }
+    if (componentsPerRow === 2) {
+      return 2;
+    }
+    if (componentsPerRow === 3) {
+      return 3;
+    }
+    if (componentsPerRow === 4) {
+      return 4;
+    }
+    // Default to 4 for 4+ components per row
+    return 4;
+  }
+
+  /**
+   * @description Get dynamic style string for layout based on container size
+   * Uses CSS Grid with responsive column count based on containerSize
+   * @return {String} CSS style string with grid-template-columns
    */
   get layoutStyle() {
-    if (this.componentsPerRow) {
-      return `--components-per-row: ${this.componentsPerRow};`;
-    }
-    return '';
+    const columns = this.gridColumns;
+    // Use CSS Grid with equal-sized columns (1fr each)
+    // This ensures all cards are the same size
+    return `grid-template-columns: repeat(${columns}, minmax(0, 1fr));`;
   }
 
   /**
    * @description Get components from configuration with type flags
    * Filters out components without a valid type and adds isTile/isList flags
-   * @return {Array} Array of component objects with type flags
+   * Also adds itemClass for grid layout (lists span full width)
+   * @return {Array} Array of component objects with type flags and itemClass
    */
   get components() {
     if (!this.groupConfig || !this.groupConfig.components) {
@@ -138,11 +267,18 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
         const hasType = comp.type && comp.type.trim().length > 0;
         return hasType;
       })
-      .map((comp) => ({
-        ...comp,
-        isTile: comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.TILE,
-        isList: comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.LIST
-      }));
+      .map((comp) => {
+        const isTile = comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.TILE;
+        const isList = comp.type === HM_ConfigurableComponentGroup.COMPONENT_TYPES.LIST;
+        // Lists span full width across all grid columns
+        const itemClass = isList ? 'hm-group-item hm-group-item--full-width' : 'hm-group-item';
+        return {
+          ...comp,
+          isTile,
+          isList,
+          itemClass
+        };
+      });
 
     return filtered;
   }
@@ -197,5 +333,20 @@ export default class HM_ConfigurableComponentGroup extends LightningElement {
    */
   get errorMessage() {
     return this.extractErrorMessage(this.error);
+  }
+
+  /**
+   * @description Lifecycle hook called when component is removed from DOM
+   * Cleans up ResizeObserver and debounce timeout
+   */
+  disconnectedCallback() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.resizeDebounceTimeout) {
+      clearTimeout(this.resizeDebounceTimeout);
+      this.resizeDebounceTimeout = null;
+    }
   }
 }

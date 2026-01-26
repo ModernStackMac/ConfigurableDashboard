@@ -7,19 +7,12 @@
 
 /* ==================== LAYOUTS ==================== */
 .hm-group-layout-horizontal {
-  display: flex;
-  flex-direction: row;
+  display: grid;
   gap: var(--slds-g-spacing-4, 16px);
-  flex-wrap: wrap;
   width: 100%;
   box-sizing: border-box;
-}
-
-/* Horizontal layout with components per row specified - use grid for better control */
-.hm-group-layout-horizontal[style*="--components-per-row"] {
-  display: grid;
-  /* Use minmax to allow natural wrapping when screen is too small */
-  grid-template-columns: repeat(var(--components-per-row, auto-fit), minmax(250px, 1fr));
+  /* Default to 4 columns, will be overridden by inline style based on containerSize */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .hm-group-layout-vertical {
@@ -27,47 +20,31 @@
   flex-direction: column;
   gap: var(--slds-g-spacing-4, 16px);
   width: 100%;
+  box-sizing: border-box;
 }
 
 .hm-group-layout-grid {
   display: grid;
-  /* Use minmax to allow natural wrapping - if screen is too small, items wrap to fewer columns */
-  grid-template-columns: repeat(var(--components-per-row, auto-fit), minmax(250px, 1fr));
   gap: var(--slds-g-spacing-4, 16px);
   width: 100%;
-}
-
-/* Responsive: On smaller screens (mobile/tablet), reduce to single column */
-@media (max-width: 768px) {
-  .hm-group-layout-grid[style*="--components-per-row"],
-  .hm-group-layout-horizontal[style*="--components-per-row"] {
-    /* Force single column on mobile/tablet for better readability */
-    grid-template-columns: repeat(1, 1fr);
-  }
-}
-
-/* Responsive: On medium screens, limit to 2 columns max */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .hm-group-layout-grid[style*="--components-per-row"],
-  .hm-group-layout-horizontal[style*="--components-per-row"] {
-    /* Limit to 2 columns max on medium screens */
-    grid-template-columns: repeat(2, minmax(250px, 1fr));
-  }
+  box-sizing: border-box;
+  /* Default to 4 columns, will be overridden by inline style based on containerSize */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .hm-group-item {
-  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: stretch;
   width: 100%;
   box-sizing: border-box;
+  /* Ensure items don't overflow their grid cell */
+  overflow: hidden;
 }
 
-/* When there's only one item in horizontal layout, make it full width */
-.hm-group-layout-horizontal > .hm-group-item:only-child {
-  flex: 1 1 100%;
-  max-width: 100%;
+/* Lists span full width across all grid columns */
+.hm-group-item--full-width {
+  grid-column: 1 / -1;
 }
 
 /* ==================== LOADING & ERROR ==================== */
@@ -82,7 +59,10 @@
 .hm-group-container {
   /* Container wrapper for dark mode support */
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  /* Prevent overflow */
+  overflow: hidden;
 }
 
 /* SLDS2: Error message uses color-mix() for border color with rgba fallback for browser compatibility */
