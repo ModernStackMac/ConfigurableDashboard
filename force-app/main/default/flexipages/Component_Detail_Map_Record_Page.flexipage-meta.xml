@@ -103,7 +103,7 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Data_Source_Name__c</fieldItem>
+                <fieldItem>Record.HM_Data_Source__c</fieldItem>
                 <identifier>RecordHM_Data_Source_Name_cField2</identifier>
             </fieldInstance>
         </itemInstances>
@@ -227,7 +227,7 @@
                     <name>uiBehavior</name>
                     <value>none</value>
                 </fieldInstanceProperties>
-                <fieldItem>Record.HM_Data_Source_Name__c</fieldItem>
+                <fieldItem>Record.HM_Data_Source__c</fieldItem>
                 <identifier>RecordHM_Data_Source_Name_cField</identifier>
             </fieldInstance>
         </itemInstances>

@@ -284,7 +284,7 @@ public with sharing class HM_DashboardConfigService {
           HM_Map_Type__c,
           HM_Display_Order__c,
           HM_Format_Type__c,
-          HM_Data_Source_Name__c,
+          HM_Data_Source__c,
           HM_Column_Badge_Type__c,
           HM_Column_Badge_Variant__c,
           HM_Object_Type__c
@@ -387,7 +387,7 @@ public with sharing class HM_DashboardConfigService {
     if (!componentIds.isEmpty()) {
       List<HM_Component_Detail_Map__c> allDetailMaps = [
         SELECT Id, HM_Field_API_Name__c, HM_Label__c, HM_Map_Type__c, HM_Display_Order__c,
-               HM_Format_Type__c, HM_Data_Source_Name__c, HM_Column_Badge_Type__c,
+               HM_Format_Type__c, HM_Data_Source__c, HM_Column_Badge_Type__c,
                HM_Column_Badge_Variant__c, HM_Object_Type__c, HM_Dashboard_Component__c
         FROM HM_Component_Detail_Map__c
         WHERE HM_Dashboard_Component__c IN :componentIds
@@ -686,7 +686,7 @@ public with sharing class HM_DashboardConfigService {
     mapData.put('mapType', detailMap.HM_Map_Type__c);
     mapData.put('displayOrder', detailMap.HM_Display_Order__c);
     mapData.put('formatType', detailMap.HM_Format_Type__c);
-    mapData.put('dataSourceName', detailMap.HM_Data_Source_Name__c);
+    mapData.put('dataSourceId', detailMap.HM_Data_Source__c);
     mapData.put('columnBadgeType', detailMap.HM_Column_Badge_Type__c);
     mapData.put('columnBadgeVariant', detailMap.HM_Column_Badge_Variant__c);
     

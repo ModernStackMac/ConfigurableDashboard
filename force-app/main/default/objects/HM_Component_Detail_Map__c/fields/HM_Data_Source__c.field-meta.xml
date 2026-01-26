@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HM_Data_Source__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <externalId>false</externalId>
+    <inlineHelpText>Select the data source to use for this mapping. If blank, uses the first data source.</inlineHelpText>
+    <label>Data Source</label>
+    <referenceTo>HM_Dashboard_Data_Source__c</referenceTo>
+    <relationshipLabel>Component Detail Maps</relationshipLabel>
+    <relationshipName>Component_Detail_Maps</relationshipName>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

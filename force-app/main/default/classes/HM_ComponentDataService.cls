@@ -158,7 +158,7 @@ public with sharing class HM_ComponentDataService {
           List<HM_Component_Detail_Map__c> tileDetailMaps = [
             SELECT
               Id,
-              HM_Data_Source_Name__c,
+              HM_Data_Source__c,
               HM_Field_API_Name__c,
               HM_Format_Type__c,
               HM_Map_Type__c
@@ -1013,22 +1013,22 @@ public with sharing class HM_ComponentDataService {
   }
 
   /**
-   * @description Find data source by name or return first available
+   * @description Find data source by Id or return first available
    * @param dataSources List of data sources to search
-   * @param dataSourceName Optional name to search for
+   * @param dataSourceId Optional Id of specific data source to find
    * @return HM_Dashboard_Data_Source__c Found data source or null if list is empty
    */
-  private static HM_Dashboard_Data_Source__c findDataSourceByName(
+  private static HM_Dashboard_Data_Source__c findDataSourceById(
     List<HM_Dashboard_Data_Source__c> dataSources,
-    String dataSourceName
+    Id dataSourceId
   ) {
     if (dataSources == null || dataSources.isEmpty()) {
       return null;
     }
     
-    if (String.isNotBlank(dataSourceName)) {
+    if (dataSourceId != null) {
       for (HM_Dashboard_Data_Source__c ds : dataSources) {
-        if (ds.Name == dataSourceName) {
+        if (ds.Id == dataSourceId) {
           return ds;
         }
       }
@@ -1108,9 +1108,9 @@ public with sharing class HM_ComponentDataService {
     }
     
     try {
-      HM_Dashboard_Data_Source__c subtitleDataSource = findDataSourceByName(
+      HM_Dashboard_Data_Source__c subtitleDataSource = findDataSourceById(
         dataSources,
-        subtitleDetailMap.HM_Data_Source_Name__c
+        subtitleDetailMap.HM_Data_Source__c
       );
       
       if (subtitleDataSource == null) {
@@ -1166,9 +1166,9 @@ public with sharing class HM_ComponentDataService {
     }
     
     try {
-      HM_Dashboard_Data_Source__c badgeDataSource = findDataSourceByName(
+      HM_Dashboard_Data_Source__c badgeDataSource = findDataSourceById(
         dataSources,
-        badgeDetailMap.HM_Data_Source_Name__c
+        badgeDetailMap.HM_Data_Source__c
       );
       
       if (badgeDataSource == null) {
