@@ -30,10 +30,6 @@ public with sharing class HM_ComponentDataService {
   private static final String SOQL_KEYWORD_SELECT = 'SELECT';
   private static final String SOQL_KEYWORD_FROM = 'FROM';
   
-  private static final Set<String> DML_KEYWORDS = new Set<String>{ 
-    'INSERT', 'UPDATE', 'DELETE', 'UPSERT', 'MERGE' 
-  };
-  
   private static final String MERGE_FIELD_USER_ID = '{!UserId}';
   private static final String MERGE_FIELD_TODAY = '{!Today}';
   private static final String MERGE_FIELD_THIS_MONTH = '{!ThisMonth}';
@@ -58,7 +54,6 @@ public with sharing class HM_ComponentDataService {
   private static final String ERROR_INSUFFICIENT_PERMISSIONS_DATA_SOURCE = 'Insufficient permissions to access Dashboard Data Source';
   private static final String ERROR_SOQL_QUERY_REQUIRED = 'Data Source {0}: SOQL Query is required';
   private static final String ERROR_SOQL_MUST_START_WITH_SELECT = 'Data Source {0}: Invalid SOQL query syntax: Query must start with SELECT';
-  private static final String ERROR_SOQL_DML_NOT_ALLOWED = 'Data Source {0}: Invalid SOQL query syntax: DML operations are not allowed';
   private static final String ERROR_SOQL_DUPLICATE_FROM = 'Invalid SOQL query syntax: Query contains {0} FROM clauses. Only one FROM clause is allowed. Example: "SELECT Id FROM Account ORDER BY Name"';
   private static final String ERROR_SOQL_MISSING_FROM = 'Invalid SOQL query syntax: Query must contain a FROM clause';
   private static final String ERROR_EXECUTING_COMPONENT_QUERY = 'Error executing component query: {0}';
@@ -302,15 +297,6 @@ public with sharing class HM_ComponentDataService {
       throw new AuraHandledException(
         String.format(ERROR_SOQL_MUST_START_WITH_SELECT, new List<String>{ String.valueOf(dataSource.Id) })
       );
-    }
-
-    // Check for DML keywords
-    for (String keyword : DML_KEYWORDS) {
-      if (soqlUpper.contains(keyword)) {
-        throw new AuraHandledException(
-          String.format(ERROR_SOQL_DML_NOT_ALLOWED, new List<String>{ String.valueOf(dataSource.Id) })
-        );
-      }
     }
 
     // Validate basic SOQL syntax

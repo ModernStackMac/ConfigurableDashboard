@@ -283,6 +283,91 @@ public with sharing class HM_DataSourceBuilderService {
           }
         }
         
+        // Populate relationship metadata for REFERENCE fields
+        if (fieldType == Schema.DisplayType.REFERENCE) {
+          fi.isReference = true;
+          fi.relationshipName = fieldDesc.getRelationshipName();
+          fi.referenceTo = new List<String>();
+          for (Schema.SObjectType refType : fieldDesc.getReferenceTo()) {
+            fi.referenceTo.add(refType.getDescribe().getName());
+          }
+        } else {
+          fi.isReference = false;
+        }
+        
+        fields.add(fi);
+      }
+    }
+    
+    fields.sort();
+    return fields;
+  }
+  
+  /**
+   * @description Get accessible fields for a related object via a lookup relationship
+   * @param baseObjectApiName API name of the base object (e.g., "PersonLifeEvent")
+   * @param relationshipFieldApiName API name of the lookup field (e.g., "PrimaryPersonId")
+   * @return List<FieldInfo> Fields from the related object with relationship path prefix
+   */
+  @AuraEnabled(cacheable=true)
+  public static List<FieldInfo> getRelatedObjectFields(
+    String baseObjectApiName,
+    String relationshipFieldApiName
+  ) {
+    if (String.isBlank(baseObjectApiName) || String.isBlank(relationshipFieldApiName)) {
+      return new List<FieldInfo>();
+    }
+    
+    // Get the relationship field's describe
+    Schema.SObjectType baseType = Schema.getGlobalDescribe().get(baseObjectApiName);
+    if (baseType == null || !baseType.getDescribe().isAccessible()) {
+      throw new AuraHandledException('Base object not accessible: ' + baseObjectApiName);
+    }
+    
+    Schema.SObjectField relField = baseType.getDescribe().fields.getMap()
+      .get(relationshipFieldApiName.toLowerCase());
+    if (relField == null) {
+      throw new AuraHandledException('Field not found: ' + relationshipFieldApiName);
+    }
+    
+    Schema.DescribeFieldResult relFieldDesc = relField.getDescribe();
+    if (relFieldDesc.getType() != Schema.DisplayType.REFERENCE) {
+      throw new AuraHandledException('Field is not a relationship: ' + relationshipFieldApiName);
+    }
+    
+    // Get the relationship name for SOQL path construction
+    String relationshipName = relFieldDesc.getRelationshipName();
+    if (String.isBlank(relationshipName)) {
+      throw new AuraHandledException('No relationship name for: ' + relationshipFieldApiName);
+    }
+    
+    // Get the first referenced object (handle polymorphic lookups by using first)
+    List<Schema.SObjectType> refTypes = relFieldDesc.getReferenceTo();
+    if (refTypes.isEmpty()) {
+      throw new AuraHandledException('No reference target for: ' + relationshipFieldApiName);
+    }
+    
+    Schema.DescribeSObjectResult targetDescribe = refTypes[0].getDescribe();
+    if (!targetDescribe.isAccessible()) {
+      throw new AuraHandledException('Target object not accessible');
+    }
+    
+    // Get fields from the related object
+    List<FieldInfo> fields = new List<FieldInfo>();
+    Map<String, Schema.SObjectField> targetFieldMap = targetDescribe.fields.getMap();
+    
+    for (String fieldName : targetFieldMap.keySet()) {
+      Schema.DescribeFieldResult fieldDesc = targetFieldMap.get(fieldName).getDescribe();
+      if (fieldDesc.isAccessible()) {
+        FieldInfo fi = new FieldInfo();
+        // Store the full relationship path for SOQL
+        fi.apiName = relationshipName + '.' + fieldDesc.getName();
+        fi.label = fieldDesc.getLabel();
+        fi.type = String.valueOf(fieldDesc.getType());
+        fi.isRequired = false;
+        fi.isFilterable = fieldDesc.isFilterable();
+        fi.isReference = false;
+        
         fields.add(fi);
       }
     }
@@ -337,15 +422,28 @@ public with sharing class HM_DataSourceBuilderService {
         fieldSet.add('Id');
       }
       
-      // Add remaining fields
+      // Add remaining fields - handle both direct and relationship fields
       Map<String, Schema.SObjectField> fieldMap = objType.getDescribe().fields.getMap();
       for (String fieldName : fieldApiNames) {
-        String lowerFieldName = fieldName.toLowerCase();
-        if (fieldMap.containsKey(lowerFieldName) && !fieldSet.contains(fieldName)) {
-          Schema.DescribeFieldResult fieldDesc = fieldMap.get(lowerFieldName).getDescribe();
-          if (fieldDesc.isAccessible()) {
-            orderedFields.add(fieldName);
-            fieldSet.add(fieldName);
+        if (fieldSet.contains(fieldName)) {
+          continue;
+        }
+        
+        // Check if this is a relationship field (contains a dot)
+        if (fieldName.contains('.')) {
+          // Relationship field - add it directly without validation
+          // The query will fail if invalid, which is acceptable for preview
+          orderedFields.add(fieldName);
+          fieldSet.add(fieldName);
+        } else {
+          // Direct field - validate it exists and is accessible
+          String lowerFieldName = fieldName.toLowerCase();
+          if (fieldMap.containsKey(lowerFieldName)) {
+            Schema.DescribeFieldResult fieldDesc = fieldMap.get(lowerFieldName).getDescribe();
+            if (fieldDesc.isAccessible()) {
+              orderedFields.add(fieldName);
+              fieldSet.add(fieldName);
+            }
           }
         }
       }
@@ -356,11 +454,21 @@ public with sharing class HM_DataSourceBuilderService {
       
       // Build column info
       for (String fieldName : orderedFields) {
-        Schema.DescribeFieldResult fieldDesc = fieldMap.get(fieldName.toLowerCase()).getDescribe();
         ColumnInfo col = new ColumnInfo();
-        col.apiName = fieldDesc.getName();
-        col.label = fieldDesc.getLabel();
-        col.type = String.valueOf(fieldDesc.getType());
+        
+        if (fieldName.contains('.')) {
+          // Relationship field - use the field path as both apiName and label
+          col.apiName = fieldName;
+          col.label = fieldName;
+          col.type = 'STRING';
+        } else {
+          // Direct field - get metadata from describe
+          Schema.DescribeFieldResult fieldDesc = fieldMap.get(fieldName.toLowerCase()).getDescribe();
+          col.apiName = fieldDesc.getName();
+          col.label = fieldDesc.getLabel();
+          col.type = String.valueOf(fieldDesc.getType());
+        }
+        
         result.columns.add(col);
       }
       
@@ -404,7 +512,16 @@ public with sharing class HM_DataSourceBuilderService {
         Map<String, Object> recordMap = new Map<String, Object>();
         for (String fieldName : orderedFields) {
           try {
-            Object value = record.get(fieldName);
+            Object value;
+            
+            if (fieldName.contains('.')) {
+              // Relationship field - traverse the path
+              value = getNestedFieldValue(record, fieldName);
+            } else {
+              // Direct field
+              value = record.get(fieldName);
+            }
+            
             // Format the value for display
             if (value instanceof Date) {
               recordMap.put(fieldName, ((Date)value).format());
@@ -436,11 +553,39 @@ public with sharing class HM_DataSourceBuilderService {
   // ==================== PRIVATE HELPER METHODS ====================
 
   /**
-   * @description Replace Apex binding syntax with actual values for preview execution
-   * Handles :UserInfo.getUserId() binding which cannot be used in dynamic SOQL
-   * @param query String containing potential Apex bindings
-   * @return String with bindings replaced by escaped literal values
+   * @description Get value from a nested field path (e.g., "PrimaryPerson.Name")
+   * @param record The SObject record
+   * @param fieldPath Dot-notation field path
+   * @return Object The field value or null if not found
    */
+  private static Object getNestedFieldValue(SObject record, String fieldPath) {
+    if (record == null || String.isBlank(fieldPath)) {
+      return null;
+    }
+    
+    List<String> parts = fieldPath.split('\\.');
+    SObject current = record;
+    
+    // Traverse all parts except the last (which is the actual field)
+    for (Integer i = 0; i < parts.size() - 1; i++) {
+      current = current.getSObject(parts[i]);
+      if (current == null) {
+        return null;
+      }
+    }
+    
+    // Get the final field value
+    return current.get(parts[parts.size() - 1]);
+  }
+  
+  /**
+   * @description Replace Apex binding syntax with actual values for preview execution.
+   * Handles :UserInfo.getUserId() binding which cannot be used in dynamic SOQL.
+   * The binding is replaced with an escaped literal value for safe query execution.
+   * @param query String containing potential Apex bindings (e.g., "OwnerId = :UserInfo.getUserId()")
+   * @return String with bindings replaced by escaped literal values (e.g., "OwnerId = '005xx...'")
+   */
+  @TestVisible
   private static String replaceApexBindings(String query) {
     if (String.isBlank(query)) {
       return query;
@@ -510,6 +655,11 @@ public with sharing class HM_DataSourceBuilderService {
     @AuraEnabled public Boolean isRequired;
     @AuraEnabled public Boolean isFilterable;
     @AuraEnabled public List<PicklistValue> picklistValues;
+    
+    // Relationship metadata for lookup/master-detail fields
+    @AuraEnabled public Boolean isReference;
+    @AuraEnabled public String relationshipName;
+    @AuraEnabled public List<String> referenceTo;
     
     public Integer compareTo(Object other) {
       FieldInfo otherField = (FieldInfo) other;

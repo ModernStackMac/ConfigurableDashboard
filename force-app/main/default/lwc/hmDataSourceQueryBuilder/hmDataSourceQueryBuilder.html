@@ -266,7 +266,28 @@
                       <div class="field-checkbox-container">
                         <template if:true={hasFilteredFields}>
                           <template for:each={filteredFieldOptions} for:item="field">
-                            <div key={field.apiName} class="field-checkbox-item">
+                            <div key={field.apiName} class={field.itemClass}>
+                              <!-- Expand/Collapse Chevron for lookup fields -->
+                              <template if:true={field.isExpandable}>
+                                <button type="button" 
+                                        class="slds-button slds-button_icon expand-chevron"
+                                        data-api-name={field.apiName}
+                                        onclick={handleFieldExpand}
+                                        title="Expand related fields">
+                                  <lightning-icon 
+                                    icon-name={field.chevronIcon}
+                                    size="x-small"
+                                    alternative-text="Expand">
+                                  </lightning-icon>
+                                </button>
+                              </template>
+                              <template if:false={field.isExpandable}>
+                                <template if:false={field.isChild}>
+                                  <div class="expand-chevron-placeholder"></div>
+                                </template>
+                              </template>
+                              
+                              <!-- Checkbox -->
                               <lightning-input
                                 type="checkbox"
                                 label={field.displayLabel}
@@ -274,6 +295,11 @@
                                 checked={field.isSelected}
                                 onchange={handleFieldCheckboxChange}>
                               </lightning-input>
+                              
+                              <!-- Loading spinner for expanding field -->
+                              <template if:true={field.isLoading}>
+                                <lightning-spinner size="x-small" alternative-text="Loading related fields..."></lightning-spinner>
+                              </template>
                             </div>
                           </template>
                         </template>
@@ -602,6 +628,49 @@
                 </div>
                 </lightning-accordion-section>
 
+                <!-- Preview Results Section -->
+                <lightning-accordion-section name="preview" label={previewAccordionLabel}>
+                  <div class="accordion-content">
+                    <template if:true={queryError}>
+                      <div class="slds-box slds-theme_error slds-m-bottom_small">
+                        <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                        <span>{queryError}</span>
+                      </div>
+                    </template>
+                    <template if:false={queryError}>
+                      <template if:true={hasQueryResults}>
+                        <div class="preview-table-wrapper">
+                          <lightning-datatable
+                            key-field="Id"
+                            data={queryResults}
+                            columns={queryColumns}
+                            hide-checkbox-column
+                            show-row-number-column>
+                          </lightning-datatable>
+                        </div>
+                        <div class="slds-text-body_small slds-text-color_weak slds-m-top_small">
+                          Showing {queryResultsCount} of {queryTotalCount} records
+                        </div>
+                      </template>
+                      <template if:false={hasQueryResults}>
+                        <template if:false={isQueryLoading}>
+                          <div class="slds-illustration slds-illustration_small slds-p-vertical_medium">
+                            <div class="slds-text-longform slds-text-align_center">
+                              <lightning-icon icon-name="utility:preview" size="medium" class="slds-m-bottom_small"></lightning-icon>
+                              <p class="slds-text-body_regular slds-text-color_weak">Configure query and click Preview to see results</p>
+                            </div>
+                          </div>
+                        </template>
+                        <template if:true={isQueryLoading}>
+                          <div class="slds-is-relative slds-p-vertical_large">
+                            <lightning-spinner alternative-text="Loading preview..." size="medium"></lightning-spinner>
+                          </div>
+                        </template>
+                      </template>
+                    </template>
+                  </div>
+                </lightning-accordion-section>
+
             </template>
             <!-- End: conditional sections for when object is selected -->
 
@@ -655,56 +724,6 @@
               </div>
             </div>
 
-            <!-- Preview Results Card -->
-            <div class="results-card">
-              <div class="results-card-header">
-                <lightning-icon icon-name="utility:table" size="x-small" class="slds-m-right_x-small"></lightning-icon>
-                <span class="results-card-title">Preview Results</span>
-                <template if:true={hasQueryResults}>
-                  <span class="results-count-badge">{queryTotalCount}</span>
-                </template>
-                <template if:true={isQueryLoading}>
-                  <lightning-spinner alternative-text="Loading..." size="x-small" class="slds-m-left_x-small"></lightning-spinner>
-                </template>
-              </div>
-              <div class="results-card-content">
-                <template if:true={queryError}>
-                  <div class="results-error">
-                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
-                    <span>{queryError}</span>
-                  </div>
-                </template>
-                <template if:false={queryError}>
-                  <template if:true={hasQueryResults}>
-                    <div class="results-table-wrapper">
-                      <lightning-datatable
-                        key-field="Id"
-                        data={queryResults}
-                        columns={queryColumns}
-                        hide-checkbox-column
-                        show-row-number-column>
-                      </lightning-datatable>
-                    </div>
-                    <div class="results-card-footer">
-                      <span>Showing {queryResultsCount} of {queryTotalCount}</span>
-                    </div>
-                  </template>
-                  <template if:false={hasQueryResults}>
-                    <template if:false={isQueryLoading}>
-                      <div class="results-empty-state">
-                        <lightning-icon icon-name="utility:preview" size="small" class="slds-m-bottom_xx-small"></lightning-icon>
-                        <p>Configure query to see results</p>
-                      </div>
-                    </template>
-                    <template if:true={isQueryLoading}>
-                      <div class="results-loading-state">
-                        <p>Loading preview...</p>
-                      </div>
-                    </template>
-                  </template>
-                </template>
-              </div>
-            </div>
           </div>
         </div>
 

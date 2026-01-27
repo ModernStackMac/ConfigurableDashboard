@@ -217,113 +217,17 @@
   --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-50, #6b6b6b);
 }
 
-/* ==================== Results Card (Right Column) ==================== */
-.results-card {
-  background-color: var(--slds-g-color-neutral-base-100, #ffffff);
-  border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
-  border-radius: var(--slds-g-radius-border-1, 0.25rem);
-  overflow: hidden;
-  flex: 1;
-  min-height: 12rem;
-  display: flex;
-  flex-direction: column;
-}
-
-.results-card-header {
-  display: flex;
-  align-items: center;
-  padding: var(--slds-g-spacing-2, 0.5rem) var(--slds-g-spacing-3, 0.75rem);
-  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
-  border-bottom: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
-  flex-shrink: 0;
-}
-
-.results-card-header lightning-icon {
-  --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-50, #706e6b);
-}
-
-.results-card-title {
-  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
-  font-weight: var(--slds-g-font-weight-6, 600);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--slds-g-color-neutral-base-30, #3e3e3c);
-}
-
-.results-count-badge {
-  margin-left: var(--slds-g-spacing-2, 0.5rem);
-  padding: 0 var(--slds-g-spacing-2, 0.5rem);
-  font-size: var(--slds-g-font-scale-neg-2, 0.625rem);
-  font-weight: var(--slds-g-font-weight-6, 600);
-  background-color: var(--slds-g-color-brand-base-50, #0176d3);
-  color: #ffffff;
-  border-radius: var(--slds-g-radius-border-4, 1rem);
-  line-height: 1.4;
-}
-
-.results-card-content {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 8rem;
-}
-
+/* ==================== Preview Table ==================== */
 .results-table-wrapper {
   overflow-x: auto;
 }
 
-.results-card-footer {
-  padding: var(--slds-g-spacing-1, 0.25rem) var(--slds-g-spacing-3, 0.75rem);
-  border-top: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-base-1, #e5e5e5);
-  background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
-  font-size: var(--slds-g-font-scale-neg-2, 0.625rem);
-  color: var(--slds-g-color-neutral-base-50, #706e6b);
-  flex-shrink: 0;
-}
-
-.results-error {
-  display: flex;
-  align-items: flex-start;
-  padding: var(--slds-g-spacing-3, 0.75rem);
-  background-color: rgba(234, 0, 30, 0.08);
-  color: #c23934;
-  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
-}
-
-.results-error lightning-icon {
-  --slds-c-icon-color-foreground: #c23934;
-  flex-shrink: 0;
-}
-
-.results-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--slds-g-spacing-5, 1.5rem);
-  color: var(--slds-g-color-neutral-base-50, #706e6b);
-  text-align: center;
-  height: 100%;
-  min-height: 8rem;
-}
-
-.results-empty-state lightning-icon {
-  --slds-c-icon-color-foreground: var(--slds-g-color-neutral-base-60, #aeaeae);
-}
-
-.results-empty-state p {
-  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
-  margin: 0;
-}
-
-.results-loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--slds-g-spacing-5, 1.5rem);
-  color: var(--slds-g-color-neutral-base-50, #706e6b);
-  font-size: var(--slds-g-font-scale-neg-1, 0.75rem);
-  height: 100%;
-  min-height: 8rem;
+/* Preview table in accordion section */
+.preview-table-wrapper {
+  overflow-x: auto;
+  max-height: 25rem;
+  border: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
 }
 
 /* ==================== Docked Footer ==================== */
@@ -408,7 +312,10 @@
   background-color: var(--slds-g-color-neutral-base-100, #ffffff);
 }
 
+/* Expandable field row layout */
 .field-checkbox-item {
+  display: flex;
+  align-items: center;
   padding: var(--slds-g-spacing-2, 0.5rem) var(--slds-g-spacing-3, 0.75rem);
   border-bottom: 1px solid var(--slds-g-color-border-base-1, #e5e5e5);
 }
@@ -419,6 +326,44 @@
 
 .field-checkbox-item:hover {
   background-color: var(--slds-g-color-neutral-base-95, #f3f3f3);
+}
+
+/* Indented child fields (relationship fields) */
+.field-checkbox-item--child {
+  padding-left: calc(var(--slds-g-spacing-3, 0.75rem) + 1.75rem);
+  background-color: var(--slds-g-color-neutral-base-95, #f9f9f9);
+}
+
+.field-checkbox-item--child:hover {
+  background-color: var(--slds-g-color-neutral-base-90, #f0f0f0);
+}
+
+/* Expand/collapse chevron button */
+.expand-chevron {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: var(--slds-g-spacing-2, 0.5rem);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expand-chevron:hover {
+  background-color: var(--slds-g-color-neutral-base-90, #e5e5e5);
+  border-radius: var(--slds-g-radius-border-1, 0.25rem);
+}
+
+/* Placeholder for non-expandable fields (keeps alignment consistent) */
+.expand-chevron-placeholder {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: var(--slds-g-spacing-2, 0.5rem);
+  flex-shrink: 0;
 }
 
 /* ==================== Aggregate Field Dropdown ==================== */
