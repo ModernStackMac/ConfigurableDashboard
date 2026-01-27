@@ -77,7 +77,24 @@
   color: var(--slds-g-color-neutral-base-40, #a0a0a0);
 }
 
-/* Filter Group */
+/* Filter Menu - Bare icon button with dropdown */
+.cc-filter-menu {
+  --slds-c-button-icon-color-foreground: var(--slds-g-color-neutral-base-50, #747474);
+}
+
+.cc-filter-menu:hover {
+  --slds-c-button-icon-color-foreground: var(--slds-g-color-brand-base-50, #0176d3);
+}
+
+.cc-dark .cc-filter-menu {
+  --slds-c-button-icon-color-foreground: var(--slds-g-color-neutral-base-40, #a0a0a0);
+}
+
+.cc-dark .cc-filter-menu:hover {
+  --slds-c-button-icon-color-foreground: var(--slds-g-color-brand-base-40, #1b96ff);
+}
+
+/* Legacy Filter Group - kept for backward compatibility */
 /* SLDS2: Segmented button group with rounded outer corners, matching SLDS button group pattern */
 .cc-filter-group {
   display: flex;

@@ -1316,10 +1316,22 @@ export default class HM_ConfigurableList extends NavigationMixin(
   }
 
   /**
-   * @description Handle filter button click
+   * @description Handle filter button click (legacy - kept for backward compatibility)
    */
   handleFilterClick(event) {
     const filterValue = event.currentTarget.dataset.filter;
+    if (filterValue) {
+      this.activeFilter = filterValue;
+      this.applyFilter();
+    }
+  }
+
+  /**
+   * @description Handle filter menu item selection
+   * @param {Event} event - Menu select event with detail.value
+   */
+  handleFilterMenuSelect(event) {
+    const filterValue = event.detail.value;
     if (filterValue) {
       this.activeFilter = filterValue;
       this.applyFilter();
@@ -1332,6 +1344,18 @@ export default class HM_ConfigurableList extends NavigationMixin(
    */
   get showFilters() {
     return this.filters && this.filters.length >= 2;
+  }
+
+  /**
+   * @description Get filter items formatted for lightning-button-menu
+   * @returns {Array} Menu items with value, label, and checked state
+   */
+  get filterMenuItems() {
+    return this.filters.map((filter) => ({
+      value: filter.value,
+      label: `${filter.label} (${filter.count})`,
+      checked: filter.active
+    }));
   }
 
   /**
