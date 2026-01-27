@@ -73,9 +73,9 @@
                 <identifier>RecordHM_Label_cField</identifier>
                 <visibilityRule>
                     <criteria>
-                        <leftValue>{!Record.HM_Dashboard_Component__r.RecordType.DeveloperName}</leftValue>
-                        <operator>CONTAINS</operator>
-                        <rightValue>List</rightValue>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>EQUAL</operator>
+                        <rightValue>List Column</rightValue>
                     </criteria>
                 </visibilityRule>
             </fieldInstance>
@@ -84,15 +84,15 @@
             <fieldInstance>
                 <fieldInstanceProperties>
                     <name>uiBehavior</name>
-                    <value>required</value>
+                    <value>none</value>
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Field_API_Name__c</fieldItem>
                 <identifier>RecordHM_Field_API_Name_cField</identifier>
                 <visibilityRule>
                     <criteria>
-                        <leftValue>{!Record.HM_Dashboard_Component__r.RecordType.DeveloperName}</leftValue>
-                        <operator>CONTAINS</operator>
-                        <rightValue>List</rightValue>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>EQUAL</operator>
+                        <rightValue>List Column</rightValue>
                     </criteria>
                 </visibilityRule>
             </fieldInstance>
@@ -105,6 +105,40 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Data_Source__c</fieldItem>
                 <identifier>RecordHM_Data_Source_Name_cField2</identifier>
+            </fieldInstance>
+        </itemInstances>
+        <itemInstances>
+            <fieldInstance>
+                <fieldInstanceProperties>
+                    <name>uiBehavior</name>
+                    <value>none</value>
+                </fieldInstanceProperties>
+                <fieldItem>Record.HM_Comparison_Data_Source__c</fieldItem>
+                <identifier>RecordHM_Comparison_Data_Source_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>EQUAL</operator>
+                        <rightValue>Tile Badge</rightValue>
+                    </criteria>
+                </visibilityRule>
+            </fieldInstance>
+        </itemInstances>
+        <itemInstances>
+            <fieldInstance>
+                <fieldInstanceProperties>
+                    <name>uiBehavior</name>
+                    <value>none</value>
+                </fieldInstanceProperties>
+                <fieldItem>Record.HM_Comparison_Type__c</fieldItem>
+                <identifier>RecordHM_Comparison_Type_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>EQUAL</operator>
+                        <rightValue>Tile Badge</rightValue>
+                    </criteria>
+                </visibilityRule>
             </fieldInstance>
         </itemInstances>
         <name>Facet-ee3e53a0-f8fc-4d05-bd41-341f41f6db54</name>
@@ -129,6 +163,13 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Format_Type__c</fieldItem>
                 <identifier>RecordHM_Format_Type_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>NE</operator>
+                        <rightValue>Tile Badge</rightValue>
+                    </criteria>
+                </visibilityRule>
             </fieldInstance>
         </itemInstances>
         <itemInstances>
@@ -177,6 +218,13 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Column_Badge_Type__c</fieldItem>
                 <identifier>RecordHM_Column_Badge_Type_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>EQUAL</operator>
+                        <rightValue>List Column</rightValue>
+                    </criteria>
+                </visibilityRule>
             </fieldInstance>
         </itemInstances>
         <name>Facet-e4c23a49-ca08-4b10-93e0-7e2bd55c06b4</name>
@@ -191,6 +239,13 @@
                 </fieldInstanceProperties>
                 <fieldItem>Record.HM_Column_Badge_Variant__c</fieldItem>
                 <identifier>RecordHM_Column_Badge_Variant_cField</identifier>
+                <visibilityRule>
+                    <criteria>
+                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
+                        <operator>EQUAL</operator>
+                        <rightValue>List Column</rightValue>
+                    </criteria>
+                </visibilityRule>
             </fieldInstance>
         </itemInstances>
         <name>Facet-a8b5d377-a617-479c-90fb-af02a75effc1</name>
@@ -218,48 +273,6 @@
             </componentInstance>
         </itemInstances>
         <name>Facet-21785d75-3309-4291-8554-fdbcbc36d804</name>
-        <type>Facet</type>
-    </flexiPageRegions>
-    <flexiPageRegions>
-        <itemInstances>
-            <fieldInstance>
-                <fieldInstanceProperties>
-                    <name>uiBehavior</name>
-                    <value>none</value>
-                </fieldInstanceProperties>
-                <fieldItem>Record.HM_Data_Source__c</fieldItem>
-                <identifier>RecordHM_Data_Source_Name_cField</identifier>
-            </fieldInstance>
-        </itemInstances>
-        <name>Facet-60c391ee-d74b-4a7e-ae4e-ba596e74b581</name>
-        <type>Facet</type>
-    </flexiPageRegions>
-    <flexiPageRegions>
-        <name>Facet-46e6f630-2a5e-4332-af7d-118f4ecf8c88</name>
-        <type>Facet</type>
-    </flexiPageRegions>
-    <flexiPageRegions>
-        <itemInstances>
-            <componentInstance>
-                <componentInstanceProperties>
-                    <name>body</name>
-                    <value>Facet-60c391ee-d74b-4a7e-ae4e-ba596e74b581</value>
-                </componentInstanceProperties>
-                <componentName>flexipage:column</componentName>
-                <identifier>flexipage_column7</identifier>
-            </componentInstance>
-        </itemInstances>
-        <itemInstances>
-            <componentInstance>
-                <componentInstanceProperties>
-                    <name>body</name>
-                    <value>Facet-46e6f630-2a5e-4332-af7d-118f4ecf8c88</value>
-                </componentInstanceProperties>
-                <componentName>flexipage:column</componentName>
-                <identifier>flexipage_column8</identifier>
-            </componentInstance>
-        </itemInstances>
-        <name>Facet-81a376dd-12c2-41f0-ad98-e23b595a1072</name>
         <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
@@ -367,31 +380,6 @@
                 </componentInstanceProperties>
                 <componentName>flexipage:fieldSection</componentName>
                 <identifier>flexipage_fieldSection3</identifier>
-                <visibilityRule>
-                    <criteria>
-                        <leftValue>{!Record.HM_Map_Type__c}</leftValue>
-                        <operator>EQUAL</operator>
-                        <rightValue>List Column</rightValue>
-                    </criteria>
-                </visibilityRule>
-            </componentInstance>
-        </itemInstances>
-        <itemInstances>
-            <componentInstance>
-                <componentInstanceProperties>
-                    <name>columns</name>
-                    <value>Facet-81a376dd-12c2-41f0-ad98-e23b595a1072</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>horizontalAlignment</name>
-                    <value>false</value>
-                </componentInstanceProperties>
-                <componentInstanceProperties>
-                    <name>label</name>
-                    <value>Advanced Options</value>
-                </componentInstanceProperties>
-                <componentName>flexipage:fieldSection</componentName>
-                <identifier>flexipage_fieldSection4</identifier>
             </componentInstance>
         </itemInstances>
         <itemInstances>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Comparison_Type_Required</fullName>
+    <active>true</active>
+    <description>Ensures that Comparison Type is specified when a Comparison Data Source is selected. This is required for badge comparison calculations to work correctly.</description>
+    <errorConditionFormula>AND(
+  NOT(ISBLANK(HM_Comparison_Data_Source__c)),
+  ISBLANK(TEXT(HM_Comparison_Type__c))
+)</errorConditionFormula>
+    <errorDisplayField>HM_Comparison_Type__c</errorDisplayField>
+    <errorMessage>Comparison Type is required when Comparison Data Source is specified. Please select &apos;Difference&apos; or &apos;Percentage Change&apos;.</errorMessage>
+</ValidationRule>

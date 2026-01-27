@@ -17,23 +17,59 @@
         <itemInstances>
             <componentInstance>
                 <componentInstanceProperties>
+                    <name>componentGroupId</name>
+                    <value>a0dD700000EgNiBIAV</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>isDarkMode</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentName>hmConfigurableComponentGroup</componentName>
+                <identifier>c_hmConfigurableComponentGroup</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>region1</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
                     <name>componentId</name>
-                    <value>a0eD70000065AVnIAM</value>
+                    <value>a0eD70000065ATkIAM</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>isDarkMode</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentName>hmConfigurableTile</componentName>
+                <identifier>c_hmConfigurableTile</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>region2</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>componentId</name>
+                    <value>a0eD70000065AU0IAM</value>
                 </componentInstanceProperties>
                 <componentInstanceProperties>
                     <name>isDarkMode</name>
                     <value>false</value>
                 </componentInstanceProperties>
                 <componentName>hmConfigurableList</componentName>
-                <identifier>c_hmConfigurableList</identifier>
+                <identifier>c_hmConfigurableList2</identifier>
             </componentInstance>
         </itemInstances>
-        <name>main</name>
+        <name>region3</name>
         <type>Region</type>
     </flexiPageRegions>
     <masterLabel>Configurable Dashboard</masterLabel>
     <template>
-        <name>flexipage:defaultAppHomeTemplate</name>
+        <name>flexipage:appHomeTemplateTwoColumnsStacked</name>
     </template>
     <type>AppPage</type>
 </FlexiPage>

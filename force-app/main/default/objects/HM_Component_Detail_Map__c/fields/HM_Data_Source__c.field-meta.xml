@@ -3,7 +3,7 @@
     <fullName>HM_Data_Source__c</fullName>
     <deleteConstraint>SetNull</deleteConstraint>
     <externalId>false</externalId>
-    <inlineHelpText>Select the data source to use for this mapping. If blank, uses the first data source.</inlineHelpText>
+    <inlineHelpText>Required. Select the data source that provides the value for this mapping. For Tile Value, this is the main displayed number. For Tile Badge, this is the current period value for comparison. For List Column, this links the Field API Name to a specific data source.</inlineHelpText>
     <label>Data Source</label>
     <referenceTo>HM_Dashboard_Data_Source__c</referenceTo>
     <relationshipLabel>Component Detail Maps</relationshipLabel>
