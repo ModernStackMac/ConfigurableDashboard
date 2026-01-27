@@ -58,7 +58,7 @@
           <!-- Table Header -->
           <div class="cc-table-header" role="row">
             <template if:true={hasRowIcons}>
-              <div class="cc-col-icon" role="columnheader"></div>
+              <div class="cc-col-icon" role="columnheader" aria-label="Row icon"></div>
             </template>
             <template for:each={visibleColumns} for:item="column">
               <div

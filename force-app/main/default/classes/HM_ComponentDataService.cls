@@ -142,29 +142,34 @@ public with sharing class HM_ComponentDataService {
         return buildEmptyResponse();
       }
 
-      // Query Component Detail Maps with Map Type "Subtitle" and "Tile Badge" for tile components
+      // Query Component Detail Maps with Map Type "Tile Value", "Subtitle", and "Tile Badge" for tile components
       // Combined into single query for performance optimization
+      HM_Component_Detail_Map__c tileValueDetailMap = null;
       HM_Component_Detail_Map__c subtitleDetailMap = null;
       HM_Component_Detail_Map__c badgeDetailMap = null;
       if (component.HM_Type__c == COMPONENT_TYPE_TILE) {
         // Check object accessibility for Component Detail Maps
         if (Schema.sObjectType.HM_Component_Detail_Map__c.isAccessible()) {
-          // Single query for both subtitle and badge detail maps
+          // Single query for tile value, subtitle, and badge detail maps
           List<HM_Component_Detail_Map__c> tileDetailMaps = [
             SELECT
               Id,
               HM_Data_Source__c,
               HM_Field_API_Name__c,
               HM_Format_Type__c,
-              HM_Map_Type__c
+              HM_Map_Type__c,
+              HM_Comparison_Data_Source__c,
+              HM_Comparison_Type__c
             FROM HM_Component_Detail_Map__c
             WHERE HM_Dashboard_Component__c = :componentId
-              AND HM_Map_Type__c IN ('Subtitle', 'Tile Badge')
+              AND HM_Map_Type__c IN ('Tile Value', 'Subtitle', 'Tile Badge')
           ];
           
           // Process results into separate maps
           for (HM_Component_Detail_Map__c detailMap : tileDetailMaps) {
-            if (detailMap.HM_Map_Type__c == 'Subtitle' && subtitleDetailMap == null) {
+            if (detailMap.HM_Map_Type__c == 'Tile Value' && tileValueDetailMap == null) {
+              tileValueDetailMap = detailMap;
+            } else if (detailMap.HM_Map_Type__c == 'Subtitle' && subtitleDetailMap == null) {
               subtitleDetailMap = detailMap;
             } else if (detailMap.HM_Map_Type__c == 'Tile Badge' && badgeDetailMap == null) {
               badgeDetailMap = detailMap;
@@ -194,16 +199,40 @@ public with sharing class HM_ComponentDataService {
 
       // Process all data sources and combine results
       // For List components: combine all LIST sources
-      // For Tile components: use first AGGREGATE or first LIST source
+      // For Tile components: use data source from Tile Value detail map, or fallback to first
       Map<String, Object> mainResponse;
       if (component.HM_Type__c == COMPONENT_TYPE_LIST) {
         mainResponse = processMultipleDataSourcesForList(dataSources, context, component.HM_Type__c);
       } else {
-        // Tile component - process first data source only
+        // Tile component - process data source from Tile Value detail map, or fallback to first
         if (dataSources.isEmpty()) {
           return buildEmptyResponse();
         }
-        mainResponse = processDataSource(dataSources[0], context, component.HM_Type__c);
+        
+        // Determine which data source to use for main tile value
+        HM_Dashboard_Data_Source__c tileValueDataSource = null;
+        if (tileValueDetailMap != null && tileValueDetailMap.HM_Data_Source__c != null) {
+          tileValueDataSource = findDataSourceById(dataSources, tileValueDetailMap.HM_Data_Source__c);
+          // If not found in component's data sources, query directly
+          if (tileValueDataSource == null) {
+            List<HM_Dashboard_Data_Source__c> tileValueDSList = [
+              SELECT Id, Name, HM_SOQL_Query__c, HM_Return_Type__c, HM_Active__c, HM_Order__c, HM_Row_Icon_Name__c
+              FROM HM_Dashboard_Data_Source__c
+              WHERE Id = :tileValueDetailMap.HM_Data_Source__c AND HM_Active__c = TRUE
+              LIMIT 1
+            ];
+            if (!tileValueDSList.isEmpty()) {
+              tileValueDataSource = tileValueDSList[0];
+            }
+          }
+        }
+        
+        // Fallback to first data source if no Tile Value mapping or data source not found
+        if (tileValueDataSource == null) {
+          tileValueDataSource = dataSources[0];
+        }
+        
+        mainResponse = processDataSource(tileValueDataSource, context, component.HM_Type__c);
         
         // Process subtitle data source if different from main data source
         if (subtitleDetailMap != null) {
@@ -387,10 +416,11 @@ public with sharing class HM_ComponentDataService {
           // Aggregate alias resolution strategy:
           // 1. 'totalWon' - Legacy alias used in some dashboard configurations for SUM(Amount)
           // 2. First available key - Fallback for queries without explicit aliases (expr0, expr1, etc.)
+          // 3. Default to 0 if map is empty (defensive programming)
           // Note: Salesforce generates default aliases like 'expr0' for unnamed aggregate expressions
           Object value = fields.containsKey('totalWon') 
             ? fields.get('totalWon') 
-            : fields.values()[0];
+            : (!fields.isEmpty() ? fields.values()[0] : 0);
           
           // If numeric and null, return 0
           if (value == null) {
@@ -858,9 +888,10 @@ public with sharing class HM_ComponentDataService {
     
     // Aggregate alias resolution (same strategy as executeSOQLQuery):
     // 'totalWon' for legacy compatibility, otherwise first available value
+    // Default to 0 if map is empty (defensive programming)
     Object value = fields.containsKey('totalWon') 
       ? fields.get('totalWon') 
-      : fields.values()[0];
+      : (!fields.isEmpty() ? fields.values()[0] : 0);
     
     // If null, return 0
     if (value == null) {
@@ -1002,7 +1033,7 @@ public with sharing class HM_ComponentDataService {
    * @description Find data source by Id or return first available
    * @param dataSources List of data sources to search
    * @param dataSourceId Optional Id of specific data source to find
-   * @return HM_Dashboard_Data_Source__c Found data source or null if list is empty
+   * @return HM_Dashboard_Data_Source__c Found data source, first available if Id is null, or null if not found
    */
   private static HM_Dashboard_Data_Source__c findDataSourceById(
     List<HM_Dashboard_Data_Source__c> dataSources,
@@ -1012,15 +1043,20 @@ public with sharing class HM_ComponentDataService {
       return null;
     }
     
-    if (dataSourceId != null) {
-      for (HM_Dashboard_Data_Source__c ds : dataSources) {
-        if (ds.Id == dataSourceId) {
-          return ds;
-        }
+    // If no specific ID requested, return null (data source is required)
+    if (dataSourceId == null) {
+      return null;
+    }
+    
+    // Search for specific ID
+    for (HM_Dashboard_Data_Source__c ds : dataSources) {
+      if (ds.Id == dataSourceId) {
+        return ds;
       }
     }
     
-    return dataSources[0];
+    // ID was specified but not found in list
+    return null;
   }
 
   /**
@@ -1135,6 +1171,7 @@ public with sharing class HM_ComponentDataService {
 
   /**
    * @description Process badge data source and extract/formatted value
+   * Supports comparison between two aggregate data sources for calculating difference or percentage change
    * @param badgeDetailMap Component Detail Map with Map Type "Tile Badge"
    * @param dataSources List of all data sources for the component
    * @param context Context parameters for merge fields and Apex methods
@@ -1172,6 +1209,66 @@ public with sharing class HM_ComponentDataService {
         return null;
       }
       
+      // Check if comparison data source is configured
+      if (badgeDetailMap.HM_Comparison_Data_Source__c != null) {
+        // Get comparison data source - first try from existing list, then query directly
+        HM_Dashboard_Data_Source__c comparisonDS = findDataSourceById(
+          dataSources,
+          badgeDetailMap.HM_Comparison_Data_Source__c
+        );
+        
+        // If not found in component's data sources, query it directly
+        // (comparison data source may belong to a different component or be shared)
+        if (comparisonDS == null) {
+          List<HM_Dashboard_Data_Source__c> comparisonDSList = [
+            SELECT
+              Id,
+              Name,
+              HM_SOQL_Query__c,
+              HM_Return_Type__c,
+              HM_Active__c,
+              HM_Order__c,
+              HM_Row_Icon_Name__c
+            FROM HM_Dashboard_Data_Source__c
+            WHERE Id = :badgeDetailMap.HM_Comparison_Data_Source__c
+              AND HM_Active__c = TRUE
+            LIMIT 1
+          ];
+          if (!comparisonDSList.isEmpty()) {
+            comparisonDS = comparisonDSList[0];
+          }
+        }
+        
+        if (comparisonDS != null) {
+          // Process comparison data source (guaranteed to be Aggregate by validation rule)
+          Map<String, Object> comparisonResponse = processDataSource(
+            comparisonDS,
+            context,
+            componentType
+          );
+          
+          if (comparisonResponse != null && comparisonResponse.get('success') == true) {
+            // Extract aggregate values directly (no field API name needed for Aggregate)
+            Decimal currentValue = extractAggregateNumericValue(badgeResponse);
+            Decimal comparisonValue = extractAggregateNumericValue(comparisonResponse);
+            
+            // Calculate based on comparison type
+            String comparisonType = badgeDetailMap.HM_Comparison_Type__c;
+            if (comparisonType == 'Difference') {
+              return String.valueOf(currentValue - comparisonValue);
+            } else if (comparisonType == 'Percentage Change') {
+              if (comparisonValue != 0) {
+                Decimal pctChange = ((currentValue - comparisonValue) / comparisonValue) * 100;
+                return String.valueOf(pctChange.setScale(1, RoundingMode.HALF_UP));
+              }
+              // If comparison is 0: return 100% if current > 0, else 0%
+              return currentValue > 0 ? '100' : '0';
+            }
+          }
+        }
+      }
+      
+      // No comparison configured - use original single-value logic
       // Extract raw value from response
       Object rawValue = extractValueFromResponse(
         badgeResponse,
@@ -1203,6 +1300,33 @@ public with sharing class HM_ComponentDataService {
       throw ex;
     } catch (Exception ex) {
       return null;
+    }
+  }
+
+  /**
+   * @description Extract numeric value from Aggregate response
+   * @param response Response map from processDataSource (must be AGGREGATE shape)
+   * @return Decimal Numeric value, or 0 if null/invalid
+   */
+  private static Decimal extractAggregateNumericValue(Map<String, Object> response) {
+    if (response == null || response.get('shape') != SHAPE_AGGREGATE) {
+      return 0;
+    }
+    
+    Object aggregateValue = response.get('aggregateValue');
+    if (aggregateValue == null) {
+      return 0;
+    }
+    if (aggregateValue instanceof Decimal) {
+      return (Decimal) aggregateValue;
+    }
+    if (aggregateValue instanceof Integer) {
+      return Decimal.valueOf((Integer) aggregateValue);
+    }
+    try {
+      return Decimal.valueOf(String.valueOf(aggregateValue));
+    } catch (Exception e) {
+      return 0;
     }
   }
 

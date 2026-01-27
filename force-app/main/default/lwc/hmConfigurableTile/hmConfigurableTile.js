@@ -449,12 +449,12 @@ export default class HM_ConfigurableTile extends LightningElement {
   /**
    * @description Get icon class based on icon background color configuration
    * Uses component's iconBackgroundColor picklist value to determine styling
-   * @param {String} iconName - Unused parameter retained for API stability. Icon class is
-   *                            determined solely by iconBackgroundColor, not the icon name.
-   *                            Callers pass iconName by convention but it's not processed.
+   * @param {String} _iconName - Unused parameter retained for API stability. Icon class is
+   *                             determined solely by iconBackgroundColor, not the icon name.
+   *                             Callers pass iconName by convention but it's not processed.
    * @return {String} CSS class for icon container styling
    */
-  getIconClass(iconName) {  // eslint-disable-line no-unused-vars
+  getIconClass(_iconName) {  // eslint-disable-line no-unused-vars
     const bgColor = this.componentConfig?.iconBackgroundColor;
     
     // If no background color or "None", return no-background class
@@ -764,6 +764,21 @@ export default class HM_ConfigurableTile extends LightningElement {
    */
   get tileClass() {
     return "cc-kpi-card";
+  }
+
+  /**
+   * @description Handle keyboard interaction for card accessibility
+   * Allows Enter and Space keys to activate the card like a click
+   * @param {KeyboardEvent} event - Keyboard event
+   */
+  handleCardKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      // Dispatch custom event for parent components to handle navigation
+      this.dispatchEvent(new CustomEvent("cardactivate", {
+        detail: { componentId: this.componentId }
+      }));
+    }
   }
 
   /**
