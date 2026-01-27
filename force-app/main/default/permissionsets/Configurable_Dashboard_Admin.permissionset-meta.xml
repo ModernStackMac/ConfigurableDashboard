@@ -28,7 +28,7 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
-        <field>HM_Component_Detail_Map__c.HM_Data_Source_Name__c</field>
+        <field>HM_Component_Detail_Map__c.HM_Data_Source__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

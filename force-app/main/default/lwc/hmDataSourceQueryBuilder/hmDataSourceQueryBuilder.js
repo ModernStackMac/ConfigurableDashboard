@@ -6,6 +6,7 @@ import loadDataSource from "@salesforce/apex/HM_DataSourceBuilderService.loadDat
 import saveDataSourceComplete from "@salesforce/apex/HM_DataSourceBuilderService.saveDataSourceComplete";
 import getAccessibleObjects from "@salesforce/apex/HM_DataSourceBuilderService.getAccessibleObjects";
 import getObjectFields from "@salesforce/apex/HM_DataSourceBuilderService.getObjectFields";
+import getRelatedObjectFields from "@salesforce/apex/HM_DataSourceBuilderService.getRelatedObjectFields";
 import executePreviewQuery from "@salesforce/apex/HM_DataSourceBuilderService.executePreviewQuery";
 
 /**
@@ -78,11 +79,15 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       { label: "is null", value: "is_null" },
       { label: "is not null", value: "is_not_null" },
       { label: "= TODAY", value: "date_today" },
+      { label: "> TODAY", value: "date_gt_today" },
+      { label: "< TODAY", value: "date_lt_today" },
       { label: "= THIS_WEEK", value: "date_this_week" },
       { label: "= THIS_MONTH", value: "date_this_month" },
       { label: "= THIS_YEAR", value: "date_this_year" },
       { label: "= LAST_N_DAYS:n", value: "date_last_n_days" },
-      { label: "= NEXT_N_DAYS:n", value: "date_next_n_days" }
+      { label: "> LAST_N_DAYS:n", value: "date_gt_last_n_days" },
+      { label: "= NEXT_N_DAYS:n", value: "date_next_n_days" },
+      { label: "< NEXT_N_DAYS:n", value: "date_lt_next_n_days" }
     ],
     BOOLEAN: [
       { label: "equals", value: "equals" },
@@ -175,6 +180,10 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   fieldCache = {};
   fieldSearchTerm = "";
 
+  // Relationship field expansion state - tracks which lookup fields are expanded
+  // Structure: { fieldApiName: { expanded: boolean, loading: boolean, children: [] } }
+  @track expandedFields = {};
+
   // ==================== FILTERS STATE ====================
   @track whereConditions = [];
   conditionIdCounter = 0;
@@ -201,11 +210,11 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   
   // Accordion section state - tracked to preserve user's manual open/close actions
   // All sections open by default (sections not yet rendered are ignored by the accordion)
-  @track openSections = ["settings", "query", "fields", "aggregate", "filters"];
+  @track openSections = ["settings", "query", "fields", "aggregate", "filters", "preview"];
   error = null;
 
-  // Timeout IDs for cleanup on disconnect
-  _blurTimeoutIds = [];
+  // Timeout IDs for cleanup on disconnect (Set for O(1) add/delete)
+  _pendingTimeouts = new Set();
   
   // Auto-refresh debounce timer
   _autoRefreshTimeoutId = null;
@@ -241,8 +250,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
 
   disconnectedCallback() {
     // Clear any pending blur timeouts to prevent memory leaks
-    this._blurTimeoutIds.forEach((timeoutId) => clearTimeout(timeoutId));
-    this._blurTimeoutIds = [];
+    this._pendingTimeouts.forEach((id) => clearTimeout(id));
+    this._pendingTimeouts.clear();
     
     // Clear auto-refresh timeout
     if (this._autoRefreshTimeoutId) {
@@ -470,6 +479,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       // Reset all field/aggregate state when object changes
       this.selectedFieldApiNames = [];
       this.fieldSearchTerm = "";
+      this.expandedFields = {};
       this.aggregateFunction = null;
       this.aggregateFieldApiName = null;
       this.aggregateFieldSearchTerm = "";
@@ -508,6 +518,11 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       if (!sectionsToOpen.includes("filters")) {
         sectionsToOpen.push("filters");
       }
+
+      // Always add preview section if not already open
+      if (!sectionsToOpen.includes("preview")) {
+        sectionsToOpen.push("preview");
+      }
       
       // Force accordion to recognize new sections by setting a new array reference
       this.openSections = sectionsToOpen;
@@ -537,6 +552,124 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
 
     this.updateSoqlPreview();
+  }
+
+  /**
+   * @description Toggle expansion of a relationship field and lazy-load children
+   * @param {Event} event - Click event from chevron
+   */
+  async handleFieldExpand(event) {
+    event.stopPropagation();
+    const fieldApiName = event.currentTarget.dataset.apiName;
+    const currentState = this.expandedFields[fieldApiName] || {};
+
+    if (currentState.expanded) {
+      // Collapse
+      this.expandedFields = {
+        ...this.expandedFields,
+        [fieldApiName]: { ...currentState, expanded: false }
+      };
+    } else {
+      // Expand - load children if not already loaded
+      if (!currentState.children) {
+        this.expandedFields = {
+          ...this.expandedFields,
+          [fieldApiName]: { ...currentState, expanded: true, loading: true }
+        };
+
+        try {
+          const children = await getRelatedObjectFields({
+            baseObjectApiName: this.page2Data.selectedObjectApiName,
+            relationshipFieldApiName: fieldApiName
+          });
+          this.expandedFields = {
+            ...this.expandedFields,
+            [fieldApiName]: { expanded: true, loading: false, children }
+          };
+        } catch (error) {
+          this.showError("Error", `Failed to load related fields: ${error.body?.message || error.message}`);
+          this.expandedFields = {
+            ...this.expandedFields,
+            [fieldApiName]: { expanded: false, loading: false, children: [] }
+          };
+        }
+      } else {
+        // Already have children, just expand
+        this.expandedFields = {
+          ...this.expandedFields,
+          [fieldApiName]: { ...currentState, expanded: true }
+        };
+      }
+    }
+  }
+
+  /**
+   * @description Get the parent (lookup) field API name from a relationship field path
+   * @param {string} fieldPath - Relationship field path, e.g., "PrimaryPerson.Name"
+   * @returns {string|null} Parent field API name or null if not found
+   */
+  getParentFieldApiName(fieldPath) {
+    const relationshipName = fieldPath.split(".")[0];
+    const parentField = this.allFields.find((f) => f.relationshipName === relationshipName);
+    return parentField?.apiName || null;
+  }
+
+  /**
+   * @description Auto-expand lookup fields that have selected relationship children
+   * Called during edit mode to restore expanded state for selected relationship fields
+   */
+  async autoExpandFieldsWithSelectedChildren() {
+    const relationshipFields = this.selectedFieldApiNames.filter((f) => f.includes("."));
+    if (relationshipFields.length === 0) {
+      return;
+    }
+
+    // Group relationship fields by their parent lookup field
+    const parentFieldsToExpand = new Set();
+    for (const relField of relationshipFields) {
+      const parentApiName = this.getParentFieldApiName(relField);
+      if (parentApiName) {
+        parentFieldsToExpand.add(parentApiName);
+      }
+    }
+
+    // Mark all parent fields as loading first
+    const fieldsArray = Array.from(parentFieldsToExpand);
+    for (const parentApiName of fieldsArray) {
+      if (!this.expandedFields[parentApiName]?.expanded) {
+        this.expandedFields = {
+          ...this.expandedFields,
+          [parentApiName]: { expanded: true, loading: true, children: null }
+        };
+      }
+    }
+
+    // Load all children in parallel
+    const loadPromises = fieldsArray.map(async (parentApiName) => {
+      try {
+        const children = await getRelatedObjectFields({
+          baseObjectApiName: this.page2Data.selectedObjectApiName,
+          relationshipFieldApiName: parentApiName
+        });
+        return { parentApiName, children, success: true };
+      } catch {
+        return { parentApiName, children: [], success: false };
+      }
+    });
+
+    const results = await Promise.all(loadPromises);
+
+    // Update state with results
+    for (const result of results) {
+      this.expandedFields = {
+        ...this.expandedFields,
+        [result.parentApiName]: {
+          expanded: result.success,
+          loading: false,
+          children: result.children
+        }
+      };
+    }
   }
 
   // ==================== QUERY TYPE HANDLERS ====================
@@ -664,8 +797,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     const timeoutId = setTimeout(() => {
       this.isAggregateFieldListOpen = false;
       this.aggregateFieldHighlightedIndex = -1;
+      this._pendingTimeouts.delete(timeoutId);
     }, 200);
-    this._blurTimeoutIds.push(timeoutId);
+    this._pendingTimeouts.add(timeoutId);
   }
 
   /**
@@ -752,10 +886,11 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     this.isObjectListOpen = false;
     this.highlightedIndex = -1;
     this.filterObjects();
-    // Reset field selection and aggregate state
+    // Reset field selection, expand state, and aggregate state
     this.allFields = [];
     this.selectedFieldApiNames = [];
     this.fieldSearchTerm = "";
+    this.expandedFields = {};
     this.aggregateFunction = null;
     this.aggregateFieldApiName = null;
     this.aggregateFieldSearchTerm = "";
@@ -782,8 +917,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     const timeoutId = setTimeout(() => {
       this.isObjectListOpen = false;
       this.highlightedIndex = -1;
+      this._pendingTimeouts.delete(timeoutId);
     }, 200);
-    this._blurTimeoutIds.push(timeoutId);
+    this._pendingTimeouts.add(timeoutId);
   }
 
   /**
@@ -821,6 +957,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
           // Reset all field/aggregate state when object changes
           this.selectedFieldApiNames = [];
           this.fieldSearchTerm = "";
+          this.expandedFields = {};
           this.aggregateFunction = null;
           this.aggregateFieldApiName = null;
           this.aggregateFieldSearchTerm = "";
@@ -1234,8 +1371,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     // eslint-disable-next-line @lwc/lwc/no-async-operation
     const timeoutId = setTimeout(() => {
       this.openFieldListConditionId = null;
+      this._pendingTimeouts.delete(timeoutId);
     }, 200);
-    this._blurTimeoutIds.push(timeoutId);
+    this._pendingTimeouts.add(timeoutId);
   }
 
   /**
@@ -1309,9 +1447,12 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       
       // Determine value input type and visibility
       const nullOperators = ["is_null", "is_not_null"];
-      const dateLiteralOperators = ["date_today", "date_this_week", "date_this_month", "date_this_year"];
+      const dateLiteralOperators = [
+        "date_today", "date_gt_today", "date_lt_today",
+        "date_this_week", "date_this_month", "date_this_year"
+      ];
       const showValueInput = !nullOperators.includes(condition.operator) && !dateLiteralOperators.includes(condition.operator);
-      const showNDaysInput = condition.operator === "date_last_n_days" || condition.operator === "date_next_n_days";
+      const showNDaysInput = ["date_last_n_days", "date_gt_last_n_days", "date_next_n_days", "date_lt_next_n_days"].includes(condition.operator);
       const isPicklistField = condition.fieldType === "PICKLIST" || condition.fieldType === "MULTIPICKLIST";
       const isBooleanField = condition.fieldType === "BOOLEAN";
       const isNumberField = ["INTEGER", "DOUBLE", "CURRENCY", "PERCENT"].includes(condition.fieldType);
@@ -1487,24 +1628,74 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   }
 
   /**
-   * @description Get filtered field options with selection state for checkbox list
-   * @returns {Array} Field options filtered by search term with selection state
+   * @description Get filtered field options with selection state, including inline expanded children
+   * Search includes both parent fields and their cached children - if a child matches,
+   * the parent is shown (auto-expanded) with matching children
+   * @returns {Array} Field options filtered by search term with selection and expand state
    */
   get filteredFieldOptions() {
     const term = this.fieldSearchTerm.toLowerCase().trim();
-    let fields = this.allFields;
+    const result = [];
 
-    if (term) {
-      fields = fields.filter(
-        (f) => f.label.toLowerCase().includes(term) || f.apiName.toLowerCase().includes(term)
+    for (const field of this.allFields) {
+      const expandState = this.expandedFields[field.apiName] || {};
+      const isExpandable = field.isReference && field.relationshipName;
+      const children = expandState.children || [];
+
+      // Check if parent matches search
+      const parentMatches =
+        !term ||
+        field.label.toLowerCase().includes(term) ||
+        field.apiName.toLowerCase().includes(term);
+
+      // Check if any cached children match search (only if expanded/loaded)
+      const matchingChildren = children.filter(
+        (c) =>
+          !term ||
+          c.label.toLowerCase().includes(term) ||
+          c.apiName.toLowerCase().includes(term)
       );
-    }
+      const hasMatchingChildren = matchingChildren.length > 0;
 
-    return fields.map((f) => ({
-      ...f,
-      displayLabel: `${f.label} (${f.apiName})`,
-      isSelected: this.selectedFieldApiNames.includes(f.apiName)
-    }));
+      // Include parent if it matches OR if any children match
+      if (!parentMatches && !hasMatchingChildren) {
+        continue;
+      }
+
+      // Determine if we should show as expanded (user expanded OR children match search)
+      const shouldShowExpanded = expandState.expanded || (term && hasMatchingChildren);
+
+      result.push({
+        ...field,
+        displayLabel: `${field.label} (${field.apiName})`,
+        isSelected: this.selectedFieldApiNames.includes(field.apiName),
+        isExpandable: isExpandable,
+        isExpanded: shouldShowExpanded,
+        isLoading: expandState.loading || false,
+        isChild: false,
+        itemClass: "field-checkbox-item",
+        chevronIcon: shouldShowExpanded ? "utility:chevrondown" : "utility:chevronright"
+      });
+
+      // Add children if expanded (or auto-expanded due to search match)
+      if (shouldShowExpanded && children.length > 0) {
+        for (const child of matchingChildren) {
+          result.push({
+            ...child,
+            displayLabel: `${child.label} (${child.apiName.split(".").pop()})`,
+            isSelected: this.selectedFieldApiNames.includes(child.apiName),
+            isExpandable: false,
+            isExpanded: false,
+            isLoading: false,
+            isChild: true,
+            itemClass: "field-checkbox-item field-checkbox-item--child",
+            chevronIcon: null,
+            parentApiName: field.apiName
+          });
+        }
+      }
+    }
+    return result;
   }
 
   /**
@@ -1598,6 +1789,20 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
   get filtersAccordionLabel() {
     const count = this.whereConditions.length;
     return count > 0 ? `Filters (${count})` : "Filters";
+  }
+
+  /**
+   * @description Get preview accordion label with record count
+   * @returns {string} Label with result count if available
+   */
+  get previewAccordionLabel() {
+    if (this.isQueryLoading) {
+      return "Preview Results (loading...)";
+    }
+    if (this.hasQueryResults) {
+      return `Preview Results (${this.queryTotalCount} records)`;
+    }
+    return "Preview Results";
   }
 
   /**
@@ -1825,10 +2030,8 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     // If conditions exist, validate each one
     const nullOperators = ["is_null", "is_not_null"];
     const dateLiteralOperators = [
-      "date_today",
-      "date_this_week",
-      "date_this_month",
-      "date_this_year"
+      "date_today", "date_gt_today", "date_lt_today",
+      "date_this_week", "date_this_month", "date_this_year"
     ];
     return this.whereConditions.every((condition) => {
       // Must have field and operator
@@ -2112,7 +2315,7 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `${field} != null`;
     }
 
-    // Handle date literals
+    // Handle date literals with equals operator
     if (condition.operator === "date_today") {
       return `${field} = TODAY`;
     }
@@ -2130,6 +2333,20 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
     if (condition.operator === "date_next_n_days") {
       return `${field} = NEXT_N_DAYS:${condition.value}`;
+    }
+
+    // Handle date literals with comparison operators (>, >=, <, <=)
+    if (condition.operator === "date_gt_today") {
+      return `${field} > TODAY`;
+    }
+    if (condition.operator === "date_lt_today") {
+      return `${field} < TODAY`;
+    }
+    if (condition.operator === "date_gt_last_n_days") {
+      return `${field} > LAST_N_DAYS:${condition.value}`;
+    }
+    if (condition.operator === "date_lt_next_n_days") {
+      return `${field} < NEXT_N_DAYS:${condition.value}`;
     }
 
     // Handle LIKE operators - escape single quotes to prevent SOQL injection
@@ -2162,23 +2379,35 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       return `${field} ${operator} ${condition.value}`;
     }
 
+    // Handle Date and DateTime types (no quotes for date literals)
+    // SOQL requires: ClosedDate = 2025-01-26 (NOT '2025-01-26')
+    const dateTypes = ["DATE", "DATETIME"];
+    if (dateTypes.includes(condition.fieldType)) {
+      const dateValue = condition.value;
+      // Validate date format (YYYY-MM-DD or YYYY-MM-DDThh:mm:ssZ)
+      if (this.isValidDateFormat(dateValue)) {
+        return `${field} ${operator} ${dateValue}`;
+      }
+      // If invalid format, still output without quotes but let SOQL validation catch it
+      return `${field} ${operator} ${dateValue}`;
+    }
+
     // Handle INCLUDES/EXCLUDES for multipicklist - escape value
     if (condition.operator === "includes" || condition.operator === "excludes") {
       const escapedValue = this.escapeSoqlValue(condition.value);
       return `${field} ${operator} ('${escapedValue}')`;
     }
 
+    // Fallback: detect date values by format pattern (safety net for when fieldType is not set correctly)
+    // This prevents quoting date values that should be unquoted in SOQL
+    const dateFormatPattern = /^\d{4}-\d{2}-\d{2}/;
+    if (condition.value && dateFormatPattern.test(condition.value)) {
+      return `${field} ${operator} ${condition.value}`;
+    }
+
     // Default: string value with quotes - escape to prevent SOQL injection
     const escapedValue = this.escapeSoqlValue(condition.value);
     return `${field} ${operator} '${escapedValue}'`;
-  }
-
-  /**
-   * @description Check if SOQL preview should be shown
-   * @returns {boolean} True if object and fields are selected
-   */
-  get showSoqlPreview() {
-    return this.page2Data.selectedObjectApiName && this.selectedFieldApiNames.length > 0;
   }
 
   /**
@@ -2374,6 +2603,9 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
       // Restore selected fields AFTER loadFieldsForObject (which resets them)
       this.selectedFieldApiNames = config.selectedFields || [];
 
+      // Auto-expand lookup fields that have selected relationship children
+      await this.autoExpandFieldsWithSelectedChildren();
+
       // Restore Page 3 state
       this.whereConditions = (config.whereConditions || []).map((c) => ({
         ...c,
@@ -2445,6 +2677,36 @@ export default class HM_DataSourceQueryBuilder extends LightningElement {
     }
     // Escape backslashes first, then single quotes
     return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  }
+
+  /**
+   * @description Validate that a value is a valid SOQL date/datetime format
+   * Supports: YYYY-MM-DD (Date) and YYYY-MM-DDThh:mm:ssZ (DateTime)
+   * Also supports relative date literals like TODAY, YESTERDAY, etc.
+   * @param {string} value - Value to validate
+   * @returns {boolean} True if value is a valid date format for SOQL
+   */
+  isValidDateFormat(value) {
+    if (!value || typeof value !== "string") {
+      return false;
+    }
+    const trimmed = value.trim();
+    // Check for SOQL date literals (TODAY, YESTERDAY, LAST_N_DAYS:n, etc.)
+    const dateLiteralPattern = /^(TODAY|YESTERDAY|TOMORROW|LAST_WEEK|THIS_WEEK|NEXT_WEEK|LAST_MONTH|THIS_MONTH|NEXT_MONTH|LAST_90_DAYS|NEXT_90_DAYS|LAST_N_DAYS:\d+|NEXT_N_DAYS:\d+|THIS_QUARTER|LAST_QUARTER|NEXT_QUARTER|THIS_YEAR|LAST_YEAR|NEXT_YEAR|THIS_FISCAL_QUARTER|LAST_FISCAL_QUARTER|NEXT_FISCAL_QUARTER|THIS_FISCAL_YEAR|LAST_FISCAL_YEAR|NEXT_FISCAL_YEAR)$/i;
+    if (dateLiteralPattern.test(trimmed)) {
+      return true;
+    }
+    // Check for ISO date format: YYYY-MM-DD
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (datePattern.test(trimmed)) {
+      return true;
+    }
+    // Check for ISO datetime format: YYYY-MM-DDThh:mm:ss.sssZ or YYYY-MM-DDThh:mm:ssZ
+    const datetimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+    if (datetimePattern.test(trimmed)) {
+      return true;
+    }
+    return false;
   }
 
   /**

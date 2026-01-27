@@ -20,18 +20,23 @@
             </template>
           </div>
           <template if:true={showFilters}>
-            <div class={filterGroupClass}>
-              <template for:each={filters} for:item="filter">
-                <button
-                  key={filter.value}
-                  class={filter.computedClass}
-                  onclick={handleFilterClick}
-                  data-filter={filter.value}
-                >
-                  {filter.label} ({filter.count})
-                </button>
+            <lightning-button-menu
+              icon-name="utility:filterList"
+              alternative-text="Filter by object type"
+              variant="bare"
+              menu-alignment="right"
+              class="cc-filter-menu"
+              onselect={handleFilterMenuSelect}
+            >
+              <template for:each={filterMenuItems} for:item="item">
+                <lightning-menu-item
+                  key={item.value}
+                  value={item.value}
+                  label={item.label}
+                  checked={item.checked}
+                ></lightning-menu-item>
               </template>
-            </div>
+            </lightning-button-menu>
           </template>
         </div>
       </template>
@@ -53,7 +58,7 @@
           <!-- Table Header -->
           <div class="cc-table-header" role="row">
             <template if:true={hasRowIcons}>
-              <div class="cc-col-icon" role="columnheader"></div>
+              <div class="cc-col-icon" role="columnheader" aria-label="Row icon"></div>
             </template>
             <template for:each={visibleColumns} for:item="column">
               <div

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Data_Source_Required_For_Tiles</fullName>
+    <active>true</active>
+    <description>Requires Data Source to be specified for Tile Value, Tile Badge, Subtitle, and List Column map types. This ensures explicit configuration and prevents reliance on fallback behavior.</description>
+    <errorConditionFormula>AND(
+  OR(
+    ISPICKVAL(HM_Map_Type__c, &apos;Tile Value&apos;),
+    ISPICKVAL(HM_Map_Type__c, &apos;Tile Badge&apos;),
+    ISPICKVAL(HM_Map_Type__c, &apos;Subtitle&apos;),
+    ISPICKVAL(HM_Map_Type__c, &apos;List Column&apos;)
+  ),
+  ISBLANK(HM_Data_Source__c)
+)</errorConditionFormula>
+    <errorDisplayField>HM_Data_Source__c</errorDisplayField>
+    <errorMessage>Data Source is required for Tile Value, Tile Badge, Subtitle, and List Column map types. Please select a data source.</errorMessage>
+</ValidationRule>

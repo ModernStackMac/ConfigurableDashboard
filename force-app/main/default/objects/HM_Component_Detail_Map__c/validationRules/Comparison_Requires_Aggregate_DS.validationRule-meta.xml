@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Comparison_Requires_Aggregate_DS</fullName>
+    <active>true</active>
+    <description>Ensures that when a Comparison Data Source is configured, both the primary Data Source and the Comparison Data Source have a Return Type of Aggregate. This is required for badge comparison calculations.</description>
+    <errorConditionFormula>AND(
+  NOT(ISBLANK(HM_Comparison_Data_Source__c)),
+  OR(
+    TEXT(HM_Data_Source__r.HM_Return_Type__c) != &apos;Aggregate&apos;,
+    TEXT(HM_Comparison_Data_Source__r.HM_Return_Type__c) != &apos;Aggregate&apos;
+  )
+)</errorConditionFormula>
+    <errorDisplayField>HM_Comparison_Data_Source__c</errorDisplayField>
+    <errorMessage>Badge comparison requires both Data Source and Comparison Data Source to have Return Type of &apos;Aggregate&apos;. Only aggregate queries can be used for badge comparisons.</errorMessage>
+</ValidationRule>

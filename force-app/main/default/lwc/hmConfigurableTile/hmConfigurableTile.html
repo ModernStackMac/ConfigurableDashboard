@@ -1,6 +1,6 @@
 <template>
   <div class={containerClass}>
-    <div class={tileClass}>
+    <div class={tileClass} role="button" tabindex="0" onkeydown={handleCardKeydown}>
       <template if:true={isLoading}>
         <lightning-spinner
           alternative-text="Loading"
