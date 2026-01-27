@@ -328,6 +328,10 @@ export default class HM_ConfigurableTile extends LightningElement {
 
     // Data source validation is handled by the backend - we process whatever data was returned
 
+    // Check if backend sent a pre-formatted percentage value (e.g., "15.4%" from Percentage Change comparison)
+    // If so, preserve the backend formatting instead of re-parsing and re-formatting
+    const backendHasPercent = badgeValue != null && String(badgeValue).includes('%');
+
     // Get raw value - prefer badgeValue from backend if provided (different data source), otherwise extract from data
     let rawValue = null;
     if (badgeValue != null) {
@@ -349,12 +353,20 @@ export default class HM_ConfigurableTile extends LightningElement {
     // Determine badge direction and styling
     const direction = this.determineBadgeDirection(rawValue);
     
-    // Format the value using formatType from detail map
-    let formattedText = this.formatValue(rawValue, map.formatType);
+    // Format the value:
+    // - If backend sent a value with % (Percentage Change comparison), preserve the % symbol
+    // - Otherwise, use formatType from detail map
+    let formattedText;
+    if (backendHasPercent) {
+      // Backend already formatted with % - just format the number and add % back
+      formattedText = `${rawValue.toFixed(1)}%`;
+    } else {
+      formattedText = this.formatValue(rawValue, map.formatType);
+    }
     
     // For percentage values, ensure sign is included for positive values
     // Negative values should already have the sign from formatPercent
-    if (map.formatType === 'Percent') {
+    if (backendHasPercent || map.formatType === 'Percent') {
       if (rawValue > 0 && !formattedText.startsWith('+')) {
         formattedText = '+' + formattedText;
       }
@@ -748,8 +760,8 @@ export default class HM_ConfigurableTile extends LightningElement {
       return subtitleTemplate;
     }
     
-    // Replace all occurrences of {value} with the formatted value
-    return subtitleTemplate.replace(/{value}/g, subtitleValue);
+    // Replace all occurrences of {value} with the formatted value (case-insensitive)
+    return subtitleTemplate.replace(/{value}/gi, subtitleValue);
   }
 
   /**

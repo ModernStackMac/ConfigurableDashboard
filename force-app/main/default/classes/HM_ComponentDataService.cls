@@ -1259,10 +1259,10 @@ public with sharing class HM_ComponentDataService {
             } else if (comparisonType == 'Percentage Change') {
               if (comparisonValue != 0) {
                 Decimal pctChange = ((currentValue - comparisonValue) / comparisonValue) * 100;
-                return String.valueOf(pctChange.setScale(1, RoundingMode.HALF_UP));
+                return String.valueOf(pctChange.setScale(1, RoundingMode.HALF_UP)) + '%';
               }
               // If comparison is 0: return 100% if current > 0, else 0%
-              return currentValue > 0 ? '100' : '0';
+              return currentValue > 0 ? '100%' : '0%';
             }
           }
         }

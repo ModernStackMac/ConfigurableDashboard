@@ -30,6 +30,17 @@
         </values>
     </picklistValues>
     <picklistValues>
+        <picklist>HM_Comparison_Type__c</picklist>
+        <values>
+            <fullName>Difference</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Percentage Change</fullName>
+            <default>true</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
         <picklist>HM_Format_Type__c</picklist>
         <values>
             <fullName>Currency</fullName>

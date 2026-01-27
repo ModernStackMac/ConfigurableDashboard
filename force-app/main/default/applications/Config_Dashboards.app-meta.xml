@@ -104,7 +104,6 @@
     <isOmniPinnedViewEnabled>false</isOmniPinnedViewEnabled>
     <label>Config Dashboards</label>
     <navType>Standard</navType>
-    <tabs>Something_Cool</tabs>
     <tabs>Configurable_Dashboard</tabs>
     <tabs>HM_Dashboard__c</tabs>
     <tabs>HM_Dashboard_Component__c</tabs>
